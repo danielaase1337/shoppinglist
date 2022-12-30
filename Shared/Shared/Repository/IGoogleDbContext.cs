@@ -9,5 +9,6 @@ namespace Shared.Repository
         FirestoreDb DB { get; }
         //string GetCollectionKey(object toTypeGet);
         string GetCollectionKey(Type toTypeGet);
+
     }
 }

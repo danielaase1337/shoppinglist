@@ -3,10 +3,12 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
+
 .main {
     background-color: darkslategray;
     /*background-color: lightblue;*/
 }
+
 a, .btn-link {
     color: #0366d6;
 }
@@ -50,13 +52,16 @@ a, .btn-link {
     /* for vertical aligning */
     align-items: center;
 }
+
 .contenAlignCenter {
     align-items: center;
 }
+
 .editButtonStyle {
     margin-left: 2px;
     margin-right: 2px;
 }
+
 child-horizontal-stack {
     width: 100px;
 }
@@ -167,12 +172,12 @@ input[type="checkbox"] {
 
 .card {
     margin-top: 25px;
-    margin-bottom:10px;
+    margin-bottom: 10px;
     box-shadow: 0 4px 8px 0 rgba(0,0,0,0.6);
     transition: 0.3s;
     border-radius: 8px; /* 5px rounded corners */
     background-color: whitesmoke;
-    padding:1.3rem;
+    padding: 1.3rem;
 }
 
     /* On mouse-over, add a deeper shadow */
@@ -183,8 +188,9 @@ input[type="checkbox"] {
 
 /* Add some padding inside the card container */
 .card-maincontainer {
-    padding:1.3rem;
+    padding: 1.3rem;
 }
+
 .card-container {
     padding: 10px 8px;
 }
@@ -210,7 +216,6 @@ input[type="checkbox"] {
 .main {
     position: relative;
     z-index: 2;
-    
 }
 
 label[for='toggle-all'] {
@@ -225,7 +230,7 @@ label[for='toggle-all'] {
     margin: 0;
     padding: 0;
     list-style: none;
-    width:100%
+    width: 100%
 }
 
     .todo-list li {
@@ -291,13 +296,13 @@ label[for='toggle-all'] {
             width: 30px;
         }
 
-.todo-list li .edit {
-    display: none;
-}
+        .todo-list li .edit {
+            display: none;
+        }
 
-.todo-list li.editing:last-child {
-    margin-bottom: -1px;
-}
+        .todo-list li.editing:last-child {
+            margin-bottom: -1px;
+        }
 
 .footer {
     color: white;
@@ -315,7 +320,7 @@ label[for='toggle-all'] {
 .todo-count {
     float: left;
     text-align: left;
-    line-height:20px;
+    line-height: 20px;
 }
 
     .todo-count strong {

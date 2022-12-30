@@ -39,9 +39,9 @@ namespace Api.Controllers
                     }
 
                     var okResult = req.CreateResponse(HttpStatusCode.OK);
-                    if (resultingShops.Any()) await okResult.WriteAsJsonAsync(new List<ShopModel>());
+                    if (!resultingShops.Any()) await okResult.WriteAsJsonAsync(new List<ShopModel>());
                     else
-                        await okResult.WriteAsJsonAsync(mapper.Map<ShopModel>(resultingShops));
+                        await okResult.WriteAsJsonAsync(mapper.Map<ShopModel[]>(resultingShops));
 
                     return okResult;
                 }

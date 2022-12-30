@@ -1,12 +1,21 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+﻿@using BlazorApp.Client.Shared;
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
-        <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Sorry, there's nothing at this address.</p>
-        </LayoutView>
+        <div class="container">
+                <div class="row">
+                    <div class="col">
+                        <img src="/img/homer_404.png" height="300" />
+                    </div>
+                    <div class="col">
+                        <h1>404!</h1>
+                        <p> Doh! her var det ingen ting gitt!</p>
+                        <a href="/">Go home(er)..</a>
+                    </div>
+                </div>
+            </div>
     </NotFound>
 </Router>

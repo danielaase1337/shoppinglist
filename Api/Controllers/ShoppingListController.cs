@@ -1,19 +1,14 @@
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Threading.Tasks;
-using ApiIsolated;
 using AutoMapper;
-using Shared.HandlelisteModels;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Shared.FireStoreDataModels;
+using Shared.HandlelisteModels;
 using Shared.Repository;
-using Grpc.Core;
-using Microsoft.CodeAnalysis.CSharp;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
@@ -55,10 +50,11 @@ namespace Api.Controllers
                     }
                     var shoppingListModel = mapper.Map<ShoppingListModel[]>(result);
                     await response.WriteAsJsonAsync(shoppingListModel);
+                    return response;
                 }
                 else if (req.Method == "POST")
                 {
-                    var requestBody = req.ReadFromJsonAsync<ShoppingListModel>();
+                    var requestBody = await req.ReadFromJsonAsync<ShoppingListModel>();
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
                     var addRes = await repo.Insert(shoppinglist);
                     if (addRes == null)
@@ -71,7 +67,7 @@ namespace Api.Controllers
                 }
                 else if (req.Method == "PUT")
                 {
-                    var requestBody = req.ReadFromJsonAsync<ShoppingListModel>();
+                    var requestBody = await req.ReadFromJsonAsync<ShoppingListModel>();
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
                     var addRes = await repo.Update(shoppinglist);
                     if (addRes == null)
@@ -94,8 +90,8 @@ namespace Api.Controllers
 
         }
 
-        [Function("shoppinlist")]
-        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Function, "get", "delete", Route = "getonelist/{id}")] HttpRequestData req, object id)
+        [Function("shoppinglist")]
+        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Function, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
         {
             if(req.Method== "GET")
             {

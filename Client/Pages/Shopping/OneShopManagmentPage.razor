@@ -1,0 +1,48 @@
+﻿@page "/managemyshops/{Id}"
+@using global::Shared.FireStoreDataModels;
+@using Common;
+@inject HttpClient Http
+
+@*@using Shared.HandlelisteModels*@
+@using Microsoft.Extensions.Configuration
+<h3>OneShopManagmentPage</h3>
+<p>@shopId</p>
+<button onclick="@AddItem">Items</button>
+@code {
+    [Parameter]
+    public string Id { get; set; }
+    string shopId;
+
+    
+
+    [Inject]
+    public ISettings Settings{ get;set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var shop = await Http.GetFromJsonAsync<Shop>(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id));
+    }
+    public async void AddItem()
+    {
+        
+        //var shopItems = await Http.GetAsync("api/shopitems/2");
+        //var item = new ShopItemModel()
+        //    {
+        //        Id = "ask3234",
+        //        ItemCategory = new ItemCategoryModel()
+        //        {
+        //            Id = "DAFSDF",
+        //            Name = "meieri",
+
+        //        },
+        //        Name = "Melk",
+        //        Unit = "stk"
+        //    };
+        //var model = Mapper.Map<ShopItem>(item);
+
+        //var newItem = await Http.PostAsJsonAsync($"api/shopitems/2", model);
+
+        //var updateItem = await Http.PutAsJsonAsync("api/shopitems/2", model);
+        
+    }
+}

@@ -13,6 +13,7 @@ namespace Api
             this.CreateMap<ShopItem, ShopItemModel>().ReverseMap();
             this.CreateMap<ItemCategory, ItemCategoryModel>().ReverseMap();
             this.CreateMap<Shelf, ShelfModel>().ReverseMap();
+            this.CreateMap<Shop, ShopModel>().ReverseMap();
         }
     }
 }

@@ -11,6 +11,7 @@ namespace Shared.Repository
         public GoogleFireBaseGenericRepository(IGoogleDbContext dbContext)
         {
             this.dbContext = dbContext;
+
             if (this.dbContext.Collection == null)
             {
                 dbContext.CollectionKey = dbContext.GetCollectionKey(typeof(TEntity));

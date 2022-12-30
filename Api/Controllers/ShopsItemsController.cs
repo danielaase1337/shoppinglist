@@ -9,6 +9,7 @@ using AutoMapper;
 using Grpc.Core;
 using Microsoft.VisualBasic;
 using System;
+using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
@@ -26,7 +27,7 @@ namespace Api.Controllers
         }
 
         [Function("shopitems")]
-        public HttpResponseData RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put", Route = "shopitems")] HttpRequestData req)
+        public async  Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put")] HttpRequestData req)
         {
 
             try
@@ -34,29 +35,29 @@ namespace Api.Controllers
                 _logger.LogInformation("C# HTTP trigger function processed a request.");
                 if (req.Method == "GET")
                 {
-                    var items = shopItemsRepo.Get();
+                    var items = await shopItemsRepo.Get();
                     if (items == null) return GetErroRespons("Could not get ShopsItems", req);
 
                     var itemsModels = mapper.Map<ShopItemModel[]>(items);
                     var getRespons = req.CreateResponse(HttpStatusCode.OK);
-                    getRespons.WriteAsJsonAsync(itemsModels);
+                    await getRespons.WriteAsJsonAsync(itemsModels);
                     return getRespons;
 
                 }
                 ShopItem dbItem = null;
-                var itemToInsert = req.ReadFromJsonAsync<ShopItemModel>();
-                if (itemToInsert.Result == null) return GetNoContentRespons($"No item to {req.Method}", req);
+                var itemToInsert = await req.ReadFromJsonAsync<ShopItemModel>();
+                if (itemToInsert == null) return GetNoContentRespons($"No item to {req.Method}", req);
                 else
-                    dbItem = mapper.Map<ShopItem>(itemToInsert.Result);
+                    dbItem = mapper.Map<ShopItem>(itemToInsert);
 
                 ShopItem updatedShopItem = null;
                 if (req.Method == "POST")
                 {
-                    updatedShopItem = shopItemsRepo.Insert(dbItem)?.Result;
+                    updatedShopItem = await shopItemsRepo.Insert(dbItem);
                 }
                 if (req.Method == "PUT")
                 {
-                    updatedShopItem = shopItemsRepo.Update(dbItem)?.Result;
+                    updatedShopItem = await shopItemsRepo.Update(dbItem);
                 }
                 if (updatedShopItem == null)
                 {
@@ -64,7 +65,7 @@ namespace Api.Controllers
 
                 }
                 var response = req.CreateResponse(HttpStatusCode.OK);
-                response.WriteAsJsonAsync(mapper.Map<ShopItemModel>(updatedShopItem));
+                await response.WriteAsJsonAsync(mapper.Map<ShopItemModel>(updatedShopItem));
                 return response;
             }
             catch (System.Exception e)
@@ -78,7 +79,7 @@ namespace Api.Controllers
 
 
         [Function("shopitem")]
-        public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shopitem/{id}")] HttpRequestData req, int id)
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shopitem/{id}")] HttpRequestData req, int id)
         {
             try
             {
@@ -87,19 +88,19 @@ namespace Api.Controllers
 
                 if (req.Method == "GET")
                 {
-                    var result = shopItemsRepo.Get(id);
-                    if (result.Result == null)
+                    var result = await shopItemsRepo.Get(id);
+                    if (result == null)
                     {
                         return GetErroRespons($"Fant ikke shop item med id {id}\"", req);
                     }
-                    okRespons.WriteAsJsonAsync(mapper.Map<ShopItemModel>(result.Result));
+                    await okRespons.WriteAsJsonAsync(mapper.Map<ShopItemModel>(result));
                     return okRespons;
 
                 }
                 else //delete
                 {
-                    var deleteResult = shopItemsRepo.Delete(id);
-                    if (deleteResult == null)
+                    var deleteResult = await shopItemsRepo.Delete(id);
+                    if (!deleteResult)
                     {
                         return GetErroRespons($"Could not delete item with id {id}", req);
                     }
@@ -109,9 +110,7 @@ namespace Api.Controllers
             catch (Exception e)
             {
                 _logger.LogInformation(e.Message);
-                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                errorResponse.WriteString(e.Message);
-                return errorResponse;
+                return GetErroRespons(e.Message, req);
             }
 
         }

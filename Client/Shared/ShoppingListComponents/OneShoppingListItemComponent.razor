@@ -1,0 +1,37 @@
+﻿
+<div class="@OneShoppingListItem.CssComleteEditClassName">
+    <input class="toggle" type="checkbox" value="@OneShoppingListItem.IsDone" @onchange="@(f => VareCheckd(OneShoppingListItem, f))" />
+
+    <label>
+        @OneShoppingListItem.Varen.Name
+    </label>
+    <input @bind-value="OneShoppingListItem.Mengde" />
+    <button class="btn btn-sm btn-outline-danger" @onclick="@(e => DeleteVare(OneShoppingListItem))"><i class="fas fa-ban"> </i></button>
+
+</div>
+
+@code
+{
+
+
+    [Parameter]
+    public ShoppingListItemModel OneShoppingListItem { get; set; }
+
+    [Parameter]
+    public EventCallback DeleteVareCallback { get; set; }
+
+    public async Task DeleteVare(ShoppingListItemModel shoppingListItem)
+    {
+        await DeleteVareCallback.InvokeAsync(shoppingListItem);
+    }
+
+
+
+    private void VareCheckd(ShoppingListItemModel l, Microsoft.AspNetCore.Components.ChangeEventArgs value)
+    {
+        if (value?.Value != null && value.Value is bool bValue)
+            l.IsDone = bValue;
+    }
+    
+
+}
