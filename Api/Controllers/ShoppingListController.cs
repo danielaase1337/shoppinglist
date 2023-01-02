@@ -107,7 +107,7 @@ namespace Api.Controllers
                 await response.WriteAsJsonAsync(shoppingListModel);
                 return response;
             }
-            else if (req.Method== "DELTE")
+            else if (req.Method== "DELETE")
             {
                 var deleteRes = await repo.Delete(id);
                 if (deleteRes)
