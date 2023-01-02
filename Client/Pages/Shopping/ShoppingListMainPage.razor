@@ -1,0 +1,165 @@
+﻿@page "/shoppinglist"
+@inject HttpClient Http;
+
+<div class="card-maincontainer container-sm">
+
+    <div class="row card">
+        <h2>Handlelister</h2>
+        <div class="row">
+            <div class="col">
+                <input class="new-todo" placeholder="Navn på listen?" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler">
+            </div>
+            <div class="col-2">
+                <button type="button" class="btn-sm btn-outline-link"><i class="fas fa-check" @onclick="@(f => AddList())"></i></button>
+            </div>
+        </div>
+    </div>
+    @if (ShoppingLists != null)
+    {
+        @if (!ShoppingLists.Any())
+        {
+            <div class="row card">
+                <h6>
+                    Det finnes ingen handlelister!
+                </h6>
+            </div>
+
+        }
+        else
+        {
+            <div class="row card">
+                <ul class="todo-list">
+                    @foreach (var l in ShoppingLists)
+                    {
+                        <li class="@l.CssComleteEditClassName">
+                            <div class="parent-horizontal-stack">
+                                <div class="col-1">
+                                    <input type="checkbox" value="@l.IsDone" @onchange="@(f => ListeChecked(l, f))" />
+                                </div>
+                                <div class="col">
+                                    @if (l.EditClicked)
+                                    {
+                                        <input class="editing" @bind-value="@(l.Name)" />
+                                    }
+                                    else
+                                    {
+                                        <a href="@(GetItemNavLink(l.Id))">@l.Name</a>
+                                    }
+                                </div>
+
+                                @if (l.EditClicked)
+                                {
+                                    <div class="btn-group" role="group" aria-label="Basic example">
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => StoreChange(l))"><i class="fas fa-check"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { l.EditClicked= false;  })"><i class="fas fa-times"> </i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(l))"><i class="fas fa-ban"> </i></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-2">
+                                        <button @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></button>
+                                    </div>
+
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+    else
+    {
+        <LoadingComponent> </LoadingComponent>
+    }
+</div>
+
+
+@code
+{
+    private ICollection<ShoppingListModel> ShoppingLists;
+
+    [Inject]
+    public ISettings Settings { get; set; }
+
+    public string _newListName { get; set; }
+
+    private string GetItemNavLink(string listeId)
+    {
+        return $"shoppinglist/{listeId}";
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+          
+            ShoppingLists = await Http.GetFromJsonAsync<List<ShoppingListModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
+    }
+
+
+
+
+    private async Task StoreChange(ShoppingListModel item)
+    {
+        item.EditClicked = false;
+        await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), item);
+        //await ShoppingListDataManager.Update(item);
+    }
+
+    private async Task DeleteList(ShoppingListModel l)
+    {
+        var res = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.ShoppingList, l.Id));
+        //var res = await ShoppingListDataManager.Delete(l);
+        if (res.IsSuccessStatusCode)
+            ShoppingLists.Remove(l);
+
+    }
+
+    private async Task AddList()
+    {
+        if (string.IsNullOrWhiteSpace(_newListName)) return;
+        var newItem = new ShoppingListModel() { Name = _newListName };
+        var res = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), newItem);
+        //var res = await ShoppingListDataManager.Insert(newItem);
+        if (res != null)
+        {
+            var shoppinglist = await res.Content.ReadFromJsonAsync<ShoppingListModel>();
+            if (shoppinglist != null)
+                ShoppingLists.Add(shoppinglist);
+        }
+        _newListName = string.Empty;
+
+        OrderLists();
+
+    }
+
+
+    private async Task ListeChecked(ShoppingListModel l, Microsoft.AspNetCore.Components.ChangeEventArgs value)
+    {
+        if (value?.Value != null && value.Value is bool bValue)
+        {
+            l.IsDone = bValue;
+            await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), l);
+            //await ShoppingListDataManager.Update(l);
+        }
+    }
+
+    private async Task OnKeyUpNewListItemHandler(KeyboardEventArgs args)
+    {
+        if (args.Code == null && string.IsNullOrEmpty(_newListName)) return;
+        if ((args.Code == null && !string.IsNullOrEmpty(_newListName)) ||
+            (args.Code != null && args.Code.Equals("Enter")))
+            await AddList();
+    }
+    private void OrderLists()
+    {
+        ShoppingLists = ShoppingLists.OrderBy(f => f.Name).ToList();
+    }
+
+}

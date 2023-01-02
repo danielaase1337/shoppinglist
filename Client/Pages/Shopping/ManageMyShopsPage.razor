@@ -1,0 +1,142 @@
+﻿@page "/managemyshops"
+@using BlazorApp.Client.Common;
+@inject HttpClient Http
+
+
+<div class="card-maincontainer container-sm">
+    <div class="card">
+        <div class="row">
+            <div class="col">
+                <h2>Lagrede Butikker</h2>
+                <div class="row">
+                    <div class="col">
+                        <input class="new-todo" placeholder="Navn?" name="newVare" @bind="@_newShopName" @onkeyup="OnKeyUpNewListItemHandler">
+                    </div>
+                    <div class="col-2">
+                        @*<Button Size="Size.Small"><i class="fas fa-check" @onclick="@(f => AddShop())"></i></Button>*@
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @if (MyShops != null)
+    {
+        <div class="card">
+            <div class="row">
+                <ul class="todo-list">
+                    @foreach (var l in MyShops)
+                    {
+                        <li class="@l.CssComleteEditClassName">
+                            <div class="parent-horizontal-stack">
+                                <div class="col">
+                                    @if (l.EditClicked)
+                                    {
+                                        <input class="editing" @bind-value="@(l.Name)" />
+                                    }
+                                    else
+                                    {
+                                        <label>
+                                            <a href="@(GetItemNavLink(l.Id))">@l.Name</a>
+                                        </label>
+                                    }
+                                </div>
+                                @if (l.EditClicked)
+                                {
+                                    <div class="btn-group" role="group" aria-label="Basic example">
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => StoreChange(l))"><i class="fas fa-check"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { l.EditClicked= false;  })"><i class="fas fa-times"> </i></button>
+                                        @*<button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(l))"><i class="fas fa-ban"> </i></button>    *@
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-2">
+                                        <Button @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></Button>
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    }
+
+                </ul>
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent>
+
+        </LoadingComponent>
+    }
+</div>
+
+
+@code {
+
+    [Inject]
+    public ISettings Settings { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+
+        MyShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
+        if (MyShops == null)
+            MyShops = new List<ShopModel>();
+
+    }
+
+    private ShopModel newShop = new ShopModel();
+    private string _newShopName;
+
+
+
+    private ICollection<ShopModel> MyShops { get; set; }
+
+    private async Task StoreChange(ShopModel item)
+    {
+        item.EditClicked = false;
+        await Http.PutAsJsonAsync<ShopModel>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), item);
+    }
+    private async Task DeleteList(ShopModel l)
+    {
+        var deleRes = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, l.Id));
+        if (deleRes != null && deleRes.IsSuccessStatusCode)
+            MyShops.Remove(l);
+    }
+
+    private string GetItemNavLink(string shopId)
+    {
+        return $"oneShop/{shopId}";
+    }
+
+    private async Task OnKeyUpNewListItemHandler(KeyboardEventArgs args)
+    {
+        if (args.Code.Equals("Enter"))
+        {
+            await AddShop();
+        }
+    }
+
+    private async Task AddShop()
+    {
+        if (string.IsNullOrEmpty(_newShopName)) return;
+        var newShop = new ShopModel() { Name = _newShopName };
+        var insertres = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), newShop);
+        if (insertres != null)
+        {
+            var parsedShop = await insertres.Content.ReadFromJsonAsync<ShopModel>();
+            if(parsedShop != null)
+                MyShops.Add(parsedShop);
+            _newShopName = string.Empty;
+        }
+    }
+
+
+
+
+    //protected override async Task OnParametersSetAsync()
+    //{
+    //    MyShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
+    //    if (MyShops == null)
+    //        MyShops = new List<ShopModel>();
+    //}
+}

@@ -1,0 +1,76 @@
+﻿
+<div class="container">
+    <footer class="footer">
+        <div class="row">
+            <div class="col">
+                <span class="todo-count">
+                    Gjennstående: <strong>@NItems</strong>
+                </span>
+                <button class="@ClearCompleteClass" @onclick="@(f => DeleteAllComplete())">Slett alle ferdige</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <ul class="filters">
+                    <li><a class="@allSelected" @onclick="@(f=> FilterClikced("all"))">Alle</a></li>
+                    <li><a class="@activeSelected" @onclick="@(f => FilterClikced("active"))">Aktive</a></li>
+                    <li><a class="@doneSelected" @onclick="@(f => FilterClikced("done"))">Ferdige</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+</div>
+
+
+@code
+{
+    private string allSelected = "";
+    private string activeSelected = "";
+    private string doneSelected = "";
+    [Parameter]
+    public bool ShowDeleteAll { get; set; } = false;
+
+    [Parameter]
+    public EventCallback FilterList { get; set; }
+    public async Task FilterClikced(string typeName)
+    {
+        allSelected = "";
+        doneSelected = "";
+        activeSelected = "";
+        switch (typeName)
+        {
+            case "all":
+                allSelected = "selected";
+                break;
+            case "done":
+                doneSelected = "selected";
+                break;
+            case "active":
+                activeSelected = "selected"; 
+                break; 
+        }
+        await FilterList.InvokeAsync(typeName);
+    }
+
+    [Parameter]
+    public EventCallback DeleteAllCompletedClikced { get; set; }
+    public async Task DeleteAllComplete()
+    {
+        await DeleteAllCompletedClikced.InvokeAsync();
+    }
+
+    [Parameter]
+    public int NItems { get; set; }
+
+    private string ClearCompleteClass
+    {
+        get
+        {
+            if (ShowDeleteAll)
+                return "clear-completed";
+            else
+                return "clear-completed hidden";
+        }
+    }
+
+}

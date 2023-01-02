@@ -1,0 +1,33 @@
+﻿
+<div class="modal" tabindex="-1" role="dialog" style="display: @(ShowConfirm ? "block" : "none")">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@ModalHeader</h5>
+                </div>
+                <div class="modal-body">
+                    <p>@ModelContent</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="@(() => { ButtonClicked(true);})">Ok</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" @onclick="@(()=> {ButtonClicked(false);})">Avbryt</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@code {
+    [Parameter]
+    public string ModelContent { get; set; } = "Er du sikker på at du vil fortsette med sletting?";
+    [Parameter]
+    public string ModalHeader { get; set; } = "Bekreft sletting";
+    [Parameter]
+    public bool ShowConfirm { get; set; } = false; 
+
+    [Parameter]
+    public EventCallback<bool> ConfirmedDeleteChanged { get; set; }
+    
+    private async Task ButtonClicked(bool result)
+    {
+        await ConfirmedDeleteChanged.InvokeAsync(result);
+    }
+}

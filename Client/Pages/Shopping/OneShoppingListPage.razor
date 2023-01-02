@@ -1,0 +1,439 @@
+﻿    @page "/shoppinglist/{id}"
+
+@inject HttpClient Http
+@inject ISettings Settings; 
+
+@if (newVareModel != null)
+{
+    <SfDialog Width="250px" ShowCloseIcon="true" IsModal="true" @bind-Visible="@IsVisible">
+        <DialogTemplates>
+            <Header> Legg til vare</Header>
+            <Content>
+                <div class="container">
+
+                    <div class="row" style="padding-top:6px">
+                        <SfTextBox Placeholder='Vare navn' FloatLabelType='@FloatLabelType.Auto'
+                               @bind-Value=@newVareModel.Name></SfTextBox>
+                    </div>
+                    <div class="row" style="padding-top:4px">
+                        <SfAutoComplete TValue="string"
+                                    TItem="ItemCategoryModel"
+                                    DataSource="@AvailableCategories"
+                                    Placeholder="Velg kategori?"
+                                    AllowFiltering="true"
+                                    FilterType="FilterType.Contains"
+                                    Highlight>
+                            <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                            <AutoCompleteEvents TItem="ItemCategoryModel" TValue="string"
+                                            ValueChange="@SelectedItemCategoryChanged">
+
+                            </AutoCompleteEvents>
+                        </SfAutoComplete>
+                    </div>
+                    <div class="row" style="padding-top:4px">
+                        <p>Valgt kategori: </p>
+                        @if (newVareModel.ItemCategory != null)
+                        {
+                            <p style="padding-top:4px">@newVareModel.ItemCategory.Name</p>
+                        }
+                    </div>
+
+                </div>
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Lager" IsPrimary="true" OnClick="@HideModalAndSave" />
+            <DialogButton Content="Avbry" OnClick="@HideModal" />
+        </DialogButtons>
+    </SfDialog>
+
+}
+
+
+@if (ThisShoppingList != null)
+{
+    
+    <div class="card-maincontainer container-sm">
+        <div class="card">
+            <div class="row align-items-start">
+
+                <div class="col">
+                    <h5 class="@showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
+                    <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
+                </div>
+
+                <div class="col-5">
+                    <SfDropDownList TValue="string" TItem="ShopModel" Placeholder="Velg butikk" DataSource="@AvailableShops" @bind-Index="@shopIndex" Width="100">
+                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
+                    </SfDropDownList>
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-sm btn-outline-info" @onclick="SortShoppingList"><i class="fas fa-sort-amount-down-alt"></i></button>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <SfAutoComplete TValue="string"
+                                TItem="ShopItemModel"
+                                DataSource="@Varer"
+                                Placeholder="Hva skal handles?"
+                                @bind-Value="@autoValue"
+                                FilterType="FilterType.Contains"
+                                Highlight>
+                        <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                        <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                        ValueChange="@SelectedShopItemChanged"></AutoCompleteEvents>
+                       
+                    </SfAutoComplete>
+                </div>
+                <div class="col-2 contenAlignCenter">
+                    <button class="btn btn-sm"><i class="fas fa-plus"></i></button>
+                  
+                </div>
+            </div>
+        </div>
+
+        @if (!ThisShoppingListItems.Any())
+        {
+            <div class="card">
+                <div class="row">
+                    <h6>Handelisten er tom, legg til varer for å komme igang.</h6>
+                </div>
+            </div>
+
+        }
+        else
+        {
+            <div class="card">
+                <div class="row">
+                    <ul class="todo-list">
+                        @foreach (var vare in ThisShoppingListItems)
+                        {
+                            <li class="@vare.CssComleteEditClassName">
+                                <div class="parent-horizontal-stack">
+                                    <div class="col-1">
+                                        <input type="checkbox" checked="@vare.IsDone" @onchange="@(f=> VareCheckChanged(f, vare))" />
+                                    </div>
+                                    <div class="col">
+                                        <a @onclick="@(f => VareClicked(vare.Varen))">
+                                            @vare.Varen.Name
+                                        </a>
+                                    </div>
+                                    <div class="col-3">
+                                        <input class="vareInputEdit" @bind-value="vare.Mengde" @onfocusout="(f=> VareMengdeFocusLost())" />
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="commandBtns"
+                                    @onclick="@(e => DeleteVare(vare))">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+        <div class="row">
+            <ListSummaryFooter NItems="@ThisShoppingList.ShoppingItems.Where(f => !f.IsDone).Count()"
+                           DeleteAllCompletedClikced="@(f => DeleteAllClicked())"
+                           FilterList="@(f=> FilterList(f))"
+                           ShowDeleteAll="@(ThisShoppingList.ShoppingItems.Where(f=>f.IsDone).Any())">
+            </ListSummaryFooter>
+        </div>
+    </div>
+
+
+}
+else
+{
+    <LoadingComponent></LoadingComponent>
+}
+
+@code {
+   
+
+    string autoValue;
+
+    string activeListFiler = "all";
+    string showEditHeader = "hidden";
+    string showH2LabelStyle = "";
+    string dropdownText = "Velg buikk";
+
+    [Parameter]
+    public string Id { get; set; }
+
+
+    ShopItemModel? newVareModel = new ShopItemModel();
+
+    public ShoppingListModel ThisShoppingList { get; set; }
+    public ICollection<ShoppingListItemModel> ThisShoppingListItems { get; set; }
+    public ICollection<ShopItemModel> Varer { get; set; }
+    public ICollection<ItemCategoryModel> AvailableCategories { get; set; }
+    ICollection<ShopModel> AvailableShops { get; set; }
+
+
+
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var ok = !string.IsNullOrEmpty(Id);
+        if (!ok)
+            return;
+
+
+        ThisShoppingList = await Http.GetFromJsonAsync<ShoppingListModel>(Settings.GetApiUrlId(ShoppingListKeysEnum.ShoppingList, Id));
+
+        if(ThisShoppingList != null)
+            ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+
+        FilterList(activeListFiler);
+
+        Varer =  await Http.GetFromJsonAsync<List<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+        AvailableCategories = await Http.GetFromJsonAsync<List<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
+
+        AvailableShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
+
+    }
+
+    public async Task DeleteVare(ShoppingListItemModel m)
+    {
+        ThisShoppingList.ShoppingItems.Remove(m);
+
+        var updated = await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
+        if (updated != null && updated.IsSuccessStatusCode)
+            ThisShoppingList = await updated.Content.ReadFromJsonAsync<ShoppingListModel>();
+        FilterList(activeListFiler);
+    }
+
+    private async Task AddVare(ShopItemModel shopItem)
+    {
+        ShoppingListItemModel newItem = new ShoppingListItemModel() { Mengde = 1, IsDone = false, Varen = shopItem };
+        ThisShoppingList.ShoppingItems.Add(newItem);
+
+        await UpdateShoppinglist(ThisShoppingList);
+
+        FilterList(activeListFiler);
+    }
+
+    private async Task AddCategory(ItemCategoryModel newCategory)
+    {
+        var existing = AvailableCategories.FirstOrDefault(f => f.Name.ToLower().Equals(newCategory.Name.ToLower()));
+        if (existing != null)
+        {
+            if (newVareModel != null)
+                newVareModel.ItemCategory = existing;
+            return;
+        }
+        else
+        {
+            var respons = await Http.PostAsJsonAsync<ItemCategoryModel>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys), newCategory);
+            if(respons != null && respons.IsSuccessStatusCode)
+            {
+                var newCat = respons.Content.ReadFromJsonAsync<ItemCategoryModel>()?.Result;
+                if (newCat != null)
+                {
+                    AvailableCategories.Add(newCat);
+                    if (newVareModel != null)
+                        newVareModel.ItemCategory = newCat;
+                }
+            }
+
+        }
+
+    }
+
+    void VareClicked(ShopItemModel varen)
+    {
+        Console.Write(varen.Name);
+        newVareModel = varen;
+        justUpdateVare = true;
+        this.IsVisible = true;
+
+    }
+
+    void ListHeaderKeyUpEventHandler()
+    {
+        showH2LabelStyle = "hidden";
+        showEditHeader = "";
+    }
+    async Task ListHeaderClickEventHandler(KeyboardEventArgs args)
+    {
+
+        if (args.Code.Equals("Enter"))
+        {
+            showH2LabelStyle = "";
+            showEditHeader = "hidden";
+            await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), ThisShoppingList);
+
+        }
+    }
+    async Task SelectedShopItemChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel> newValue)
+    {
+        if (newValue == null) return;
+        if (newValue.ItemData is ShopItemModel item)
+        {
+            if (item.IsValid())
+                await AddVare(item).ContinueWith(f =>
+                {
+                    autoValue = null;
+                });
+            else
+            {
+                newVareModel = new ShopItemModel();
+                newVareModel.Name = item.Name;
+                IsVisible = true;
+            }
+
+        }
+    }
+
+    async Task SelectedItemCategoryChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ItemCategoryModel> selectedCategory)
+    {
+        if (selectedCategory.ItemData is ItemCategoryModel itemCat)
+        {
+            await AddCategory(itemCat);
+        }
+    }
+
+    private async Task CheckAllItems(bool f)
+    {
+        foreach (var vare in ThisShoppingList.ShoppingItems)
+        {
+            vare.IsDone = f;
+        }
+        await UpdateShoppinglist(ThisShoppingList);
+
+
+    }
+    private async Task VareCheckChanged(Microsoft.AspNetCore.Components.ChangeEventArgs f, ShoppingListItemModel vare)
+    {
+        if (f.Value is bool bValue)
+        {
+            Console.WriteLine("bvalue");
+            vare.IsDone = bValue;
+            FilterList(activeListFiler);
+            await UpdateShoppinglist(ThisShoppingList);
+        }
+
+
+    }
+    private async Task UpdateShoppinglist (ShoppingListModel liste)
+    {
+        await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
+    }
+
+    public async Task VareMengdeFocusLost()
+    {
+        await UpdateShoppinglist(ThisShoppingList);
+
+    }
+
+    public async Task DeleteAllClicked()
+    {
+        var completed = ThisShoppingList.ShoppingItems.Where(f => f.IsDone).ToList();
+
+
+        foreach (var item in completed)
+        {
+            var url = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.ShopItem, item.Id));
+            ThisShoppingList.ShoppingItems.Remove(item);
+        }
+        FilterList(activeListFiler);
+    }
+    public void FilterList(object value)
+    {
+        if (value is string sValue)
+        {
+            activeListFiler = sValue;
+            if (activeListFiler.Equals("done"))
+            {
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => f.IsDone).ToList();
+            }
+            else if (activeListFiler.Equals("active"))
+            {
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => !f.IsDone).ToList();
+            }
+            else //all
+            {
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+            }
+        }
+    }
+
+    private int? shopIndex { get; set; } = -1;
+    ShopModel SelectedShop { get; set; }
+    
+    void SortShoppingList()
+    {
+        if (shopIndex == null || shopIndex == -1) return; //TODO - lag notifikasjon..
+                                                          //Insert Sort index on itemCats.
+
+
+        SelectedShop = AvailableShops.ToArray()[shopIndex.Value];
+
+        var itemCategoriesWithShortIndex = new List<ItemCategoryModel>();
+        if (SelectedShop.ShelfsInShop == null) return;
+        foreach (var shelfst in SelectedShop.ShelfsInShop)
+        {
+            var startSort = shelfst.SortIndex;
+            foreach (var cat in shelfst.ItemCateogries)
+            {
+                startSort += 1;
+                cat.SortIndex = startSort;
+                itemCategoriesWithShortIndex.Add(cat);
+            }
+        }
+
+        foreach (var item in ThisShoppingList.ShoppingItems)
+        {
+            var cat = item.Varen.ItemCategory;
+            var thisCatSort = itemCategoriesWithShortIndex.FirstOrDefault(f => f.Id.Equals(cat.Id));
+            if (thisCatSort != null)
+                item.Varen.ItemCategory.SortIndex = thisCatSort.SortIndex;
+        }
+
+
+        ThisShoppingList.ShoppingItems = ThisShoppingList.ShoppingItems.OrderBy(f => f.Varen.ItemCategory.SortIndex).ToList();
+        FilterList(activeListFiler);
+    }
+    #region Modal handling
+
+    private bool IsVisible { get; set; } = false;
+    bool justUpdateVare = false;
+    private async Task HideModalAndSave()
+    {
+
+        if (newVareModel != null)
+        {
+            if (!newVareModel.IsValid()) return;
+
+            if (justUpdateVare)
+                await Http.PutAsJsonAsync<ShopItemModel>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), newVareModel).ContinueWith(f => { autoValue = null; });
+            else
+            {
+                if (newVareModel.IsValid())
+                {
+                    await Http.PostAsJsonAsync<ShopItemModel>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), newVareModel);
+                    Varer.Add(newVareModel);
+                    await AddVare(newVareModel).ContinueWith(f => { autoValue = null; });
+                }
+            }
+
+        }
+        justUpdateVare = false;
+        this.IsVisible = false;
+
+    }
+    private void HideModal()
+    {
+        newVareModel = null;
+        justUpdateVare = false;
+        this.IsVisible = false;
+    }
+    #endregion
+}
