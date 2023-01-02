@@ -16,7 +16,39 @@ namespace ApiIsolated
         {
 
 #if DEBUG
+            //var host = new HostBuilder()
+            //    .ConfigureFunctionsWorkerDefaults()
+            //    .ConfigureServices(s =>
+            //    {
+            //        s.AddTransient<IGoogleDbContext, GoogleDbContext>();
+            //        s.AddSingleton<IGenericRepository<ShoppingList>, GoogleFireBaseGenericRepository<ShoppingList>>();
+            //        s.AddSingleton<IGenericRepository<ShopItem>, GoogleFireBaseGenericRepository<ShopItem>>();
+            //        s.AddSingleton<IGenericRepository<ItemCategory>, GoogleFireBaseGenericRepository<ItemCategory>>();
+            //        s.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
+            //        s.AddAutoMapper(Assembly.GetExecutingAssembly());
+
+            //    })
+            //    .Build();
+            //host.Run();
+
             var host = new HostBuilder()
+              .ConfigureFunctionsWorkerDefaults()
+              .ConfigureServices(s =>
+              {
+                  s.AddTransient<IGoogleDbContext, GoogleDbContext>();
+                  s.AddSingleton<IGenericRepository<ShoppingList>, MemoryGenericRepository<ShoppingList>>();
+                  s.AddSingleton<IGenericRepository<ShopItem>, MemoryGenericRepository<ShopItem>>();
+                  s.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
+                  s.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
+                  s.AddAutoMapper(Assembly.GetExecutingAssembly());
+
+              })
+
+              .Build();
+            host.Run();
+#else
+          
+             var host = new HostBuilder()
                 .ConfigureFunctionsWorkerDefaults()
                 .ConfigureServices(s =>
                 {
@@ -28,22 +60,6 @@ namespace ApiIsolated
                     s.AddAutoMapper(Assembly.GetExecutingAssembly());
 
                 })
-                .Build();
-            host.Run();
-#else
-            var host = new HostBuilder()
-                .ConfigureFunctionsWorkerDefaults()
-                .ConfigureServices(s =>
-                {
-                    s.AddTransient<IGoogleDbContext, GoogleDbContext>();
-                    s.AddSingleton<IGenericRepository<ShoppingList>, MemoryGenericRepository<ShoppingList>>();
-                    s.AddSingleton<IGenericRepository<ShopItem>, MemoryGenericRepository<ShopItem>>();
-                    s.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
-                    s.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
-                    s.AddAutoMapper(Assembly.GetExecutingAssembly());
-
-                })
-                
                 .Build();
             host.Run();
 #endif
