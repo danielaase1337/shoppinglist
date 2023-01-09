@@ -1,11 +1,13 @@
-﻿@using BlazorApp.Client.Shared;
-<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <div class="container">
+﻿
+
+
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <div class="container">
                 <div class="row">
                     <div class="col">
                         <img src="/img/homer_404.png" height="300" />
@@ -17,5 +19,6 @@
                     </div>
                 </div>
             </div>
-    </NotFound>
-</Router>
+        </NotFound>
+    </Router>
+
