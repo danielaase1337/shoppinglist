@@ -1,4 +1,5 @@
-﻿using Google.Cloud.Firestore;
+﻿using Google.Apis.Auth.OAuth2;
+using Google.Cloud.Firestore;
 using Shared.FireStoreDataModels;
 using System;
 using System.Collections.Generic;
@@ -15,9 +16,14 @@ namespace Shared.Repository
 
         public GoogleDbContext()
         {
-            //CollectionKey = collectionName;
-            DB = FirestoreDb.Create(_projectId);
-            //Collection = DB.Collection(CollectionKey);
+            var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
+            if (json == null) throw new NullReferenceException("Fant ikke googl cred");
+
+            DB = new FirestoreDbBuilder
+            {
+                ProjectId = _projectId,
+                JsonCredentials = json
+            }.Build();
         }
         public CollectionReference Collection { get; set; }
         public FirestoreDb DB { get; private set; }
