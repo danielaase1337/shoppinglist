@@ -18,7 +18,7 @@ namespace Shared.Repository
         {
             var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
             if (json == null) throw new NullReferenceException("Fant ikke googl cred");
-
+            Console.WriteLine("Googel cred is found");
             DB = new FirestoreDbBuilder
             {
                 ProjectId = _projectId,

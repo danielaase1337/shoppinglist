@@ -93,7 +93,8 @@
     {
         try
         {
-          
+            var test = await Http.GetAsync("api/DebugFunction"); 
+            Console.WriteLine(await test.Content.ReadAsStringAsync()); 
             ShoppingLists = await Http.GetFromJsonAsync<List<ShoppingListModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists));
         }
         catch (Exception ex)
