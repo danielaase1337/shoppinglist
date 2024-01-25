@@ -40,6 +40,8 @@ namespace Api.Controllers
 
                     if (result == null)
                     {
+                        _logger.Log(LogLevel.Error, $"Could not get any stored lists Error: {req.ReadAsString()}");
+                        
                         return GetErroRespons("could not get any stored lists", req);
                     }
                     else if (!result.Any())
