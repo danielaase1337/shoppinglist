@@ -60,7 +60,10 @@ namespace Api.Controllers
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
                     var addRes = await repo.Insert(shoppinglist);
                     if (addRes == null)
+                    {
+                        _logger.Log(LogLevel.Warning, $"Could not get shoppinglists");
                         return GetErroRespons("could not get shoppinglist", req);
+                    }
                     else
                     {
                         await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));
