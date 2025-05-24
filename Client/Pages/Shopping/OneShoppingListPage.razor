@@ -1,8 +1,10 @@
-﻿    @page "/shoppinglist/{id}"
-
+﻿
+    @page "/shoppinglist/{id}"
+    @* @using Syncfusion.Blazor.Inputs *@
 @inject HttpClient Http
 @inject ISettings Settings; 
 
+@* 
 @if (newVareModel != null)
 {
     <SfDialog Width="250px" ShowCloseIcon="true" IsModal="true" @bind-Visible="@IsVisible">
@@ -12,8 +14,8 @@
                 <div class="container">
 
                     <div class="row" style="padding-top:6px">
-                        <SfTextBox Placeholder='Vare navn' FloatLabelType='@FloatLabelType.Auto'
-                               @bind-Value=@newVareModel.Name></SfTextBox>
+                        
+                        <SfTextBox Placeholder='Vare navn' FloatLabelType='@FloatLabelType.Auto' Value="@newVareModel.Name"></SfTextBox>
                     </div>
                     <div class="row" style="padding-top:4px">
                         <SfAutoComplete TValue="string"
@@ -48,7 +50,7 @@
     </SfDialog>
 
 }
-
+ *@
 
 @if (ThisShoppingList != null)
 {
@@ -59,11 +61,14 @@
 
                 <div class="col">
                     <h5 class="@showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
-                    <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
+                    @* <input class="new-todo" placeholder="Navn på listen?" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler"></input> *@
+                    <input class="@showEditHeader" @bind="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
                 </div>
 
                 <div class="col-5">
-                    <SfDropDownList TValue="string" TItem="ShopModel" Placeholder="Velg butikk" DataSource="@AvailableShops" @bind-Index="@shopIndex" Width="100">
+
+                    <SfDropDownList TValue="string" TItem="ShopModel" Placeholder="Velg butikk"
+                      DataSource="@AvailableShops" @bind-Value="@SelectedShopName" Width="100">
                         <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
                     </SfDropDownList>
                 </div>
@@ -74,18 +79,18 @@
 
             <div class="row">
                 <div class="col">
-                    <SfAutoComplete TValue="string"
+                    @* <SfAutoComplete TValue="string"
                                 TItem="ShopItemModel"
                                 DataSource="@Varer"
                                 Placeholder="Hva skal handles?"
-                                @bind-Value="@autoValue"
+                                @bind="@autoValue"
                                 FilterType="FilterType.Contains"
                                 Highlight>
                         <AutoCompleteFieldSettings Value="Name" Text="Name" />
                         <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
                                         ValueChange="@SelectedShopItemChanged"></AutoCompleteEvents>
                        
-                    </SfAutoComplete>
+                    </SfAutoComplete> *@
                 </div>
                 <div class="col-2 contenAlignCenter">
                     <button class="btn btn-sm"><i class="fas fa-plus"></i></button>
@@ -121,7 +126,7 @@
                                         </a>
                                     </div>
                                     <div class="col-3">
-                                        <input class="vareInputEdit" @bind-value="vare.Mengde" @onfocusout="(f=> VareMengdeFocusLost())" />
+                                        <input class="vareInputEdit" Value="vare.Mengde" @onfocusout="(f=> VareMengdeFocusLost())" />
                                     </div>
                                     <div class="col-2">
                                         <button class="commandBtns"
@@ -154,7 +159,7 @@ else
 }
 
 @code {
-   
+
 
     string autoValue;
 
@@ -168,7 +173,7 @@ else
 
 
     ShopItemModel? newVareModel = new ShopItemModel();
-
+    string SelectedVareName { get; set; } = "";
     public ShoppingListModel ThisShoppingList { get; set; }
     public ICollection<ShoppingListItemModel> ThisShoppingListItems { get; set; }
     public ICollection<ShopItemModel> Varer { get; set; }
@@ -278,10 +283,14 @@ else
         if (newValue.ItemData is ShopItemModel item)
         {
             if (item.IsValid())
-                await AddVare(item).ContinueWith(f =>
-                {
-                    autoValue = null;
-                });
+            {
+                autoValue = null;
+                await AddVare(item);
+                //        .ContinueWith(f =>
+                // {
+
+                //     });
+            }
             else
             {
                 newVareModel = new ShopItemModel();
@@ -365,16 +374,17 @@ else
         }
     }
 
-    private int? shopIndex { get; set; } = -1;
+    public string SelectedShopName { get; set; } = "";
     ShopModel SelectedShop { get; set; }
-    
+
     void SortShoppingList()
     {
-        if (shopIndex == null || shopIndex == -1) return; //TODO - lag notifikasjon..
-                                                          //Insert Sort index on itemCats.
+        if (string.IsNullOrEmpty(SelectedShopName)) return; //TODO - lag notifikasjon..
+                                                           //Insert Sort index on itemCats.
 
-
-        SelectedShop = AvailableShops.ToArray()[shopIndex.Value];
+        var shops = AvailableShops.ToList();
+        int index = shops.Select(f=> f.Name).ToList().IndexOf(SelectedShopName);                                                 
+    SelectedShop = shops[index];
 
         var itemCategoriesWithShortIndex = new List<ItemCategoryModel>();
         if (SelectedShop.ShelfsInShop == null) return;

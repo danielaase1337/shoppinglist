@@ -7,6 +7,7 @@ using Shared.Repository;
 using System.Reflection;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
+using Microsoft.Azure.Functions.Worker;
 
 namespace ApiIsolated
 {
@@ -32,7 +33,7 @@ namespace ApiIsolated
             //host.Run();
 
             var host = new HostBuilder()
-              .ConfigureFunctionsWorkerDefaults()
+              .ConfigureFunctionsWebApplication()
               .ConfigureServices(s =>
               {
                   s.AddTransient<IGoogleDbContext, GoogleDbContext>();
@@ -41,6 +42,8 @@ namespace ApiIsolated
                   s.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
                   s.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
                   s.AddAutoMapper(Assembly.GetExecutingAssembly());
+                  s.AddApplicationInsightsTelemetryWorkerService();
+                  s.ConfigureFunctionsApplicationInsights();
 
               })
 
@@ -58,6 +61,8 @@ namespace ApiIsolated
                     s.AddSingleton<IGenericRepository<ItemCategory>, GoogleFireBaseGenericRepository<ItemCategory>>();
                     s.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
                     s.AddAutoMapper(Assembly.GetExecutingAssembly());
+                    s.AddApplicationInsightsTelemetryWorkerService();
+                  s.ConfigureFunctionsApplicationInsights();
 
                 })
                 .Build();

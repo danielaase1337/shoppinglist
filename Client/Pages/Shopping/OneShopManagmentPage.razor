@@ -1,13 +1,16 @@
-﻿@page "/managemyshops/{Id}"
+﻿@page "/oneShop/{Id}"
 @using global::Shared.FireStoreDataModels;
 @using Common;
 @inject HttpClient Http
 
-@*@using Shared.HandlelisteModels*@
+
 @using Microsoft.Extensions.Configuration
+
 <h3>OneShopManagmentPage</h3>
 <p>@shopId</p>
+
 <button onclick="@AddItem">Items</button>
+
 @code {
     [Parameter]
     public string Id { get; set; }

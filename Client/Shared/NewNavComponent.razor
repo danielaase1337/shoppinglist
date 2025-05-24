@@ -5,8 +5,8 @@
 
 
 <nav class="navbar navbar-expand-sm navbar-dark">
-    
-    
+
+
     <a class="navbar-brand" href="">The Aase-broen's</a>
 
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#toggler"
@@ -16,37 +16,41 @@
 
     <div class="@NavMenuCssClass" id="toggler" @onclick="ToggleNavMenu">
         <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
-          @*  <AuthorizeView>
-                <Authorized>*@
-                    @*<li>*@
-                        <NavLink class="nav-link" href="shoppinglist">
-                            <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
-                        </NavLink>
-                        
-                        <NavLink class="nav-link" href="admin">
-                            <span class="oi oi-arrow-circle-top" aria-hidden="true"></span>Admin
-                        </NavLink>
-                    @*</li>*@
-@*
-                    <NavLink class="nav-link" href="/managemyshops">
-                        <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
-                    </NavLink>*@
+            @*  <AuthorizeView>
+            <Authorized>*@
+            @*<li>*@
+            <NavLink class="nav-link" href="shoppinglist">
+                <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
+            </NavLink>
 
-                   @* <NavLink class="nav-link" href="#" @onclick="BeginSignOut">
-                        <span @onclick="BeginSignOut" class="oi oi-account-logout"></span>Logg ut
-                    </NavLink>*@
-               @* </Authorized>
-                <NotAuthorized>
-                    <NavLink class="nav-link" href="authentication/login">
-                        <span class="oi oi-account-login"></span> Logg inn
-                    </NavLink>
-                </NotAuthorized>
+            <NavLink class="nav-link" href="admin">
+                <span class="oi oi-arrow-circle-top" aria-hidden="true"></span>Admin
+            </NavLink>
+            @*</li>*@
+
+            <NavLink class="nav-link" href="/managemyshops">
+                <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
+            </NavLink>
+            <NavLink class="nav-link" href="/testpage">
+                <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> TEST
+            </NavLink>
+
+
+            @* <NavLink class="nav-link" href="#" @onclick="BeginSignOut">
+            <span @onclick="BeginSignOut" class="oi oi-account-logout"></span>Logg ut
+            </NavLink>
+            @* </Authorized>
+            <NotAuthorized>
+            <NavLink class="nav-link" href="authentication/login">
+            <span class="oi oi-account-login"></span> Logg inn
+            </NavLink>
+            </NotAuthorized>
             </AuthorizeView>*@
 
         </ul>
     </div>
-    
-    
+
+
 </nav>
 @code {
     private bool collapseNavMenu = true;

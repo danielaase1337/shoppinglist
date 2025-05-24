@@ -1,5 +1,6 @@
 ﻿
 using Shared.BaseModels;
+using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
 using System;
@@ -29,7 +30,7 @@ namespace Shared.Repository
             //}
             if (type == typeof(ShopModel))
             {
-                await Insert(new ShopModel() { Id = "2", Name = "Kiwi lyngås" } as TEntity);
+                await Insert(new Shop() { Id = "2", Name = "Kiwi lyngås" } as TEntity);
             }
             if (type == typeof(ShelfModel))
             {
@@ -114,7 +115,7 @@ namespace Shared.Repository
         {
             return await Task.Run(() =>
             {
-                if (id is string @s && _data.TryGetValue(@s, out TEntity exiting))
+                if (id.ToString() is string @s && _data.TryGetValue(@s, out TEntity exiting))
                 {
                     return exiting;
                 }
