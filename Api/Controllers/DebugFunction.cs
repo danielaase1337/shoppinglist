@@ -22,7 +22,7 @@ namespace Api.Controllers
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
-            response.WriteString("Welcome to Azure Functions! Its up and running");
+            response.WriteStringAsync("Welcome to Azure Functions! Its up and running");
 
             return response;
         }
