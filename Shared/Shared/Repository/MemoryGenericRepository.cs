@@ -349,10 +349,10 @@ namespace Shared.Repository
             {
                 if (id is string @s && _data.TryGetValue(@s, out TEntity exiting))
                 {
-                    _data.Remove(@s);
+                    return _data.Remove(@s);
                 }
 
-                return true;
+                return false; // Return false if item was not found or deleted
             });
         }
 

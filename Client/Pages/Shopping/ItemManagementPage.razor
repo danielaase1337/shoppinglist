@@ -1,6 +1,7 @@
 @page "/items"
 @inject HttpClient Http
 @inject ISettings Settings
+@inject IJSRuntime JSRuntime
 
 <div class="card-maincontainer container-sm">
     
@@ -348,20 +349,43 @@
     {
         if (AllItems == null) return;
 
+        // Add confirmation dialog
+        if (!await ConfirmDelete($"Er du sikker på at du vil slette '{item.Name}'?"))
+        {
+            return;
+        }
+
         try
         {
-            var response = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.shopItems, item.Id));
+            var deleteUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.ShopItem, item.Id);
+            Console.WriteLine($"Attempting to delete item {item.Name} with ID {item.Id} using URL: {deleteUrl}");
+            
+            var response = await Http.DeleteAsync(deleteUrl);
+            
+            Console.WriteLine($"Delete response status: {response.StatusCode}");
             
             if (response.IsSuccessStatusCode)
             {
                 AllItems.Remove(item);
+                Console.WriteLine($"Successfully deleted item {item.Name}");
                 StateHasChanged();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Failed to delete item. Status: {response.StatusCode}, Content: {errorContent}");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error deleting item: {ex.Message}");
         }
+    }
+
+    private async Task<bool> ConfirmDelete(string message)
+    {
+        // Use JavaScript confirm dialog
+        return await JSRuntime.InvokeAsync<bool>("confirm", message);
     }
 
     private Task SaveAllItems()
