@@ -16,9 +16,16 @@ namespace Shared.Repository
 
         public GoogleDbContext()
         {
-            var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
+           var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
+            if(Path.IsPathFullyQualified(json))//This is to check if the env variable is a path to a file and then read the json. In prod this will read directly the credentials
+            {
+                json = File.ReadAllText(json);
+            }
             if (json == null) throw new NullReferenceException("Fant ikke googl cred");
-            Console.WriteLine("Googel cred is found");
+           
+    
+           
+           Console.WriteLine("Googel cred is found");
             DB = new FirestoreDbBuilder
             {
                 ProjectId = _projectId,
