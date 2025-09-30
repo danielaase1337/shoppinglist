@@ -35,10 +35,16 @@
                                     }
                                     else
                                     {
+
                                         <label>
                                             <a href="@(GetItemNavLink(l.Id))">@l.Name</a>
                                         </label>
                                     }
+                                </div>
+                                <div class="col-3">
+                                    <a href="shopconfig/@l.Id" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-cog"></i> Konfigurer
+                                    </a>
                                 </div>
                                 @if (l.EditClicked)
                                 {
@@ -51,7 +57,7 @@
                                 else
                                 {
                                     <div class="col-2">
-                                        <Button @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></Button>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></button>
                                     </div>
                                 }
                             </div>
@@ -74,22 +80,20 @@
 @code {
 
     [Inject]
-    public ISettings Settings { get; set; }
+    public ISettings Settings { get; set; } = null!;
     protected override async Task OnInitializedAsync()
     {
 
-        MyShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
-        if (MyShops == null)
-            MyShops = new List<ShopModel>();
+        MyShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops)) ?? new List<ShopModel>();
 
     }
 
     private ShopModel newShop = new ShopModel();
-    private string _newShopName;
+    private string _newShopName = "";
 
 
 
-    private ICollection<ShopModel> MyShops { get; set; }
+    private ICollection<ShopModel>? MyShops { get; set; }
 
     private async Task StoreChange(ShopModel item)
     {
@@ -100,7 +104,7 @@
     {
         var deleRes = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, l.Id));
         if (deleRes != null && deleRes.IsSuccessStatusCode)
-            MyShops.Remove(l);
+            MyShops?.Remove(l);
     }
 
     private string GetItemNavLink(string shopId)
@@ -125,7 +129,7 @@
         {
             var parsedShop = await insertres.Content.ReadFromJsonAsync<ShopModel>();
             if(parsedShop != null)
-                MyShops.Add(parsedShop);
+                MyShops?.Add(parsedShop);
             _newShopName = string.Empty;
         }
     }

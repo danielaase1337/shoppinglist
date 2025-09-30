@@ -78,7 +78,7 @@ namespace Api.Controllers
         }
 
         [Function("shop")]
-        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shop/{id}")] HttpRequestData req, int id)
+        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shop/{id}")] HttpRequestData req, string id)
         {
             try
             {

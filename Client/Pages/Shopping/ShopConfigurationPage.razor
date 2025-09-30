@@ -1,0 +1,430 @@
+@page "/shopconfig/{Id}"
+@using BlazorApp.Client.Common
+@using BlazorApp.Client.Shared
+@inject HttpClient Http
+@inject ISettings Settings
+
+<div class="card-maincontainer container-sm">
+    
+    @if (CurrentShop != null)
+    {
+        <!-- Shop Header -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h2>Konfigurer Butikk: @CurrentShop.Name</h2>
+                    <p class="text-muted">Dra og slipp hyller for å endre rekkefølgen som du går gjennom butikken</p>
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-success" @onclick="SaveShopConfiguration">
+                        <i class="fas fa-save"></i> Lagre
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Shelf -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Legg til ny hylle</h5>
+                    <div class="row">
+                        <div class="col">
+                            <input class="new-todo" placeholder="Navn på hylle?" @bind="@newShelfName" @onkeyup="OnKeyUpNewShelfHandler">
+                        </div>
+                        <div class="col-2">
+                            <button type="button" class="btn-sm btn-outline-success" @onclick="AddNewShelf">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shelves Configuration -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Hyller i butikken (rekkefølge som du går gjennom butikken)</h5>
+                    
+                    @if (CurrentShop.ShelfsInShop != null && CurrentShop.ShelfsInShop.Any())
+                    {
+                        <div class="shelf-container">
+                            @foreach (var shelf in CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex))
+                            {
+                                <div class="shelf-item card-item" draggable="true" 
+                                     @ondragstart="@(() => HandleDragStart(shelf))"
+                                     @ondragover:preventDefault="true"
+                                     @ondrop="@(() => HandleDrop(shelf))">
+                                    
+                                    <div class="parent-horizontal-stack">
+                                        <div class="col-1">
+                                            <span class="sort-indicator">@shelf.SortIndex</span>
+                                        </div>
+                                        <div class="col">
+                                            @if (shelf.EditClicked)
+                                            {
+                                                <input class="editing" @bind-value="@shelf.Name" @onkeyup="@(e => HandleShelfNameKeyUp(e, shelf))" />
+                                            }
+                                            else
+                                            {
+                                                <label @ondblclick="@(() => EnableEdit(shelf))">
+                                                    @shelf.Name
+                                                </label>
+                                            }
+                                        </div>
+                                        <div class="col-3">
+                                            <span class="text-muted">@shelf.ItemCateogries.Count kategorier</span>
+                                        </div>
+                                        <div class="col-2">
+                                            @if (shelf.EditClicked)
+                                            {
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(() => SaveShelf(shelf))">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(() => CancelEdit(shelf))">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-primary" @onclick="@(() => EnableEdit(shelf))">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(() => DeleteShelf(shelf))">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-secondary" title="Dra for å endre rekkefølge">
+                                                        <i class="fas fa-grip-vertical"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <!-- Categories in shelf -->
+                                    @if (shelf.ItemCateogries.Any())
+                                    {
+                                        <div class="shelf-categories">
+                                            <small class="text-muted">Kategorier i denne hyllen:</small>
+                                            <div class="category-tags">
+                                                @foreach (var category in shelf.ItemCateogries)
+                                                {
+                                                    <span class="badge badge-secondary category-tag">@category.Name</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <p>Ingen hyller er konfigurert for denne butikken ennå. Legg til hyller ovenfor for å komme i gang.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories Assignment -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5 style="color: #333;">Tilgjengelige Kategorier</h5>
+                    <p class="text-muted">Dra kategorier til riktig hylle</p>
+                    
+                    @if (AvailableCategories != null && AvailableCategories.Any())
+                    {
+                        <div class="categories-grid">
+                            @foreach (var category in AvailableCategories)
+                            {
+                                <div class="category-item" draggable="true">
+                                    <span class="badge badge-primary">@category.Name</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private ShopModel? CurrentShop { get; set; }
+    private ICollection<ItemCategoryModel>? AvailableCategories { get; set; }
+    private string newShelfName = "";
+    private ShelfModel? draggedShelf;
+    private string originalShelfName = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(Id))
+        {
+            try
+            {
+                // Load shop data
+                CurrentShop = await Http.GetFromJsonAsync<ShopModel>(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id));
+                
+                // Load available categories
+                AvailableCategories = await Http.GetFromJsonAsync<List<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
+
+                // Ensure shop has shelfs collection
+                if (CurrentShop != null && CurrentShop.ShelfsInShop == null)
+                {
+                    CurrentShop.ShelfsInShop = new List<ShelfModel>();
+                }
+
+                // Ensure sort indexes are set
+                EnsureSortIndexes();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading shop: {ex.Message}");
+            }
+        }
+    }
+
+    private void EnsureSortIndexes()
+    {
+        if (CurrentShop?.ShelfsInShop == null) return;
+
+        var shelfs = CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        for (int i = 0; i < shelfs.Count; i++)
+        {
+            shelfs[i].SortIndex = i + 1;
+        }
+    }
+
+    private async Task OnKeyUpNewShelfHandler(KeyboardEventArgs args)
+    {
+        if (args.Code.Equals("Enter"))
+        {
+            await AddNewShelf();
+        }
+    }
+
+    private Task AddNewShelf()
+    {
+        if (string.IsNullOrWhiteSpace(newShelfName) || CurrentShop == null) return Task.CompletedTask;
+
+        var newShelf = new ShelfModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = newShelfName,
+            SortIndex = (CurrentShop.ShelfsInShop?.Count ?? 0) + 1,
+            ItemCateogries = new List<ItemCategoryModel>()
+        };
+
+        if (CurrentShop.ShelfsInShop == null)
+            CurrentShop.ShelfsInShop = new List<ShelfModel>();
+
+        CurrentShop.ShelfsInShop.Add(newShelf);
+        newShelfName = "";
+        
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void EnableEdit(ShelfModel shelf)
+    {
+        originalShelfName = shelf.Name;
+        shelf.EditClicked = true;
+    }
+
+    private void CancelEdit(ShelfModel shelf)
+    {
+        shelf.Name = originalShelfName;
+        shelf.EditClicked = false;
+    }
+
+    private void SaveShelf(ShelfModel shelf)
+    {
+        shelf.EditClicked = false;
+    }
+
+    private Task HandleShelfNameKeyUp(KeyboardEventArgs args, ShelfModel shelf)
+    {
+        if (args.Code.Equals("Enter"))
+        {
+            SaveShelf(shelf);
+        }
+        else if (args.Code.Equals("Escape"))
+        {
+            CancelEdit(shelf);
+        }
+        return Task.CompletedTask;
+    }
+
+    private void DeleteShelf(ShelfModel shelf)
+    {
+        if (CurrentShop?.ShelfsInShop != null)
+        {
+            CurrentShop.ShelfsInShop.Remove(shelf);
+            EnsureSortIndexes();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleDragStart(ShelfModel shelf)
+    {
+        draggedShelf = shelf;
+    }
+
+    private void HandleDrop(ShelfModel targetShelf)
+    {
+        if (draggedShelf != null && draggedShelf != targetShelf && CurrentShop?.ShelfsInShop != null)
+        {
+            var shelfs = CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+            var draggedIndex = shelfs.IndexOf(draggedShelf);
+            var targetIndex = shelfs.IndexOf(targetShelf);
+
+            // Reorder the list
+            shelfs.RemoveAt(draggedIndex);
+            shelfs.Insert(targetIndex, draggedShelf);
+
+            // Update sort indexes
+            for (int i = 0; i < shelfs.Count; i++)
+            {
+                shelfs[i].SortIndex = i + 1;
+            }
+
+            StateHasChanged();
+        }
+        draggedShelf = null;
+    }
+
+    private async Task SaveShopConfiguration()
+    {
+        try
+        {
+            EnsureSortIndexes();
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), CurrentShop);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Could add a success message here
+                Console.WriteLine("Shop configuration saved successfully");
+            }
+            else
+            {
+                Console.WriteLine($"Error saving shop configuration: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving shop: {ex.Message}");
+        }
+    }
+}
+
+<style>
+    h2, h5 {
+        color: #333 !important;
+    }
+    
+    .shelf-container {
+        min-height: 200px;
+        padding: 10px;
+    }
+
+    .shelf-item {
+        margin-bottom: 10px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: #fff;
+        cursor: move;
+        transition: all 0.2s ease;
+    }
+
+    .shelf-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-color: #007bff;
+    }
+
+    .sort-indicator {
+        font-weight: bold;
+        color: #6c757d;
+        background: #e9ecef;
+        padding: 4px 8px;
+        border-radius: 50%;
+        font-size: 0.875rem;
+    }
+
+    .shelf-categories {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+
+    .category-tags {
+        margin-top: 5px;
+    }
+
+    .category-tag {
+        margin-right: 5px;
+        margin-bottom: 3px;
+        display: inline-block;
+    }
+
+    .categories-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .category-item {
+        cursor: grab;
+        color: #333;
+    }
+
+    .category-item:active {
+        cursor: grabbing;
+    }
+
+    .category-item .badge {
+        color: white;
+        background-color: #007bff;
+    }
+
+    .card-item {
+        transition: transform 0.2s ease;
+    }
+
+    .card-item:hover {
+        transform: translateX(5px);
+    }
+
+    .editButtonStyle {
+        margin-left: 2px;
+    }
+
+    .parent-horizontal-stack {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .editing {
+        border: 1px solid #007bff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        width: 100%;
+    }
+</style>
