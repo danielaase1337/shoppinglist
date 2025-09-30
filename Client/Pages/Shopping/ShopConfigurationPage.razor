@@ -1,6 +1,7 @@
 @page "/shopconfig/{Id}"
 @using BlazorApp.Client.Common
 @using BlazorApp.Client.Shared
+@using Microsoft.AspNetCore.Components.Web
 @inject HttpClient Http
 @inject ISettings Settings
 
@@ -53,10 +54,15 @@
                         <div class="shelf-container">
                             @foreach (var shelf in CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex))
                             {
-                                <div class="shelf-item card-item" draggable="true" 
+                                <div class="shelf-item card-item @(shelf == draggedShelf ? "dragging" : "")" 
+                                     draggable="true" 
                                      @ondragstart="@(() => HandleDragStart(shelf))"
+                                     @ondragover="@HandleDragOver"
                                      @ondragover:preventDefault="true"
-                                     @ondrop="@(() => HandleDrop(shelf))">
+                                     @ondrop="@(() => HandleDrop(shelf))"
+                                     @ondrop:preventDefault="true"
+                                     @ondragenter="@(() => HandleDragEnter(shelf))"
+                                     @ondragenter:preventDefault="true">
                                     
                                     <div class="parent-horizontal-stack">
                                         <div class="col-1">
@@ -109,14 +115,31 @@
                                     <!-- Categories in shelf -->
                                     @if (shelf.ItemCateogries.Any())
                                     {
-                                        <div class="shelf-categories">
+                                        <div class="shelf-categories drop-zone-area"
+                                             @ondrop="@(() => HandleCategoryDrop(shelf))"
+                                             @ondragover:preventDefault="true"
+                                             @ondragenter:preventDefault="true">
                                             <small class="text-muted">Kategorier i denne hyllen:</small>
                                             <div class="category-tags">
                                                 @foreach (var category in shelf.ItemCateogries)
                                                 {
-                                                    <span class="badge badge-secondary category-tag">@category.Name</span>
+                                                    <span class="badge badge-primary category-tag">
+                                                        @category.Name
+                                                        <button class="btn btn-sm btn-link text-white p-0 ml-1" 
+                                                                @onclick="@(() => RemoveCategoryFromShelf(shelf, category))"
+                                                                title="Fjern fra hylle">×</button>
+                                                    </span>
                                                 }
                                             </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="shelf-categories drop-zone"
+                                             @ondrop="@(() => HandleCategoryDrop(shelf))"
+                                             @ondragover:preventDefault="true"
+                                             @ondragenter:preventDefault="true">
+                                            <small class="text-muted">Dra kategorier hit for å legge dem i denne hyllen</small>
                                         </div>
                                     }
                                 </div>
@@ -143,13 +166,22 @@
                     @if (AvailableCategories != null && AvailableCategories.Any())
                     {
                         <div class="categories-grid">
-                            @foreach (var category in AvailableCategories)
+                            @foreach (var category in GetUnusedCategories())
                             {
-                                <div class="category-item" draggable="true">
+                                <div class="category-item @(category == draggedCategory ? "dragging" : "")" 
+                                     draggable="true" 
+                                     @ondragstart="@(() => HandleCategoryDragStart(category))">
                                     <span class="badge badge-primary">@category.Name</span>
                                 </div>
                             }
                         </div>
+                        
+                        @if (!GetUnusedCategories().Any())
+                        {
+                            <div class="alert alert-info">
+                                <small>Alle kategorier er allerede tildelt hyller.</small>
+                            </div>
+                        }
                     }
                 </div>
             </div>
@@ -169,6 +201,7 @@
     private ICollection<ItemCategoryModel>? AvailableCategories { get; set; }
     private string newShelfName = "";
     private ShelfModel? draggedShelf;
+    private ItemCategoryModel? draggedCategory;
     private string originalShelfName = "";
 
     protected override async Task OnParametersSetAsync()
@@ -285,6 +318,16 @@
         draggedShelf = shelf;
     }
 
+    private void HandleDragOver()
+    {
+        // Allow dropping
+    }
+
+    private void HandleDragEnter(ShelfModel shelf)
+    {
+        // Visual feedback when hovering over drop target
+    }
+
     private void HandleDrop(ShelfModel targetShelf)
     {
         if (draggedShelf != null && draggedShelf != targetShelf && CurrentShop?.ShelfsInShop != null)
@@ -293,19 +336,94 @@
             var draggedIndex = shelfs.IndexOf(draggedShelf);
             var targetIndex = shelfs.IndexOf(targetShelf);
 
-            // Reorder the list
-            shelfs.RemoveAt(draggedIndex);
-            shelfs.Insert(targetIndex, draggedShelf);
-
-            // Update sort indexes
-            for (int i = 0; i < shelfs.Count; i++)
+            if (draggedIndex >= 0 && targetIndex >= 0)
             {
-                shelfs[i].SortIndex = i + 1;
-            }
+                // Reorder the list
+                shelfs.RemoveAt(draggedIndex);
+                shelfs.Insert(targetIndex, draggedShelf);
 
-            StateHasChanged();
+                // Update sort indexes
+                for (int i = 0; i < shelfs.Count; i++)
+                {
+                    shelfs[i].SortIndex = i + 1;
+                }
+
+                StateHasChanged();
+            }
         }
         draggedShelf = null;
+    }
+
+    // Category drag and drop methods
+    private void HandleCategoryDragStart(ItemCategoryModel category)
+    {
+        draggedCategory = category;
+        Console.WriteLine($"Started dragging category: {category.Name}");
+    }
+
+    private void HandleCategoryDrop(ShelfModel targetShelf)
+    {
+        Console.WriteLine($"Attempting to drop category on shelf: {targetShelf.Name}");
+        
+        if (draggedCategory != null && targetShelf != null)
+        {
+            Console.WriteLine($"Dropping category {draggedCategory.Name} on shelf {targetShelf.Name}");
+            
+            // Check if category is already in this shelf
+            if (!targetShelf.ItemCateogries.Any(c => c.Id == draggedCategory.Id))
+            {
+                // Remove from other shelfs first
+                if (CurrentShop?.ShelfsInShop != null)
+                {
+                    foreach (var shelf in CurrentShop.ShelfsInShop)
+                    {
+                        var existingCategory = shelf.ItemCateogries.FirstOrDefault(c => c.Id == draggedCategory.Id);
+                        if (existingCategory != null)
+                        {
+                            shelf.ItemCateogries.Remove(existingCategory);
+                            Console.WriteLine($"Removed category from shelf: {shelf.Name}");
+                        }
+                    }
+                }
+                
+                // Add to target shelf
+                targetShelf.ItemCateogries.Add(draggedCategory);
+                Console.WriteLine($"Added category {draggedCategory.Name} to shelf {targetShelf.Name}");
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"Category {draggedCategory.Name} already exists in shelf {targetShelf.Name}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"Drop failed - draggedCategory: {draggedCategory?.Name}, targetShelf: {targetShelf?.Name}");
+        }
+        
+        draggedCategory = null;
+    }
+
+    private void RemoveCategoryFromShelf(ShelfModel shelf, ItemCategoryModel category)
+    {
+        shelf.ItemCateogries.Remove(category);
+        Console.WriteLine($"Removed category {category.Name} from shelf {shelf.Name}");
+        StateHasChanged();
+    }
+
+    private IEnumerable<ItemCategoryModel> GetUnusedCategories()
+    {
+        if (AvailableCategories == null || CurrentShop?.ShelfsInShop == null)
+            return new List<ItemCategoryModel>();
+
+        // Get all category IDs that are already assigned to shelfs
+        var usedCategoryIds = CurrentShop.ShelfsInShop
+            .SelectMany(shelf => shelf.ItemCateogries)
+            .Select(cat => cat.Id)
+            .ToHashSet();
+
+        // Return categories that are not yet assigned
+        return AvailableCategories.Where(cat => !usedCategoryIds.Contains(cat.Id));
     }
 
     private async Task SaveShopConfiguration()
@@ -357,6 +475,11 @@
         border-color: #007bff;
     }
 
+    .shelf-item.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+    }
+
     .sort-indicator {
         font-weight: bold;
         color: #6c757d;
@@ -380,6 +503,33 @@
         margin-right: 5px;
         margin-bottom: 3px;
         display: inline-block;
+        background-color: #007bff !important;
+        color: white !important;
+        padding: 6px 10px !important;
+        font-size: 14px !important;
+        line-height: 1.4 !important;
+        vertical-align: middle;
+    }
+
+    .category-tag button {
+        color: white !important;
+        font-weight: bold;
+        font-size: 16px !important;
+        line-height: 1 !important;
+        padding: 0 4px !important;
+        margin-left: 6px !important;
+        border: none !important;
+        background: transparent !important;
+        text-decoration: none !important;
+        vertical-align: middle;
+        display: inline-block;
+    }
+
+    .category-tag button:hover {
+        color: #ffcccc !important;
+        background: rgba(255, 255, 255, 0.2) !important;
+        border-radius: 50%;
+        text-decoration: none !important;
     }
 
     .categories-grid {
@@ -392,15 +542,49 @@
     .category-item {
         cursor: grab;
         color: #333;
+        transition: all 0.2s ease;
     }
 
     .category-item:active {
         cursor: grabbing;
     }
 
+    .category-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.9);
+    }
+
     .category-item .badge {
         color: white;
         background-color: #007bff;
+    }
+
+    .drop-zone {
+        min-height: 40px;
+        border: 2px dashed #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        margin-top: 10px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+
+    .drop-zone:hover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+
+    .drop-zone-area {
+        border: 1px solid transparent;
+        border-radius: 5px;
+        padding: 5px;
+        margin-top: 10px;
+        transition: all 0.2s ease;
+    }
+
+    .drop-zone-area:hover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
     }
 
     .card-item {
