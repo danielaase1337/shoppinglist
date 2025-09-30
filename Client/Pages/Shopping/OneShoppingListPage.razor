@@ -352,15 +352,23 @@ else
             activeListFiler = sValue;
             if (activeListFiler.Equals("done"))
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => f.IsDone).ToList();
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .Where(f => f.IsDone)
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
             else if (activeListFiler.Equals("active"))
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => !f.IsDone).ToList();
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .Where(f => !f.IsDone)
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
             else //all
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
         }
     }
@@ -370,36 +378,106 @@ else
     
     void SortShoppingList()
     {
-        if (shopIndex == null || shopIndex == -1) return; //TODO - lag notifikasjon..
-                                                          //Insert Sort index on itemCats.
-
-
-        SelectedShop = AvailableShops.ToArray()[shopIndex.Value];
-
-        var itemCategoriesWithShortIndex = new List<ItemCategoryModel>();
-        if (SelectedShop.ShelfsInShop == null) return;
-        foreach (var shelfst in SelectedShop.ShelfsInShop)
+        Console.WriteLine($"SortShoppingList called. shopIndex: {shopIndex}");
+        
+        if (shopIndex == null || shopIndex == -1) 
         {
-            var startSort = shelfst.SortIndex;
-            foreach (var cat in shelfst.ItemCateogries)
+            Console.WriteLine("No shop selected - cannot sort");
+            // TODO - lag notifikasjon til bruker om at butikk må velges først
+            return;
+        }
+
+        Console.WriteLine($"Sorting with shop index: {shopIndex}");
+        
+        // OPTIMIZATION 1: Use ElementAt() instead of ToArray() conversion
+        SelectedShop = AvailableShops.ElementAt(shopIndex.Value);
+        Console.WriteLine($"Selected shop: {SelectedShop.Name}");
+        
+        if (SelectedShop.ShelfsInShop == null) 
+        {
+            Console.WriteLine("No shelfs found in selected shop");
+            return;
+        }
+
+        Console.WriteLine($"Found {SelectedShop.ShelfsInShop.Count} shelfs in shop");
+
+        // OPTIMIZATION 2: Use Dictionary for O(1) lookup instead of O(M) FirstOrDefault
+        var categoryToSortIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        
+        // Build category sort index mapping efficiently - FIXED ALGORITHM
+        foreach (var shelf in SelectedShop.ShelfsInShop)
+        {
+            Console.WriteLine($"Processing shelf: {shelf.Name}, SortIndex: {shelf.SortIndex}");
+            
+            var categoryIndexInShelf = 0;
+            foreach (var cat in shelf.ItemCateogries)
             {
-                startSort += 1;
-                cat.SortIndex = startSort;
-                itemCategoriesWithShortIndex.Add(cat);
+                categoryIndexInShelf++;
+                
+                // CORRECT CALCULATION: (ShelfIndex * 1000) + CategoryIndex
+                // This ensures shelf order is preserved, then category order within shelf
+                var sortIndex = (shelf.SortIndex * 1000) + categoryIndexInShelf;
+                
+                // Use both exact name and trimmed/normalized name for matching
+                categoryToSortIndex[cat.Name] = sortIndex;
+                categoryToSortIndex[cat.Name.Trim()] = sortIndex;
+                categoryToSortIndex[cat.Id] = sortIndex;
+                Console.WriteLine($"  Category: {cat.Name} assigned SortIndex: {sortIndex} (Shelf: {shelf.SortIndex}, Cat: {categoryIndexInShelf})");
             }
         }
 
+        Console.WriteLine($"Built category mapping with {categoryToSortIndex.Count} categories");
+
+        // OPTIMIZATION 3: Update sort indices in single pass with O(1) lookup
+        var itemsUpdated = 0;
         foreach (var item in ThisShoppingList.ShoppingItems)
         {
-            var cat = item.Varen.ItemCategory;
-            var thisCatSort = itemCategoriesWithShortIndex.FirstOrDefault(f => f.Id.Equals(cat.Id));
-            if (thisCatSort != null)
-                item.Varen.ItemCategory.SortIndex = thisCatSort.SortIndex;
+            var category = item.Varen.ItemCategory;
+            int sortIndex = 0;
+            
+            // Try multiple matching strategies
+            if (categoryToSortIndex.TryGetValue(category.Id, out sortIndex) ||
+                categoryToSortIndex.TryGetValue(category.Name, out sortIndex) ||
+                categoryToSortIndex.TryGetValue(category.Name.Trim(), out sortIndex))
+            {
+                item.Varen.ItemCategory.SortIndex = sortIndex;
+                itemsUpdated++;
+                Console.WriteLine($"  Matched '{item.Varen.Name}' category '{category.Name}' to SortIndex: {sortIndex}");
+            }
+            else
+            {
+                Console.WriteLine($"  NO MATCH for '{item.Varen.Name}' category '{category.Name}' (ID: '{category.Id}')");
+                // Keep existing sort index (likely 0)
+            }
         }
+        
+        Console.WriteLine($"Updated sort index for {itemsUpdated} items");
 
-
-        ThisShoppingList.ShoppingItems = ThisShoppingList.ShoppingItems.OrderBy(f => f.Varen.ItemCategory.SortIndex).ToList();
+        // OPTIMIZATION 4: Sort in-place using ToList() for correct collection type
+        var beforeSort = ThisShoppingList.ShoppingItems.Count;
+        ThisShoppingList.ShoppingItems = ThisShoppingList.ShoppingItems
+            .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+            .ToList();
+        
+        Console.WriteLine($"Sorted {beforeSort} items. Final count: {ThisShoppingList.ShoppingItems.Count}");
+        
+        // DEBUG: Show final sorted order with item names and sort indices
+        Console.WriteLine("=== FINAL SORTED ORDER ===");
+        int index = 1;
+        foreach (var item in ThisShoppingList.ShoppingItems)
+        {
+            Console.WriteLine($"{index}. {item.Varen.Name} (Category: {item.Varen.ItemCategory.Name}, SortIndex: {item.Varen.ItemCategory.SortIndex})");
+            index++;
+        }
+        Console.WriteLine("=== END SORTED ORDER ===");
+        
+        // Apply current filter to the newly sorted list
         FilterList(activeListFiler);
+        
+        Console.WriteLine("SortShoppingList completed successfully");
+        
+        // FORCE UI UPDATE: Tell Blazor to re-render the component
+        StateHasChanged();
     }
     #region Modal handling
 
