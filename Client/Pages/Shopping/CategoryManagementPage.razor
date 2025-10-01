@@ -18,8 +18,15 @@
                     <p class="text-muted">Organisér kategorier og varene som tilhører dem</p>
                 </div>
                 <div class="col-2">
-                    <button class="btn btn-success" @onclick="SaveCategoryConfiguration">
-                        <i class="fas fa-save"></i> Lagre
+                    <button class="btn btn-success" @onclick="SaveCategoryConfiguration" disabled="@isUpdating">
+                        @if (isUpdating)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i> <span>Lagrer...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save"></i> <span>Lagre</span>
+                        }
                     </button>
                 </div>
             </div>
@@ -55,7 +62,7 @@
                         <div class="category-container">
                             @foreach (var category in AllCategories.OrderBy(c => c.Name))
                             {
-                                <div class="category-item card-item">
+                                <div class="category-item card-item @(currentDropTarget?.Id == category.Id ? "can-drop" : "")">
                                     <div class="category-header">
                                         <div class="row align-items-center">
                                             <div class="col">
@@ -99,19 +106,25 @@
                                     </div>
 
                                     <!-- Items in this category -->
-                                    <div class="category-items">
+                                    <div class="category-items drop-zone @(currentDropTarget?.Id == category.Id ? "drag-over" : "")" 
+                                         @ondragover="@HandleDragOver"
+                                         @ondragover:preventDefault="true"
+                                         @ondrop="@(() => HandleItemDrop(category))"
+                                         @ondrop:preventDefault="true"
+                                         @ondragenter="@(() => HandleDragEnter(category))"
+                                         @ondragenter:preventDefault="true"
+                                         @ondragleave="@HandleDragLeave"
+                                         @ondragleave:preventDefault="true">
                                         @if (GetItemsInCategory(category.Id).Any())
                                         {
                                             <div class="items-grid">
                                                 @foreach (var item in GetItemsInCategory(category.Id).OrderBy(i => i.Name))
                                                 {
-                                                    <div class="item-chip"
+                                                    <div class="item-chip @(draggedItem?.Id == item.Id ? "dragging" : "")"
                                                          draggable="true"
                                                          @ondragstart="@(() => HandleItemDragStart(item))"
-                                                         @ondragover="@HandleDragOver"
-                                                         @ondragover:preventDefault="true"
-                                                         @ondrop="@(() => HandleItemDrop(category))"
-                                                         @ondrop:preventDefault="true">
+                                                         @ondragend="@HandleDragEnd"
+                                                         @ondragend:preventDefault="true">
                                                         <span class="item-name">@item.Name</span>
                                                         @if (!string.IsNullOrEmpty(item.Unit))
                                                         {
@@ -123,11 +136,7 @@
                                         }
                                         else
                                         {
-                                            <div class="empty-category"
-                                                 @ondragover="@HandleDragOver"
-                                                 @ondragover:preventDefault="true"
-                                                 @ondrop="@(() => HandleItemDrop(category))"
-                                                 @ondrop:preventDefault="true">
+                                            <div class="empty-category @(currentDropTarget?.Id == category.Id ? "drag-over" : "")">
                                                 <i class="fas fa-box-open text-muted"></i>
                                                 <small class="text-muted">Ingen varer i denne kategorien. Dra varer hit for å flytte dem.</small>
                                             </div>
@@ -147,12 +156,14 @@
                                             <i class="fas fa-exclamation-triangle"></i> Varer uten kategori
                                             <span class="badge badge-warning ms-2">@GetUncategorizedItems().Count() varer</span>
                                         </h6>
-                                        <div class="items-grid">
+                                        <div class="items-grid uncategorized-zone">
                                             @foreach (var item in GetUncategorizedItems().OrderBy(i => i.Name))
                                             {
                                                 <div class="item-chip uncategorized"
                                                      draggable="true"
-                                                     @ondragstart="@(() => HandleItemDragStart(item))">
+                                                     @ondragstart="@(() => HandleItemDragStart(item))"
+                                                     @ondragend="@HandleDragEnd"
+                                                     @ondragend:preventDefault="true">
                                                     <span class="item-name">@item.Name</span>
                                                     @if (!string.IsNullOrEmpty(item.Unit))
                                                     {
@@ -194,6 +205,7 @@
         border-radius: 8px;
         padding: 1rem;
         background: #fafafa;
+        transition: all 0.3s ease;
     }
 
     .category-header {
@@ -213,13 +225,27 @@
     }
 
     .category-items {
-        min-height: 60px;
+        min-height: 80px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+
+    .category-items.drop-zone {
+        border: 2px dashed transparent;
+        padding: 10px;
+    }
+
+    .category-items.drop-zone.drag-over {
+        border-color: #007bff;
+        background-color: #e7f3ff;
+        transform: scale(1.02);
     }
 
     .items-grid {
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
+        min-height: 40px;
     }
 
     .item-chip {
@@ -234,11 +260,20 @@
         align-items: center;
         gap: 0.25rem;
         transition: all 0.2s ease;
+        opacity: 1;
     }
 
     .item-chip:hover {
         background: #0056b3;
         transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+    }
+
+    .item-chip.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+        cursor: grabbing;
+        z-index: 1000;
     }
 
     .item-chip.uncategorized {
@@ -270,11 +305,30 @@
         border-radius: 8px;
         background: #f8f9fa;
         transition: all 0.2s ease;
+        min-height: 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
 
     .empty-category:hover {
         border-color: #007bff;
         background: #e7f3ff;
+    }
+
+    .empty-category.drag-over {
+        border-color: #28a745;
+        background: #d4edda;
+        transform: scale(1.05);
+    }
+
+    .uncategorized-zone {
+        background: #fff3cd;
+        border: 2px dashed #ffc107;
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 60px;
     }
 
     .editing {
@@ -304,6 +358,25 @@
     .card-item:hover {
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
+
+    /* Visual indicators for drag states */
+    .category-item.can-drop {
+        border-color: #28a745;
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+    }
+
+    .drag-helper {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        background: #007bff;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        opacity: 0.8;
+        transform: translate(-50%, -50%);
+    }
 </style>
 
 @code {
@@ -315,6 +388,8 @@
     
     // Drag and drop
     private ShopItemModel? draggedItem;
+    private ItemCategoryModel? currentDropTarget;
+    private bool isUpdating = false;
     
     // Edit state
     private string originalCategoryName = "";
@@ -509,6 +584,8 @@
     private void HandleItemDragStart(ShopItemModel item)
     {
         draggedItem = item;
+        Console.WriteLine($"Started dragging item: {item.Name}");
+        StateHasChanged();
     }
 
     private void HandleDragOver(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
@@ -516,34 +593,97 @@
         args.DataTransfer.DropEffect = "move";
     }
 
+    private void HandleDragEnter(ItemCategoryModel category)
+    {
+        if (draggedItem != null && draggedItem.ItemCategory?.Id != category.Id)
+        {
+            currentDropTarget = category;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleDragLeave(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
+    {
+        // Small delay to prevent flickering when moving between child elements
+        Task.Delay(50).ContinueWith(_ =>
+        {
+            if (currentDropTarget != null)
+            {
+                currentDropTarget = null;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void HandleDragEnd(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
+    {
+        currentDropTarget = null;
+        StateHasChanged();
+    }
+
     private async Task HandleItemDrop(ItemCategoryModel targetCategory)
     {
-        if (draggedItem == null) return;
+        if (draggedItem == null || isUpdating) return;
+
+        var itemName = draggedItem.Name;
+        Console.WriteLine($"Dropping item {itemName} into category {targetCategory.Name}");
+
+        // Store original category for potential rollback
+        var originalCategory = draggedItem.ItemCategory;
+        
+        // Set updating state
+        isUpdating = true;
 
         try
         {
-            // Update item's category
+            // Optimistic UI update - show change immediately
             draggedItem.ItemCategory = new ItemCategoryModel 
             { 
                 Id = targetCategory.Id, 
                 Name = targetCategory.Name 
             };
+            
+            // Update UI immediately for better UX
+            StateHasChanged();
+            Console.WriteLine($"⚡ UI updated optimistically - {itemName} moved to {targetCategory.Name}");
 
-            // Save to API
+            // Save to API in background
             var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), draggedItem);
             
             if (response.IsSuccessStatusCode)
             {
+                Console.WriteLine($"✅ Database updated successfully - {itemName} in {targetCategory.Name}");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ API Error {response.StatusCode}: {errorContent}");
+                
+                // Rollback UI change on API failure
+                draggedItem.ItemCategory = originalCategory;
                 StateHasChanged();
+                Console.WriteLine($"🔄 Rolled back UI change for {itemName}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error moving item: {ex.Message}");
+            Console.WriteLine($"❌ Exception during drop: {ex.Message}");
+            
+            // Rollback UI change on exception
+            if (draggedItem != null)
+            {
+                draggedItem.ItemCategory = originalCategory;
+                StateHasChanged();
+                Console.WriteLine($"🔄 Rolled back UI change due to exception");
+            }
         }
         finally
         {
+            // Always clear drag state and updating flag
             draggedItem = null;
+            currentDropTarget = null;
+            isUpdating = false;
+            StateHasChanged();
         }
     }
 
