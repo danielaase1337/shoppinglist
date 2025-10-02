@@ -1,10 +1,23 @@
 ﻿@page "/shoppinglist"
 @inject HttpClient Http;
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
+@inject BlazorApp.Client.Services.IBackgroundPreloadService BackgroundPreload
 
 <div class="card-maincontainer container-sm">
 
     <div class="row card">
         <h2>Handlelister</h2>
+        @if (ShoppingLists != null && ShoppingLists.Any())
+        {
+            var activeLists = ShoppingLists.Where(l => !l.IsDone).Count();
+            if (activeLists > 0)
+            {
+                <p class="text-muted">
+                    <i class="fas fa-bolt text-success"></i> 
+                    @activeLists aktive lister preloadet for rask tilgang
+                </p>
+            }
+        }
         <div class="row">
             <div class="col">
                 <input class="new-todo" placeholder="Navn på listen?" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler">
@@ -43,7 +56,13 @@
                                     }
                                     else
                                     {
-                                        <a href="@(GetItemNavLink(l.Id))">@l.Name</a>
+                                        <a href="@(GetItemNavLink(l.Id))">
+                                            @l.Name
+                                            @if (!l.IsDone)
+                                            {
+                                                <span class="badge badge-success ms-2" title="Aktiv liste - preloadet for rask tilgang">⚡</span>
+                                            }
+                                        </a>
                                     }
                                 </div>
 
@@ -91,15 +110,30 @@
     }
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("📋 ShoppingListMainPage: Checking cache for instant loading...");
+        
         try
         {
-            // var test = await Http.GetAsync("api/DebugFunction"); 
-            // Console.WriteLine(await test.Content.ReadAsStringAsync()); 
-            ShoppingLists = await Http.GetFromJsonAsync<List<ShoppingListModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists));
+            // Try to get cached data first for instant display
+            ShoppingLists = await DataCache.GetShoppingListsAsync() ?? new List<ShoppingListModel>();
+            
+            if (ShoppingLists.Any())
+            {
+                Console.WriteLine($"⚡ Instant load: {ShoppingLists.Count} shopping lists from cache");
+                StateHasChanged(); // Immediately update UI
+            }
+            else
+            {
+                Console.WriteLine("📋 No cached data, fetching from API...");
+                // If no cache, force refresh to get data
+                ShoppingLists = await DataCache.GetShoppingListsAsync(forceRefresh: true) ?? new List<ShoppingListModel>();
+                Console.WriteLine($"📋 Loaded {ShoppingLists.Count} shopping lists from API");
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            Console.WriteLine($"❌ Error loading shopping lists: {ex.Message}");
+            ShoppingLists = new List<ShoppingListModel>();
         }
     }
 
@@ -109,8 +143,15 @@
     private async Task StoreChange(ShoppingListModel item)
     {
         item.EditClicked = false;
-        await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), item);
+        var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), item);
         //await ShoppingListDataManager.Update(item);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            // Invalidate cache so other pages see the changes
+            DataCache.InvalidateShoppingListsCache();
+            Console.WriteLine($"✅ Updated shopping list: {item.Name}");
+        }
     }
 
     private async Task DeleteList(ShoppingListModel l)
@@ -118,8 +159,13 @@
         var res = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.ShoppingList, l.Id));
         //var res = await ShoppingListDataManager.Delete(l);
         if (res.IsSuccessStatusCode)
+        {
             ShoppingLists.Remove(l);
-
+            
+            // Invalidate cache so other pages see the deletion
+            DataCache.InvalidateShoppingListsCache();
+            Console.WriteLine($"✅ Deleted shopping list: {l.Name}");
+        }
     }
 
     private async Task AddList()
@@ -128,16 +174,21 @@
         var newItem = new ShoppingListModel() { Name = _newListName };
         var res = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), newItem);
         //var res = await ShoppingListDataManager.Insert(newItem);
-        if (res != null)
+        if (res != null && res.IsSuccessStatusCode)
         {
             var shoppinglist = await res.Content.ReadFromJsonAsync<ShoppingListModel>();
             if (shoppinglist != null)
+            {
                 ShoppingLists.Add(shoppinglist);
+                
+                // Invalidate cache so other pages see the new list
+                DataCache.InvalidateShoppingListsCache();
+                Console.WriteLine($"✅ Added new shopping list: {shoppinglist.Name}");
+            }
         }
         _newListName = string.Empty;
 
         OrderLists();
-
     }
 
 
@@ -146,8 +197,15 @@
         if (value?.Value != null && value.Value is bool bValue)
         {
             l.IsDone = bValue;
-            await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), l);
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), l);
             //await ShoppingListDataManager.Update(l);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Invalidate cache when list completion status changes
+                DataCache.InvalidateShoppingListsCache();
+                Console.WriteLine($"✅ Updated shopping list completion: {l.Name} = {bValue}");
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject ISettings Settings
 @inject IJSRuntime JSRuntime
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
 
 <div class="card-maincontainer container-sm">
     
@@ -199,23 +200,42 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("📦 ItemManagementPage: Checking cache for instant loading...");
+        
         try
         {
-            // Load all items
-            AllItems = await Http.GetFromJsonAsync<List<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+            // Try to get cached data first for instant display
+            var cachedItems = await DataCache.GetItemsAsync();
+            var cachedCategories = await DataCache.GetCategoriesAsync();
             
-            // Load available categories
-            AvailableCategories = await Http.GetFromJsonAsync<List<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
-
-            // Ensure items collection exists
-            if (AllItems == null)
+            if (cachedItems?.Any() == true && cachedCategories?.Any() == true)
             {
-                AllItems = new List<ShopItemModel>();
+                // Instant load from cache
+                AllItems = cachedItems;
+                AvailableCategories = cachedCategories;
+                Console.WriteLine($"⚡ Instant load: {AllItems.Count} items and {AvailableCategories.Count} categories from cache");
+                StateHasChanged(); // Update UI immediately
+                return;
             }
+            
+            Console.WriteLine("📦 No cached data, loading in parallel from API...");
+            
+            // Load both datasets in parallel if no cache
+            var loadItems = DataCache.GetItemsAsync(forceRefresh: true);
+            var loadCategories = DataCache.GetCategoriesAsync(forceRefresh: true);
+            
+            await Task.WhenAll(loadItems, loadCategories);
+            
+            AllItems = await loadItems ?? new List<ShopItemModel>();
+            AvailableCategories = await loadCategories ?? new List<ItemCategoryModel>();
+            
+            Console.WriteLine($"📦 Loaded {AllItems.Count} items and {AvailableCategories.Count} categories from API");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading items: {ex.Message}");
+            Console.WriteLine($"❌ Error loading item management data: {ex.Message}");
+            AllItems = new List<ShopItemModel>();
+            AvailableCategories = new List<ItemCategoryModel>();
         }
     }
 
@@ -253,17 +273,21 @@
                 // Add to local collection
                 AllItems?.Add(newItem);
                 
+                // Invalidate cache so other pages see the new item
+                DataCache.InvalidateItemsCache();
+                
                 // Reset form
                 newItemName = "";
                 newItemCategoryId = "";
                 newItemUnit = "";
                 
                 StateHasChanged();
+                Console.WriteLine($"✅ Added new item: {newItem.Name}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error adding item: {ex.Message}");
+            Console.WriteLine($"❌ Error adding item: {ex.Message}");
         }
     }
 
@@ -324,7 +348,12 @@
             if (response.IsSuccessStatusCode)
             {
                 item.EditClicked = false;
+                
+                // Invalidate cache so other pages see the changes
+                DataCache.InvalidateItemsCache();
+                
                 StateHasChanged();
+                Console.WriteLine($"✅ Updated item: {item.Name}");
             }
         }
         catch (Exception ex)
@@ -367,13 +396,17 @@
             if (response.IsSuccessStatusCode)
             {
                 AllItems.Remove(item);
-                Console.WriteLine($"Successfully deleted item {item.Name}");
+                
+                // Invalidate cache so other pages see the deletion
+                DataCache.InvalidateItemsCache();
+                
+                Console.WriteLine($"✅ Successfully deleted item {item.Name}");
                 StateHasChanged();
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Failed to delete item. Status: {response.StatusCode}, Content: {errorContent}");
+                Console.WriteLine($"❌ Failed to delete item. Status: {response.StatusCode}, Content: {errorContent}");
             }
         }
         catch (Exception ex)

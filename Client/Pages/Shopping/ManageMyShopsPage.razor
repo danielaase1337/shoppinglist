@@ -1,6 +1,7 @@
 ﻿@page "/managemyshops"
 @using BlazorApp.Client.Common;
 @inject HttpClient Http
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
 
 
 <div class="card-maincontainer container-sm">
@@ -83,9 +84,33 @@
     public ISettings Settings { get; set; } = null!;
     protected override async Task OnInitializedAsync()
     {
-
-        MyShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops)) ?? new List<ShopModel>();
-
+        Console.WriteLine("🏪 ManageMyShopsPage: Checking cache for instant loading...");
+        
+        try
+        {
+            // Try to get cached data first for instant display
+            var cachedShops = await DataCache.GetShopsAsync();
+            
+            if (cachedShops?.Any() == true)
+            {
+                // Instant load from cache
+                MyShops = cachedShops;
+                Console.WriteLine($"⚡ Instant load: {MyShops.Count} shops from cache");
+                StateHasChanged(); // Update UI immediately
+                return;
+            }
+            
+            Console.WriteLine("🏪 No cached data, loading from API...");
+            
+            // Load from API if no cache
+            MyShops = await DataCache.GetShopsAsync(forceRefresh: true) ?? new List<ShopModel>();
+            Console.WriteLine($"🏪 Loaded {MyShops.Count} shops from API");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shops: {ex.Message}");
+            MyShops = new List<ShopModel>();
+        }
     }
 
     private ShopModel newShop = new ShopModel();
@@ -98,13 +123,26 @@
     private async Task StoreChange(ShopModel item)
     {
         item.EditClicked = false;
-        await Http.PutAsJsonAsync<ShopModel>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), item);
+        var response = await Http.PutAsJsonAsync<ShopModel>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), item);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            // Invalidate cache so other pages see the changes
+            DataCache.InvalidateShopsCache();
+            Console.WriteLine($"✅ Updated shop: {item.Name}");
+        }
     }
     private async Task DeleteList(ShopModel l)
     {
         var deleRes = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, l.Id));
         if (deleRes != null && deleRes.IsSuccessStatusCode)
+        {
             MyShops?.Remove(l);
+            
+            // Invalidate cache so other pages see the deletion
+            DataCache.InvalidateShopsCache();
+            Console.WriteLine($"✅ Deleted shop: {l.Name}");
+        }
     }
 
     private string GetItemNavLink(string shopId)
@@ -125,11 +163,17 @@
         if (string.IsNullOrEmpty(_newShopName)) return;
         var newShop = new ShopModel() { Name = _newShopName };
         var insertres = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), newShop);
-        if (insertres != null)
+        if (insertres != null && insertres.IsSuccessStatusCode)
         {
             var parsedShop = await insertres.Content.ReadFromJsonAsync<ShopModel>();
             if(parsedShop != null)
+            {
                 MyShops?.Add(parsedShop);
+                
+                // Invalidate cache so other pages see the new shop
+                DataCache.InvalidateShopsCache();
+                Console.WriteLine($"✅ Added new shop: {parsedShop.Name}");
+            }
             _newShopName = string.Empty;
         }
     }

@@ -1,10 +1,12 @@
 @page "/categories"
 @using BlazorApp.Client.Common
 @using BlazorApp.Client.Shared
+@using BlazorApp.Client.Services
 @using Microsoft.AspNetCore.Components.Web
 @inject HttpClient Http
 @inject ISettings Settings
 @inject IJSRuntime JSRuntime
+@inject IDataCacheService DataCache
 
 <div class="card-maincontainer container-sm">
     
@@ -396,8 +398,44 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadCategories();
-        await LoadItems();
+        try
+        {
+            Console.WriteLine("🏷️ CategoryManagementPage: Checking cache for instant loading...");
+            var startTime = DateTime.Now;
+
+            // Try to get cached data first for instant display
+            var cachedCategories = await DataCache.GetCategoriesAsync();
+            var cachedItems = await DataCache.GetItemsAsync();
+            
+            if (cachedCategories?.Any() == true && cachedItems?.Any() == true)
+            {
+                // Instant load from cache
+                AllCategories = cachedCategories;
+                AllItems = cachedItems;
+                var cacheLoadTime = DateTime.Now - startTime;
+                Console.WriteLine($"⚡ Instant load: {AllCategories.Count()} categories and {AllItems.Count()} items from cache in {cacheLoadTime.TotalMilliseconds:F0}ms");
+                StateHasChanged(); // Update UI immediately
+                return;
+            }
+            
+            Console.WriteLine("🏷️ No cached data, loading in parallel from API...");
+
+            // Load categories and items in parallel if no cache
+            var categoriesTask = DataCache.GetCategoriesAsync(forceRefresh: true);
+            var itemsTask = DataCache.GetItemsAsync(forceRefresh: true);
+
+            await Task.WhenAll(categoriesTask, itemsTask);
+
+            AllCategories = await categoriesTask;
+            AllItems = await itemsTask;
+
+            var loadTime = DateTime.Now - startTime;
+            Console.WriteLine($"🏷️ Category management page loaded from API in {loadTime.TotalMilliseconds:F0}ms");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading category management: {ex.Message}");
+        }
     }
 
     private async Task LoadCategories()
@@ -453,6 +491,10 @@
                 {
                     AllCategories.Add(createdCategory);
                     newCategoryName = "";
+                    
+                    // Invalidate cache so other pages get fresh data
+                    DataCache.InvalidateCategoriesCache();
+                    
                     StateHasChanged();
                 }
             }
@@ -653,6 +695,9 @@
             if (response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"✅ Database updated successfully - {itemName} in {targetCategory.Name}");
+                
+                // Invalidate items cache so other pages see the change
+                DataCache.InvalidateItemsCache();
             }
             else
             {

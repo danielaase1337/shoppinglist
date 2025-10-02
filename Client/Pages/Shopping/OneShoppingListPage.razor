@@ -1,7 +1,9 @@
-﻿    @page "/shoppinglist/{id}"
+﻿@page "/shoppinglist/{id}"
+@using BlazorApp.Client.Services
 
 @inject HttpClient Http
-@inject ISettings Settings; 
+@inject ISettings Settings
+@inject IDataCacheService DataCache 
 
 @if (newVareModel != null)
 {
@@ -60,6 +62,12 @@
                 <div class="col">
                     <h5 class="@showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
+                    @if (!ThisShoppingList.IsDone)
+                    {
+                        <small class="text-success">
+                            <i class="fas fa-bolt"></i> Preloadet for rask tilgang
+                        </small>
+                    }
                 </div>
 
                 <div class="col-5">
@@ -185,19 +193,38 @@ else
         if (!ok)
             return;
 
+        try
+        {
+            Console.WriteLine($"🚀 Loading shopping list page for ID: {Id}");
+            var startTime = DateTime.Now;
 
-        ThisShoppingList = await Http.GetFromJsonAsync<ShoppingListModel>(Settings.GetApiUrlId(ShoppingListKeysEnum.ShoppingList, Id));
+            // Load shopping list details and shared data in parallel
+            var shoppingListTask = DataCache.GetShoppingListAsync(Id);
+            var itemsTask = DataCache.GetItemsAsync();
+            var categoriesTask = DataCache.GetCategoriesAsync();
+            var shopsTask = DataCache.GetShopsAsync();
 
-        if(ThisShoppingList != null)
-            ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+            // Wait for all tasks to complete
+            await Task.WhenAll(shoppingListTask, itemsTask, categoriesTask, shopsTask);
 
-        FilterList(activeListFiler);
+            // Assign results
+            ThisShoppingList = await shoppingListTask;
+            Varer = await itemsTask;
+            AvailableCategories = await categoriesTask;
+            AvailableShops = await shopsTask;
 
-        Varer =  await Http.GetFromJsonAsync<List<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
-        AvailableCategories = await Http.GetFromJsonAsync<List<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
+            if (ThisShoppingList != null)
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems;
 
-        AvailableShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
+            FilterList(activeListFiler);
 
+            var loadTime = DateTime.Now - startTime;
+            Console.WriteLine($"⚡ Shopping list page loaded in {loadTime.TotalMilliseconds:F0}ms");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shopping list page: {ex.Message}");
+        }
     }
 
     public async Task DeleteVare(ShoppingListItemModel m)
