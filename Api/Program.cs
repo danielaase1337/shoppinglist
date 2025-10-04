@@ -13,38 +13,38 @@ namespace ApiIsolated
     {
         public static void Main()
         {
-
-#if DEBUG
-           var host = new HostBuilder()
-             .ConfigureFunctionsWebApplication()
-             .ConfigureServices(s =>
-             {
-                 s.AddTransient<IGoogleDbContext, GoogleDbContext>();
-                 s.AddSingleton<IGenericRepository<ShoppingList>, MemoryGenericRepository<ShoppingList>>();
-                 s.AddSingleton<IGenericRepository<ShopItem>, MemoryGenericRepository<ShopItem>>();
-                 s.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
-                 s.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
-                 s.AddAutoMapper(Assembly.GetExecutingAssembly());
-
-             })
-             .Build();
-           host.Run();
-#else
-             var host = new HostBuilder()
+            var host = new HostBuilder()
                 .ConfigureFunctionsWebApplication()
-                .ConfigureServices(s =>
+                .ConfigureServices((context, services) =>
                 {
-                    s.AddTransient<IGoogleDbContext, GoogleDbContext>();
-                    s.AddSingleton<IGenericRepository<ShoppingList>, GoogleFireBaseGenericRepository<ShoppingList>>();
-                    s.AddSingleton<IGenericRepository<ShopItem>, GoogleFireBaseGenericRepository<ShopItem>>();
-                    s.AddSingleton<IGenericRepository<ItemCategory>, GoogleFireBaseGenericRepository<ItemCategory>>();
-                    s.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
-                    s.AddAutoMapper(Assembly.GetExecutingAssembly());
+                    services.AddTransient<IGoogleDbContext, GoogleDbContext>();
+                    services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
+                    // Use environment variable to determine which repository to use
+                    var environment = context.HostingEnvironment.EnvironmentName;
+                    var useMemoryDb = environment == "Development" || 
+                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT"));
+
+                    if (useMemoryDb)
+                    {
+                        // Development or local - use memory repositories
+                        services.AddSingleton<IGenericRepository<ShoppingList>, MemoryGenericRepository<ShoppingList>>();
+                        services.AddSingleton<IGenericRepository<ShopItem>, MemoryGenericRepository<ShopItem>>();
+                        services.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
+                        services.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
+                    }
+                    else
+                    {
+                        // Production - use Firestore repositories
+                        services.AddSingleton<IGenericRepository<ShoppingList>, GoogleFireBaseGenericRepository<ShoppingList>>();
+                        services.AddSingleton<IGenericRepository<ShopItem>, GoogleFireBaseGenericRepository<ShopItem>>();
+                        services.AddSingleton<IGenericRepository<ItemCategory>, GoogleFireBaseGenericRepository<ItemCategory>>();
+                        services.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
+                    }
                 })
                 .Build();
+            
             host.Run();
-#endif
         }
     }
 }
