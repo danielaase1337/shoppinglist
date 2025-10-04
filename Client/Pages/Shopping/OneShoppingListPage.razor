@@ -1,7 +1,9 @@
-﻿    @page "/shoppinglist/{id}"
+﻿@page "/shoppinglist/{id}"
+@using BlazorApp.Client.Services
 
 @inject HttpClient Http
-@inject ISettings Settings; 
+@inject ISettings Settings
+@inject IDataCacheService DataCache 
 
 @if (newVareModel != null)
 {
@@ -55,24 +57,29 @@
     
     <div class="card-maincontainer container-sm">
         <div class="card">
-            <div class="row align-items-start">
-
+            <div class="row align-items-center mb-3">
                 <div class="col">
-                    <h5 class="@showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
+                    <h5 class="shopping-list-title @showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
-                </div>
-
-                <div class="col-5">
-                    <SfDropDownList TValue="string" TItem="ShopModel" Placeholder="Velg butikk" DataSource="@AvailableShops" @bind-Index="@shopIndex" Width="100">
-                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
-                    </SfDropDownList>
-                </div>
-                <div class="col-2">
-                    <button class="btn btn-sm btn-outline-info" @onclick="SortShoppingList"><i class="fas fa-sort-amount-down-alt"></i></button>
                 </div>
             </div>
 
-            <div class="row">
+            <div class="row align-items-center mb-3">
+                <div class="col-12">
+                    <SfDropDownList TValue="string" 
+                                  TItem="ShopModel" 
+                                  Placeholder="Velg butikk for sortering" 
+                                  DataSource="@AvailableShops" 
+                                  @bind-Index="@shopIndex" 
+                                  Width="100%"
+                                  PopupHeight="300px">
+                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
+                        <DropDownListEvents TValue="string" TItem="ShopModel" ValueChange="OnShopSelectionChanged"></DropDownListEvents>
+                    </SfDropDownList>
+                </div>
+            </div>
+
+            <div class="row align-items-center mb-4">
                 <div class="col">
                     <SfAutoComplete TValue="string"
                                 TItem="ShopItemModel"
@@ -80,16 +87,18 @@
                                 Placeholder="Hva skal handles?"
                                 @bind-Value="@autoValue"
                                 FilterType="FilterType.Contains"
+                                Width="100%"
+                                PopupHeight="300px"
                                 Highlight>
                         <AutoCompleteFieldSettings Value="Name" Text="Name" />
                         <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
                                         ValueChange="@SelectedShopItemChanged"></AutoCompleteEvents>
-                       
                     </SfAutoComplete>
                 </div>
-                <div class="col-2 contenAlignCenter">
-                    <button class="btn btn-sm"><i class="fas fa-plus"></i></button>
-                  
+                <div class="col-auto">
+                    <button class="btn btn-add-item" title="Legg til vare">
+                        <i class="fas fa-plus"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -185,19 +194,38 @@ else
         if (!ok)
             return;
 
+        try
+        {
+            Console.WriteLine($"🚀 Loading shopping list page for ID: {Id}");
+            var startTime = DateTime.Now;
 
-        ThisShoppingList = await Http.GetFromJsonAsync<ShoppingListModel>(Settings.GetApiUrlId(ShoppingListKeysEnum.ShoppingList, Id));
+            // Load shopping list details and shared data in parallel
+            var shoppingListTask = DataCache.GetShoppingListAsync(Id);
+            var itemsTask = DataCache.GetItemsAsync();
+            var categoriesTask = DataCache.GetCategoriesAsync();
+            var shopsTask = DataCache.GetShopsAsync();
 
-        if(ThisShoppingList != null)
-            ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+            // Wait for all tasks to complete
+            await Task.WhenAll(shoppingListTask, itemsTask, categoriesTask, shopsTask);
 
-        FilterList(activeListFiler);
+            // Assign results
+            ThisShoppingList = await shoppingListTask;
+            Varer = await itemsTask;
+            AvailableCategories = await categoriesTask;
+            AvailableShops = await shopsTask;
 
-        Varer =  await Http.GetFromJsonAsync<List<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
-        AvailableCategories = await Http.GetFromJsonAsync<List<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
+            if (ThisShoppingList != null)
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems;
 
-        AvailableShops = await Http.GetFromJsonAsync<List<ShopModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.Shops));
+            FilterList(activeListFiler);
 
+            var loadTime = DateTime.Now - startTime;
+            Console.WriteLine($"⚡ Shopping list page loaded in {loadTime.TotalMilliseconds:F0}ms");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shopping list page: {ex.Message}");
+        }
     }
 
     public async Task DeleteVare(ShoppingListItemModel m)
@@ -352,15 +380,23 @@ else
             activeListFiler = sValue;
             if (activeListFiler.Equals("done"))
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => f.IsDone).ToList();
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .Where(f => f.IsDone)
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
             else if (activeListFiler.Equals("active"))
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems.Where(f => !f.IsDone).ToList();
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .Where(f => !f.IsDone)
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
             else //all
             {
-                ThisShoppingListItems = ThisShoppingList.ShoppingItems;
+                ThisShoppingListItems = ThisShoppingList.ShoppingItems
+                    .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+                    .ToList();
             }
         }
     }
@@ -368,38 +404,116 @@ else
     private int? shopIndex { get; set; } = -1;
     ShopModel SelectedShop { get; set; }
     
+    void OnShopSelectionChanged(ChangeEventArgs<string, ShopModel> args)
+    {
+        Console.WriteLine($"Shop selection changed to: {args?.ItemData?.Name}");
+        // Automatically sort when shop is selected
+        SortShoppingList();
+        StateHasChanged();
+    }
+    
     void SortShoppingList()
     {
-        if (shopIndex == null || shopIndex == -1) return; //TODO - lag notifikasjon..
-                                                          //Insert Sort index on itemCats.
-
-
-        SelectedShop = AvailableShops.ToArray()[shopIndex.Value];
-
-        var itemCategoriesWithShortIndex = new List<ItemCategoryModel>();
-        if (SelectedShop.ShelfsInShop == null) return;
-        foreach (var shelfst in SelectedShop.ShelfsInShop)
+        Console.WriteLine($"SortShoppingList called. shopIndex: {shopIndex}");
+        
+        if (shopIndex == null || shopIndex == -1) 
         {
-            var startSort = shelfst.SortIndex;
-            foreach (var cat in shelfst.ItemCateogries)
+            Console.WriteLine("No shop selected - cannot sort");
+            // TODO - lag notifikasjon til bruker om at butikk må velges først
+            return;
+        }
+
+        Console.WriteLine($"Sorting with shop index: {shopIndex}");
+        
+        // OPTIMIZATION 1: Use ElementAt() instead of ToArray() conversion
+        SelectedShop = AvailableShops.ElementAt(shopIndex.Value);
+        Console.WriteLine($"Selected shop: {SelectedShop.Name}");
+        
+        if (SelectedShop.ShelfsInShop == null) 
+        {
+            Console.WriteLine("No shelfs found in selected shop");
+            return;
+        }
+
+        Console.WriteLine($"Found {SelectedShop.ShelfsInShop.Count} shelfs in shop");
+
+        // OPTIMIZATION 2: Use Dictionary for O(1) lookup instead of O(M) FirstOrDefault
+        var categoryToSortIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        
+        // Build category sort index mapping efficiently - FIXED ALGORITHM
+        foreach (var shelf in SelectedShop.ShelfsInShop)
+        {
+            Console.WriteLine($"Processing shelf: {shelf.Name}, SortIndex: {shelf.SortIndex}");
+            
+            var categoryIndexInShelf = 0;
+            foreach (var cat in shelf.ItemCateogries)
             {
-                startSort += 1;
-                cat.SortIndex = startSort;
-                itemCategoriesWithShortIndex.Add(cat);
+                categoryIndexInShelf++;
+                
+                // CORRECT CALCULATION: (ShelfIndex * 1000) + CategoryIndex
+                // This ensures shelf order is preserved, then category order within shelf
+                var sortIndex = (shelf.SortIndex * 1000) + categoryIndexInShelf;
+                
+                // Use both exact name and trimmed/normalized name for matching
+                categoryToSortIndex[cat.Name] = sortIndex;
+                categoryToSortIndex[cat.Name.Trim()] = sortIndex;
+                categoryToSortIndex[cat.Id] = sortIndex;
+                Console.WriteLine($"  Category: {cat.Name} assigned SortIndex: {sortIndex} (Shelf: {shelf.SortIndex}, Cat: {categoryIndexInShelf})");
             }
         }
 
+        Console.WriteLine($"Built category mapping with {categoryToSortIndex.Count} categories");
+
+        // OPTIMIZATION 3: Update sort indices in single pass with O(1) lookup
+        var itemsUpdated = 0;
         foreach (var item in ThisShoppingList.ShoppingItems)
         {
-            var cat = item.Varen.ItemCategory;
-            var thisCatSort = itemCategoriesWithShortIndex.FirstOrDefault(f => f.Id.Equals(cat.Id));
-            if (thisCatSort != null)
-                item.Varen.ItemCategory.SortIndex = thisCatSort.SortIndex;
+            var category = item.Varen.ItemCategory;
+            int sortIndex = 0;
+            
+            // Try multiple matching strategies
+            if (categoryToSortIndex.TryGetValue(category.Id, out sortIndex) ||
+                categoryToSortIndex.TryGetValue(category.Name, out sortIndex) ||
+                categoryToSortIndex.TryGetValue(category.Name.Trim(), out sortIndex))
+            {
+                item.Varen.ItemCategory.SortIndex = sortIndex;
+                itemsUpdated++;
+                Console.WriteLine($"  Matched '{item.Varen.Name}' category '{category.Name}' to SortIndex: {sortIndex}");
+            }
+            else
+            {
+                Console.WriteLine($"  NO MATCH for '{item.Varen.Name}' category '{category.Name}' (ID: '{category.Id}')");
+                // Keep existing sort index (likely 0)
+            }
         }
+        
+        Console.WriteLine($"Updated sort index for {itemsUpdated} items");
 
-
-        ThisShoppingList.ShoppingItems = ThisShoppingList.ShoppingItems.OrderBy(f => f.Varen.ItemCategory.SortIndex).ToList();
+        // OPTIMIZATION 4: Sort in-place using ToList() for correct collection type
+        var beforeSort = ThisShoppingList.ShoppingItems.Count;
+        ThisShoppingList.ShoppingItems = ThisShoppingList.ShoppingItems
+            .OrderBy(f => f.Varen.ItemCategory.SortIndex)
+            .ToList();
+        
+        Console.WriteLine($"Sorted {beforeSort} items. Final count: {ThisShoppingList.ShoppingItems.Count}");
+        
+        // DEBUG: Show final sorted order with item names and sort indices
+        Console.WriteLine("=== FINAL SORTED ORDER ===");
+        int index = 1;
+        foreach (var item in ThisShoppingList.ShoppingItems)
+        {
+            Console.WriteLine($"{index}. {item.Varen.Name} (Category: {item.Varen.ItemCategory.Name}, SortIndex: {item.Varen.ItemCategory.SortIndex})");
+            index++;
+        }
+        Console.WriteLine("=== END SORTED ORDER ===");
+        
+        // Apply current filter to the newly sorted list
         FilterList(activeListFiler);
+        
+        Console.WriteLine("SortShoppingList completed successfully");
+        
+        // FORCE UI UPDATE: Tell Blazor to re-render the component
+        StateHasChanged();
     }
     #region Modal handling
 

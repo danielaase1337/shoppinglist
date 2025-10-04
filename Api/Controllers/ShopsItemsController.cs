@@ -79,7 +79,7 @@ namespace Api.Controllers
 
 
         [Function("shopitem")]
-        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shopitem/{id}")] HttpRequestData req, int id)
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shopitem/{id}")] HttpRequestData req, string id)
         {
             try
             {

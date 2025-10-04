@@ -1,0 +1,500 @@
+@page "/items"
+@inject HttpClient Http
+@inject ISettings Settings
+@inject IJSRuntime JSRuntime
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
+
+<div class="card-maincontainer container-sm">
+    
+    @if (AllItems != null && AvailableCategories != null)
+    {
+        <!-- Page Header -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h2>Administrer Varer</h2>
+                    <p class="text-muted">Legg til, rediger og organiser alle varer i systemet</p>
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-success" @onclick="SaveAllItems">
+                        <i class="fas fa-save"></i> Lagre
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Item -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Legg til ny vare</h5>
+                    <div class="row">
+                        <div class="col-5">
+                            <input class="form-control" placeholder="Navn på vare..." @bind="@newItemName" @onkeyup="OnKeyUpNewItemHandler">
+                        </div>
+                        <div class="col-4">
+                            <select class="form-select" @bind="@newItemCategoryId">
+                                <option value="">-- Velg kategori --</option>
+                                @foreach (var category in AvailableCategories.OrderBy(c => c.Name))
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-2">
+                            <input class="form-control" placeholder="Enhet" @bind="@newItemUnit">
+                        </div>
+                        <div class="col-1">
+                            <button type="button" class="btn btn-outline-success" @onclick="AddNewItem">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="card">
+            <div class="row">
+                <div class="col-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input class="form-control" placeholder="Søk etter varer..." @bind="@searchText" @bind:event="oninput">
+                    </div>
+                </div>
+                <div class="col-4">
+                    <select class="form-select" @bind="@filterCategoryId">
+                        <option value="">-- Alle kategorier --</option>
+                        @foreach (var category in AvailableCategories.OrderBy(c => c.Name))
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-2">
+                    <span class="badge badge-info">@GetFilteredItems().Count() varer</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items List -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Alle varer i systemet</h5>
+                    
+                    @if (GetFilteredItems().Any())
+                    {
+                        <div class="items-container">
+                            @foreach (var item in GetFilteredItems().OrderBy(i => i.Name))
+                            {
+                                <div class="item-row card-item">
+                                    <div class="row align-items-center">
+                                        <!-- Item Name -->
+                                        <div class="col-4">
+                                            @if (item.EditClicked)
+                                            {
+                                                <input class="form-control editing" @bind-value="@item.Name" @onkeyup="@(e => HandleItemNameKeyUp(e, item))" />
+                                            }
+                                            else
+                                            {
+                                                <div class="item-name" @ondblclick="@(() => EnableEdit(item))">
+                                                    <strong>@item.Name</strong>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <!-- Category -->
+                                        <div class="col-3">
+                                            @if (item.EditClicked)
+                                            {
+                                                <select class="form-select form-select-sm" @bind="@item.ItemCategory.Id">
+                                                    @foreach (var category in AvailableCategories.OrderBy(c => c.Name))
+                                                    {
+                                                        <option value="@category.Id">@category.Name</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-primary category-badge">@item.ItemCategory.Name</span>
+                                            }
+                                        </div>
+
+                                        <!-- Unit -->
+                                        <div class="col-2">
+                                            @if (item.EditClicked)
+                                            {
+                                                <input class="form-control form-control-sm" @bind-value="@item.Unit" placeholder="Enhet" />
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">@item.Unit</small>
+                                            }
+                                        </div>
+
+                                        <!-- Actions -->
+                                        <div class="col-3">
+                                            @if (item.EditClicked)
+                                            {
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn btn-sm btn-outline-success" @onclick="@(() => SaveItem(item))">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning" @onclick="@(() => CancelEdit(item))">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="@(() => EnableEdit(item))">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteItem(item))">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <p>Ingen varer funnet som matcher søkekriteriene.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+</div>
+
+@code {
+    private ICollection<ShopItemModel>? AllItems { get; set; }
+    private ICollection<ItemCategoryModel>? AvailableCategories { get; set; }
+    
+    // New item form
+    private string newItemName = "";
+    private string newItemCategoryId = "";
+    private string newItemUnit = "";
+    
+    // Search and filter
+    private string searchText = "";
+    private string filterCategoryId = "";
+    
+    // Edit state
+    private string originalItemName = "";
+    private string originalItemUnit = "";
+    private ItemCategoryModel? originalItemCategory;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("📦 ItemManagementPage: Checking cache for instant loading...");
+        
+        try
+        {
+            // Try to get cached data first for instant display
+            var cachedItems = await DataCache.GetItemsAsync();
+            var cachedCategories = await DataCache.GetCategoriesAsync();
+            
+            if (cachedItems?.Any() == true && cachedCategories?.Any() == true)
+            {
+                // Instant load from cache
+                AllItems = cachedItems;
+                AvailableCategories = cachedCategories;
+                Console.WriteLine($"⚡ Instant load: {AllItems.Count} items and {AvailableCategories.Count} categories from cache");
+                StateHasChanged(); // Update UI immediately
+                return;
+            }
+            
+            Console.WriteLine("📦 No cached data, loading in parallel from API...");
+            
+            // Load both datasets in parallel if no cache
+            var loadItems = DataCache.GetItemsAsync(forceRefresh: true);
+            var loadCategories = DataCache.GetCategoriesAsync(forceRefresh: true);
+            
+            await Task.WhenAll(loadItems, loadCategories);
+            
+            AllItems = await loadItems ?? new List<ShopItemModel>();
+            AvailableCategories = await loadCategories ?? new List<ItemCategoryModel>();
+            
+            Console.WriteLine($"📦 Loaded {AllItems.Count} items and {AvailableCategories.Count} categories from API");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading item management data: {ex.Message}");
+            AllItems = new List<ShopItemModel>();
+            AvailableCategories = new List<ItemCategoryModel>();
+        }
+    }
+
+    private async Task OnKeyUpNewItemHandler(KeyboardEventArgs args)
+    {
+        if (args.Code.Equals("Enter"))
+        {
+            await AddNewItem();
+        }
+    }
+
+    private async Task AddNewItem()
+    {
+        if (string.IsNullOrWhiteSpace(newItemName) || string.IsNullOrWhiteSpace(newItemCategoryId)) 
+            return;
+
+        var selectedCategory = AvailableCategories?.FirstOrDefault(c => c.Id == newItemCategoryId);
+        if (selectedCategory == null) return;
+
+        var newItem = new ShopItemModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = newItemName.Trim(),
+            Unit = string.IsNullOrWhiteSpace(newItemUnit) ? "stk" : newItemUnit.Trim(),
+            ItemCategory = selectedCategory
+        };
+
+        try
+        {
+            // Post to API
+            var response = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), newItem);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Add to local collection
+                AllItems?.Add(newItem);
+                
+                // Invalidate cache so other pages see the new item
+                DataCache.InvalidateItemsCache();
+                
+                // Reset form
+                newItemName = "";
+                newItemCategoryId = "";
+                newItemUnit = "";
+                
+                StateHasChanged();
+                Console.WriteLine($"✅ Added new item: {newItem.Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error adding item: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<ShopItemModel> GetFilteredItems()
+    {
+        if (AllItems == null) return Enumerable.Empty<ShopItemModel>();
+
+        var filtered = AllItems.AsEnumerable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            filtered = filtered.Where(i => i.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Apply category filter
+        if (!string.IsNullOrWhiteSpace(filterCategoryId))
+        {
+            filtered = filtered.Where(i => i.ItemCategory.Id == filterCategoryId);
+        }
+
+        return filtered;
+    }
+
+    private void EnableEdit(ShopItemModel item)
+    {
+        originalItemName = item.Name;
+        originalItemUnit = item.Unit;
+        originalItemCategory = item.ItemCategory;
+        item.EditClicked = true;
+    }
+
+    private void CancelEdit(ShopItemModel item)
+    {
+        item.Name = originalItemName;
+        item.Unit = originalItemUnit;
+        item.ItemCategory = originalItemCategory!;
+        item.EditClicked = false;
+    }
+
+    private async Task SaveItem(ShopItemModel item)
+    {
+        try
+        {
+            // Update category reference
+            if (!string.IsNullOrEmpty(item.ItemCategory.Id))
+            {
+                var selectedCategory = AvailableCategories?.FirstOrDefault(c => c.Id == item.ItemCategory.Id);
+                if (selectedCategory != null)
+                {
+                    item.ItemCategory = selectedCategory;
+                }
+            }
+
+            // Put to API
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), item);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                item.EditClicked = false;
+                
+                // Invalidate cache so other pages see the changes
+                DataCache.InvalidateItemsCache();
+                
+                StateHasChanged();
+                Console.WriteLine($"✅ Updated item: {item.Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving item: {ex.Message}");
+        }
+    }
+
+    private async Task HandleItemNameKeyUp(KeyboardEventArgs args, ShopItemModel item)
+    {
+        if (args.Code.Equals("Enter"))
+        {
+            await SaveItem(item);
+        }
+        else if (args.Code.Equals("Escape"))
+        {
+            CancelEdit(item);
+        }
+    }
+
+    private async Task DeleteItem(ShopItemModel item)
+    {
+        if (AllItems == null) return;
+
+        // Add confirmation dialog
+        if (!await ConfirmDelete($"Er du sikker på at du vil slette '{item.Name}'?"))
+        {
+            return;
+        }
+
+        try
+        {
+            var deleteUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.ShopItem, item.Id);
+            Console.WriteLine($"Attempting to delete item {item.Name} with ID {item.Id} using URL: {deleteUrl}");
+            
+            var response = await Http.DeleteAsync(deleteUrl);
+            
+            Console.WriteLine($"Delete response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                AllItems.Remove(item);
+                
+                // Invalidate cache so other pages see the deletion
+                DataCache.InvalidateItemsCache();
+                
+                Console.WriteLine($"✅ Successfully deleted item {item.Name}");
+                StateHasChanged();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ Failed to delete item. Status: {response.StatusCode}, Content: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting item: {ex.Message}");
+        }
+    }
+
+    private async Task<bool> ConfirmDelete(string message)
+    {
+        // Use JavaScript confirm dialog
+        return await JSRuntime.InvokeAsync<bool>("confirm", message);
+    }
+
+    private Task SaveAllItems()
+    {
+        // This could be used for batch operations if needed
+        Console.WriteLine("Save all items - implement if needed for batch operations");
+        return Task.CompletedTask;
+    }
+}
+
+<style>
+    .card-item {
+        transition: transform 0.2s ease;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background-color: #fff;
+    }
+
+    .card-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .item-name {
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+    }
+
+    .item-name:hover {
+        background-color: #f8f9fa;
+    }
+
+    .category-badge {
+        font-size: 0.8rem;
+    }
+
+    .editing {
+        border: 2px solid #007bff;
+        background-color: #f8f9fa;
+    }
+
+    .items-container {
+        max-height: 600px;
+        overflow-y: auto;
+        padding: 10px 0;
+    }
+
+    .badge-info {
+        background-color: #17a2b8;
+        color: white;
+        font-size: 0.9rem;
+        padding: 0.5em 0.75em;
+    }
+
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #ced4da;
+    }
+
+    .btn-group .btn {
+        margin-right: 5px;
+    }
+
+    .btn-group .btn:last-child {
+        margin-right: 0;
+    }
+
+    .form-select-sm {
+        font-size: 0.875rem;
+    }
+
+    .form-control-sm {
+        font-size: 0.875rem;
+    }
+</style>

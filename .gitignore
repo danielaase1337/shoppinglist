@@ -343,3 +343,8 @@ healthchecksdb
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Google Cloud credentials
+**/serviceaccount.json
+**/google-credentials.json
+**/*credential*.json

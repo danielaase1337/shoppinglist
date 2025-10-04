@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject BlazorApp.Client.Services.IBackgroundPreloadService BackgroundPreload
 
 <div Class="main">
     <NewNavComponent></NewNavComponent>
@@ -8,3 +9,18 @@
         </article>
     </main>
 </div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("🏠 MainLayout: Starting fast core data preload...");
+        
+        // Start fast parallel preload of core data immediately  
+        await BackgroundPreload.StartFastCorePreloadAsync();
+        
+        Console.WriteLine("🏠 MainLayout: Starting background preload...");
+        
+        // Start background preloading of active shopping lists
+        await BackgroundPreload.StartPreloadingAsync();
+    }
+}

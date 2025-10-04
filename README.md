@@ -51,6 +51,48 @@ Once you clone the project, open the solution in the latest release of [Visual S
 - **Api**: A C# Azure Functions API, which the Blazor application will call
 - **Shared**: A C# class library with a shared data model between the Blazor and Functions application
 
+## Google Firestore Configuration
+
+This application uses Google Cloud Firestore as the production database. To test with real Firestore data locally:
+
+### Local Development Setup
+
+1. **Obtain Google Service Account Credentials**
+   - Download the service account JSON file from Google Cloud Console
+   - Save it to a secure location (e.g., `D:\Privat\GIT\Google keys\supergnisten-shoppinglist-eb82277057ad.json`)
+
+2. **Set Environment Variable**
+   ```powershell
+   # Option 1: Set file path (for local development)
+   $env:GOOGLE_CREDENTIALS = "D:\Privat\GIT\Google keys\supergnisten-shoppinglist-eb82277057ad.json"
+   
+   # Option 2: Set JSON content directly (for production/cloud deployment)
+   $env:GOOGLE_CREDENTIALS = Get-Content "D:\Privat\GIT\Google keys\supergnisten-shoppinglist-eb82277057ad.json" -Raw
+   ```
+
+3. **Smart Credential Handling**
+   The `GoogleDbContext` automatically detects whether the environment variable contains:
+   - **File path**: Uses `Path.IsPathFullyQualified()` to detect and reads the JSON content
+   - **JSON content**: Uses the value directly
+   
+   This allows seamless switching between local development (file path) and cloud deployment (JSON content).
+
+### Code Implementation
+```csharp
+var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
+if(Path.IsPathFullyQualified(json)) // Check if env var is a file path
+{
+    json = File.ReadAllText(json);   // Read JSON from file
+}
+// Use json content for Firestore authentication
+```
+
+### Debug vs Production Data
+- **Debug mode**: Uses `MemoryGenericRepository` with in-memory test data
+- **Production mode**: Uses `GoogleFireBaseGenericRepository` with live Firestore data
+
+Switch between modes by changing the build configuration in `Api/Program.cs`.
+
 ## Deploy to Azure Static Web Apps
 
 This application can be deployed to [Azure Static Web Apps](https://docs.microsoft.com/azure/static-web-apps), to learn how, check out [our quickstart guide](https://aka.ms/blazor-swa/quickstart).
