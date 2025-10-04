@@ -10,36 +10,6 @@ Playwright-testene fokuserer på:
 - **Navigasjon**: Verifisering av at alle sider lastes korrekt
 - **End-to-End brukerflyt**: Fullstendige brukerscenarioer
 
-## ⚠️ VIKTIG: Start Både Client OG API Før Testing!
-
-**Testene vil feile hvis ikke begge applikasjonene kjører:**
-1. **Azure Functions API** må kjøre på `http://localhost:7071`
-2. **Blazor WebAssembly Client** må kjøre på `https://localhost:7072`
-
-### Slik starter du begge:
-
-#### Alternativ A: Visual Studio (Anbefalt)
-1. Høyreklikk på solution → "Configure Startup Projects"
-2. Velg "Multiple startup projects"
-3. Sett både `Client` og `Api` til "Start"
-4. Trykk OK og kjør med F5
-
-#### Alternativ B: Kommandolinje
-
-**Terminal 1 - Start API:**
-```powershell
-cd Api
-func start --port 7071
-```
-
-**Terminal 2 - Start Client:**
-```powershell
-cd Client
-dotnet run
-```
-
-Vent til begge er klare (se "Now listening on..." i terminalene).
-
 ## Teststruktur
 
 ```
@@ -48,10 +18,8 @@ Client.Tests.Playwright/
 ├── GlobalUsings.cs
 ├── PlaywrightFixture.cs
 ├── Tests/
-│   ├── NavigationTests.cs             # Navigasjon og routing
-│   ├── ShoppingListSortingTests.cs    # Sorteringslogikk
-│   ├── DebugTests.cs                  # Console error diagnostikk
-│   └── PageInspectionTests.cs         # API-kall og komponent-inspeksjon
+│   ├── ShoppingListSortingTests.cs    # Hovedfokus: sorteringslogikk
+│   └── NavigationTests.cs             # Navigasjon og sideinnlasting
 └── README.md
 ```
 
@@ -63,17 +31,14 @@ Client.Tests.Playwright/
 cd Client.Tests.Playwright
 
 # Installer Playwright browsers
-pwsh bin/Debug/net9.0/playwright.ps1 install
+dotnet run --project . -- install
 
-# Eller via dotnet
-dotnet build
-playwright install
+# Eller manuelt
+npx playwright install
 ```
 
 ### Kjøre testene
 ```powershell
-# VIKTIG: Start Client og API først! (se over)
-
 # Kjør alle Playwright-tester
 dotnet test
 
@@ -81,68 +46,30 @@ dotnet test
 dotnet test --logger "console;verbosity=detailed"
 
 # Kjør spesifikk test-klasse
-dotnet test --filter "NavigationTests"
 dotnet test --filter "ShoppingListSortingTests"
-dotnet test --filter "DebugTests"
-
-# Kjør enkelttest
-dotnet test --filter "HomePage_ShouldLoadSuccessfully"
 ```
 
-## Test-kategorier
+## Viktige Testscenarioer
 
-### 1. NavigationTests 🧭
-Tester routing og sideinnlasting:
-- ✅ `HomePage_ShouldLoadSuccessfully` - Forsiden laster
-- ✅ `NavigationPages_ShouldLoadCorrectly` - Hovedsider lastes uten feil
-- ✅ `ShoppingListMainPage_ShouldShowShoppingLists` - Viser handlelister
-- ✅ `OneShoppingListPage_WithValidId_ShouldLoadCorrectly` - Enkeltliste laster med data
-- ✅ `AdminPage_ShouldLoadDatabaseManagement` - Admin-siden laster
-- ✅ `ManageMyShopsPage_WithValidId_ShouldLoad` - Butikkhåndtering laster
+### 1. Sorteringslogikk (`ShoppingListSortingTests`)
+- **Butikk-valg og sortering**: Verifiserer at handleliste-elementer sorteres korrekt basert på valgt butikks hylle-rekkefølge
+- **Syncfusion-interaksjon**: Tester dropdown og autocomplete komponenter
+- **Standard tilstand**: Verifiserer oppførsel uten butikk-valg
 
-### 2. ShoppingListSortingTests 🔀
-Tester butikk-spesifikk sortering:
-- 🔀 `OneShoppingListPage_WhenShopSelected_ShouldSortItemsByShelfOrder` - Sortering ved butikk-valg
-- 📋 `OneShoppingListPage_WhenNoShopSelected_ShouldShowUnsortedList` - Usortert liste
-- 🎯 `OneShoppingListPage_SyncfusionComponents_ShouldBeInteractive` - Syncfusion-komponenter
-
-### 3. DebugTests 🐛
-Diagnostikk-tester som fanger console-feil:
-- 🔍 `DebugAdminPage_CaptureConsoleErrors` - Admin-side console
-- 🔍 `DebugShoppingListPage_CaptureConsoleErrors` - Shopping list console
-
-### 4. PageInspectionTests 🔬
-Inspeksjon for debugging:
-- 📊 `InspectHomePage` - Inspiser forside-struktur
-- 📊 `InspectOneShoppingListPage` - Syncfusion-komponent rendering
-- 📊 `InspectPageRoutes` - Verifiser alle ruter
-- 🌐 `InspectAPIConnection` - Overvåk API-kall og feil
-
-## Testdata (DEBUG-modus)
-
-Testene bruker data fra `MemoryGenericRepository`:
-
-**Shopping Lists:**
-- ID: `test-list-1`, Navn: "Ukeshandel" (Melk, Brød, Epler)
-- ID: `test-list-2`, Navn: "Middag i kveld" (Kyllingfilet)
-
-**Shops:**
-- ID: `rema-1000`, Navn: "Rema 1000" (med 4 hyller)
-- ID: `ica-maxi`, Navn: "ICA Maxi" (med 3 hyller)
-- ID: `2`, Navn: "Kiwi lyngås"
-
-**Items:**
-- Melk, Brød, Epler, Kyllingfilet, Bananer, Yoghurt, Laks, Gulrøtter
+### 2. Navigasjon (`NavigationTests`)
+- **Sideinnlasting**: Alle hovedsider lastes uten feil
+- **Innhold-verifisering**: Sider viser forventet innhold
+- **Error-håndtering**: Ingen 404 eller kritiske feil
 
 ## Konfigurasjon
 
-### URLs
-```csharp
-Client (Blazor): https://localhost:7072
-API (Functions):  http://localhost:7071  // VIKTIG: API må også kjøre!
+### Base URL
+Testene forventer at Blazor WebAssembly appen kjører på:
+```
+https://localhost:7077
 ```
 
-**Endre i `PlaywrightFixture.cs`** hvis du bruker andre porter.
+Endre `BaseUrl` konstanten i test-filene hvis appen kjører på annen port.
 
 ### Browser-innstillinger
 I `PlaywrightFixture.cs`:
@@ -150,151 +77,55 @@ I `PlaywrightFixture.cs`:
 Browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
 {
     Headless = true,     // Sett til false for debugging
-    SlowMo = 0          // Øk for langsommere kjøring (ms)
+    SlowMo = 100        // Slow down for bedre synlighet
 });
 ```
 
-## Debugging og Feilsøking
-
-### Problem: "Failed to fetch" feil
-**Løsning:** API-et kjører ikke! Start Azure Functions API på port 7071.
-
-### Problem: Tester timeout
-**Løsning:** 
-1. Sjekk at BÅDE Client og API kjører
-2. Verifiser URL-er: Client på 7072, API på 7071
-3. Se på console output i test-resultatene
-
-### Problem: Syncfusion-komponenter ikke funnet
-**Løsning:**
-1. Øk wait-tider i testene (standard er 3-4 sekunder)
-2. Sjekk Syncfusion-lisens i `Client/Program.cs`
-3. Sett `Headless = false` og se hva som skjer i nettleseren
+## Debugging
 
 ### Vis browser under testing
+Endre i `PlaywrightFixture.cs`:
 ```csharp
-// I PlaywrightFixture.cs
-Headless = false,  // Viser browser-vindu
-SlowMo = 500      // Langsommere for å se hva som skjer
+Headless = false  // Viser browser-vindu
+SlowMo = 500     // Langsommere for å se hva som skjer
 ```
 
-### Ta screenshots
-```csharp
-await page.ScreenshotAsync(new PageScreenshotOptions 
-{ 
-    Path = "debug-screenshot.png" 
-});
-```
+### Test-spesifikke selektorer
+Testene bruker en kombinasjon av:
+- `data-testid` attributter (anbefalt)
+- CSS-selektorer for Syncfusion komponenter
+- Fallback til generiske selektorer
 
-### Console logging
-Testene fanger allerede console-output. Sjekk test-resultatene for:
-- `[log]`, `[error]`, `[warning]` fra browser console
-- API-kall detaljer (PageInspectionTests)
-
-## Syncfusion-spesifikk Testing
+## Syncfusion-spesifikke Testing
 
 ### Dropdown komponenter
 ```csharp
-var shopDropdown = page.Locator(".e-dropdownlist").First;
-await shopDropdown.ClickAsync();
-
-var firstOption = page.Locator(".e-list-item").First;
-await firstOption.ClickAsync();
+var shopDropdown = page.Locator("[data-testid='shop-dropdown']").Or(
+    page.Locator("div.e-dropdownlist")).First;
 ```
 
 ### AutoComplete komponenter
 ```csharp
-var autoComplete = page.Locator(".e-autocomplete .e-input").First;
-await autoComplete.ClickAsync();
-await page.Keyboard.TypeAsync("Melk");
-```
-
-## CI/CD Integration
-
-### GitHub Actions Eksempel
-```yaml
-- name: Setup .NET
-  uses: actions/setup-dotnet@v3
-  with:
-    dotnet-version: '9.0.x'
-
-- name: Install Azure Functions Core Tools
-  run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
-
-- name: Install Playwright
-  run: pwsh Client.Tests.Playwright/bin/Debug/net9.0/playwright.ps1 install --with-deps
-
-- name: Start API
-  run: |
-    cd Api
-    func start --port 7071 &
-    sleep 10
-
-- name: Start Client  
-  run: |
-    cd Client
-    dotnet run &
-    sleep 15
-
-- name: Run Playwright Tests
-  run: |
-    cd Client.Tests.Playwright
-    dotnet test --logger "trx"
+var autoComplete = page.Locator("input.e-input").First;
+await autoComplete.FillAsync("searchterm");
 ```
 
 ## Avhengigheter
 
-- **Microsoft.Playwright.MSTest**: Playwright for .NET
+- **Microsoft.Playwright.MSTest**: Playwright test runner
 - **xunit**: Test framework
-- **Client-prosjekt**: Blazor WebAssembly app
-- **Shared-prosjekt**: Felles modeller
-- **Azure Functions Core Tools**: For API-oppstart
+- **Client-prosjekt**: Referanse til Blazor WebAssembly app
+- **Shared-prosjekt**: Felles modeller og typer
 
 ## Kjente Begrensninger
 
-1. ⚠️ **Krever kjørende app OG API**: Både Blazor og Functions må kjøre
-2. 📝 **Syncfusion lisens**: Kan vise advarsler i console (OK for testing)
-3. 🔐 **Ingen autentisering**: Testene kjører uten login
-4. 💾 **In-memory data**: I DEBUG-modus brukes `MemoryGenericRepository`
+1. **Krever kjørende app**: Blazor WebAssembly appen må kjøre lokalt på port 7077
+2. **Syncfusion lisens**: Kan vise lisens-advarsler i browser console
+3. **API-avhengighet**: Noen tester kan kreve at API-et også kjører
 
 ## Fremtidige Forbedringer
 
-- [ ] Legg til `data-testid` attributter for bedre selektorer
-- [ ] Implementer Page Object Model pattern
-- [ ] Automatiser app-oppstart i test-suite
-- [ ] Legg til performance-metrics testing
-- [ ] Test Firestore-integrasjon (produksjons-modus)
-- [ ] Parallellisere test-kjøring
-- [ ] Legg til visual regression testing
-
-## Skriv Nye Tester
-
-### Basic Test Template
-```csharp
-[Fact]
-public async Task MyNewTest()
-{
-    var page = await _fixture.CreatePageAsync();
-    
-    try
-    {
-        await page.GotoAsync($"{BaseUrl}/your-route");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.WaitForTimeoutAsync(2000); // Blazor init
-        
-        var content = await page.TextContentAsync("body");
-        Assert.Contains("Expected Text", content);
-    }
-    finally
-    {
-        await page.CloseAsync(); // VIKTIG: Alltid close!
-    }
-}
-```
-
-### Tips
-- ✅ Alltid `await page.CloseAsync()` i `finally`
-- ⏱️ Bruk `WaitForLoadStateAsync(LoadState.NetworkIdle)`
-- 🔄 Legg til ekstra `WaitForTimeoutAsync` for Syncfusion
-- 🎯 Bruk spesifikke selektorer (`.e-dropdownlist`, `.e-autocomplete`)
-- 📸 Ta screenshots ved feil for debugging
+- Legg til data-testid attributter i Blazor komponenter for bedre test-stabilitet
+- Implementer Page Object Model for gjenbrukbare test-elementer
+- Legg til performance-testing med Playwright
+- Automatiser app-oppstart som del av test-suite
