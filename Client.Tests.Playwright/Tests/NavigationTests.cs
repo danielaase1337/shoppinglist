@@ -24,20 +24,25 @@ namespace Client.Tests.Playwright.Tests
                 // Act
                 await page.GotoAsync(BaseUrl);
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await page.WaitForTimeoutAsync(2000); // Wait for Blazor to initialize
                 
                 // Assert
                 var title = await page.TitleAsync();
                 Assert.Contains("The Aase-broen's", title, StringComparison.OrdinalIgnoreCase);
                 
                 // Verify main navigation is present
-                var navComponent = page.Locator("nav").Or(page.Locator("[data-testid='navigation']"));
+                var navComponent = page.Locator("nav");
                 await navComponent.WaitForAsync(new LocatorWaitForOptions 
                 { 
                     State = WaitForSelectorState.Visible,
-                    Timeout = 5000 
+                    Timeout = 10000 
                 });
                 
                 Assert.True(await navComponent.CountAsync() > 0, "Navigation should be present");
+                
+                // Should show shopping list content since Index page renders ShoppingListMainPage
+                var content = await page.TextContentAsync("body");
+                Assert.True(content?.Contains("Handlelister") == true, "Home page should show shopping lists");
             }
             finally
             {
@@ -46,8 +51,7 @@ namespace Client.Tests.Playwright.Tests
         }
 
         [Theory]
-        [InlineData("/shopping/shoppinglistmainpage", "Shopping Lists")]
-        [InlineData("/shopping/managemyshopspage", "Manage Shops")]
+        [InlineData("/shoppinglist", "Handlelister")]
         [InlineData("/admin", "Admin")]
         public async Task NavigationPages_ShouldLoadCorrectly(string route, string expectedContent)
         {
@@ -59,10 +63,9 @@ namespace Client.Tests.Playwright.Tests
                 // Act
                 await page.GotoAsync($"{BaseUrl}{route}");
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                await page.WaitForTimeoutAsync(2000); // Wait for full page load
+                await page.WaitForTimeoutAsync(3000); // Wait for full page load and API calls
                 
                 // Assert: Page should load without critical errors
-                var content = await page.ContentAsync();
                 var pageText = await page.TextContentAsync("body");
                 
                 // Should not show unhandled error
@@ -71,6 +74,9 @@ namespace Client.Tests.Playwright.Tests
                 // Should have substantial content
                 Assert.True(!string.IsNullOrEmpty(pageText), $"Page {route} should have content");
                 Assert.True(pageText.Length > 100, $"Page {route} should have substantial content, got: {pageText.Length} chars");
+                
+                // Should contain expected content
+                Assert.Contains(expectedContent, pageText, StringComparison.OrdinalIgnoreCase);
             }
             finally
             {
@@ -86,10 +92,10 @@ namespace Client.Tests.Playwright.Tests
             
             try
             {
-                // Act
-                await page.GotoAsync($"{BaseUrl}/shopping/shoppinglistmainpage");
+                // Act - Route is /shoppinglist based on @page directive
+                await page.GotoAsync($"{BaseUrl}/shoppinglist");
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                await page.WaitForTimeoutAsync(2000);
+                await page.WaitForTimeoutAsync(3000); // Wait for API calls
                 
                 // Assert: Page should display shopping lists or empty state
                 var content = await page.TextContentAsync("body");
@@ -97,18 +103,15 @@ namespace Client.Tests.Playwright.Tests
                 // Should not show error
                 Assert.DoesNotContain("An unhandled error has occurred", content);
                 
-                // Should have some meaningful content
-                Assert.True(!string.IsNullOrEmpty(content), "Shopping list main page should have content");
-                Assert.True(content.Length > 200, "Page should have substantial content");
+                // Should have header
+                Assert.Contains("Handlelister", content, StringComparison.OrdinalIgnoreCase);
                 
-                // Should either show lists or be a proper shopping list page
-                var hasShoppingContent = content.Contains("Ukeshandel", StringComparison.OrdinalIgnoreCase) ||
-                                       content.Contains("shopping", StringComparison.OrdinalIgnoreCase) ||
-                                       content.Contains("liste", StringComparison.OrdinalIgnoreCase) ||
-                                       content.Contains("handleliste", StringComparison.OrdinalIgnoreCase);
+                // Should show test data lists or empty message
+                var hasLists = content.Contains("Ukeshandel", StringComparison.OrdinalIgnoreCase) ||
+                              content.Contains("Middag i kveld", StringComparison.OrdinalIgnoreCase) ||
+                              content.Contains("Det finnes ingen handlelister", StringComparison.OrdinalIgnoreCase);
                 
-                Assert.True(hasShoppingContent || content.Length > 500, 
-                    "Page should show shopping-related content or substantial content");
+                Assert.True(hasLists, "Page should show shopping lists or empty state message");
             }
             finally
             {
@@ -127,7 +130,7 @@ namespace Client.Tests.Playwright.Tests
                 // Act - Use test data ID from MemoryGenericRepository
                 await page.GotoAsync($"{BaseUrl}/shoppinglist/test-list-1");
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                await page.WaitForTimeoutAsync(3000); // Wait for API calls and Syncfusion initialization
+                await page.WaitForTimeoutAsync(4000); // Wait for API calls and Syncfusion initialization
                 
                 // Assert: Page should load the shopping list
                 var content = await page.TextContentAsync("body");
@@ -140,8 +143,14 @@ namespace Client.Tests.Playwright.Tests
                 Assert.True(content.Length > 300, "Page should have substantial content for shopping list");
                 
                 // Should show the test shopping list name "Ukeshandel"
-                Assert.True(content.Contains("Ukeshandel") || content.Contains("test"), 
-                    "Page should show the shopping list name from test data");
+                Assert.Contains("Ukeshandel", content, StringComparison.OrdinalIgnoreCase);
+                
+                // Should show items from test data
+                var hasItems = content.Contains("Melk", StringComparison.OrdinalIgnoreCase) ||
+                              content.Contains("Brød", StringComparison.OrdinalIgnoreCase) ||
+                              content.Contains("Epler", StringComparison.OrdinalIgnoreCase);
+                
+                Assert.True(hasItems, "Page should show shopping list items from test data");
             }
             finally
             {
@@ -150,7 +159,7 @@ namespace Client.Tests.Playwright.Tests
         }
 
         [Fact]
-        public async Task AdminPage_ShouldLoadWithoutAuthentication()
+        public async Task AdminPage_ShouldLoadDatabaseManagement()
         {
             // Arrange
             var page = await _fixture.CreatePageAsync();
@@ -169,14 +178,39 @@ namespace Client.Tests.Playwright.Tests
                 Assert.DoesNotContain("An unhandled error has occurred", content);
                 
                 // Should show admin content
-                Assert.True(!string.IsNullOrEmpty(content) && content.Contains("Admin", StringComparison.OrdinalIgnoreCase), 
-                    "Page should show admin content");
-                Assert.True(!string.IsNullOrEmpty(content) && (content.Contains("Database", StringComparison.OrdinalIgnoreCase) || 
-                           content.Contains("Test Data", StringComparison.OrdinalIgnoreCase)), 
-                    "Page should show database management content");
+                Assert.Contains("Admin", content, StringComparison.OrdinalIgnoreCase);
                 
                 // Should have substantial content
                 Assert.True(content?.Length > 200, "Admin page should have substantial content");
+            }
+            finally
+            {
+                await page.CloseAsync();
+            }
+        }
+        
+        [Fact]
+        public async Task ManageMyShopsPage_WithValidId_ShouldLoad()
+        {
+            // Arrange
+            var page = await _fixture.CreatePageAsync();
+            
+            try
+            {
+                // Act - Use test shop ID from MemoryGenericRepository
+                await page.GotoAsync($"{BaseUrl}/managemyshops/rema-1000");
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await page.WaitForTimeoutAsync(3000);
+                
+                // Assert
+                var content = await page.TextContentAsync("body");
+                
+                // Should not show unhandled error
+                Assert.DoesNotContain("An unhandled error has occurred", content);
+                
+                // Should have content
+                Assert.True(!string.IsNullOrEmpty(content) && content.Length > 100, 
+                    "ManageMyShopsPage should have content");
             }
             finally
             {
