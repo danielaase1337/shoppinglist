@@ -57,30 +57,29 @@
     
     <div class="card-maincontainer container-sm">
         <div class="card">
-            <div class="row align-items-start">
-
+            <div class="row align-items-center mb-3">
                 <div class="col">
-                    <h5 class="@showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
+                    <h5 class="shopping-list-title @showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
-                    @if (!ThisShoppingList.IsDone)
-                    {
-                        <small class="text-success">
-                            <i class="fas fa-bolt"></i> Preloadet for rask tilgang
-                        </small>
-                    }
-                </div>
-
-                <div class="col-5">
-                    <SfDropDownList TValue="string" TItem="ShopModel" Placeholder="Velg butikk" DataSource="@AvailableShops" @bind-Index="@shopIndex" Width="100">
-                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
-                    </SfDropDownList>
-                </div>
-                <div class="col-2">
-                    <button class="btn btn-sm btn-outline-info" @onclick="SortShoppingList"><i class="fas fa-sort-amount-down-alt"></i></button>
                 </div>
             </div>
 
-            <div class="row">
+            <div class="row align-items-center mb-3">
+                <div class="col-12">
+                    <SfDropDownList TValue="string" 
+                                  TItem="ShopModel" 
+                                  Placeholder="Velg butikk for sortering" 
+                                  DataSource="@AvailableShops" 
+                                  @bind-Index="@shopIndex" 
+                                  Width="100%"
+                                  PopupHeight="300px">
+                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
+                        <DropDownListEvents TValue="string" TItem="ShopModel" ValueChange="OnShopSelectionChanged"></DropDownListEvents>
+                    </SfDropDownList>
+                </div>
+            </div>
+
+            <div class="row align-items-center mb-4">
                 <div class="col">
                     <SfAutoComplete TValue="string"
                                 TItem="ShopItemModel"
@@ -88,16 +87,18 @@
                                 Placeholder="Hva skal handles?"
                                 @bind-Value="@autoValue"
                                 FilterType="FilterType.Contains"
+                                Width="100%"
+                                PopupHeight="300px"
                                 Highlight>
                         <AutoCompleteFieldSettings Value="Name" Text="Name" />
                         <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
                                         ValueChange="@SelectedShopItemChanged"></AutoCompleteEvents>
-                       
                     </SfAutoComplete>
                 </div>
-                <div class="col-2 contenAlignCenter">
-                    <button class="btn btn-sm"><i class="fas fa-plus"></i></button>
-                  
+                <div class="col-auto">
+                    <button class="btn btn-add-item" title="Legg til vare">
+                        <i class="fas fa-plus"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -402,6 +403,14 @@ else
 
     private int? shopIndex { get; set; } = -1;
     ShopModel SelectedShop { get; set; }
+    
+    void OnShopSelectionChanged(ChangeEventArgs<string, ShopModel> args)
+    {
+        Console.WriteLine($"Shop selection changed to: {args?.ItemData?.Name}");
+        // Automatically sort when shop is selected
+        SortShoppingList();
+        StateHasChanged();
+    }
     
     void SortShoppingList()
     {

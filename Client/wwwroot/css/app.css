@@ -1,20 +1,39 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
 }
+
 .main {
-    background-color: darkslategray;
-    /*background-color: lightblue;*/
+    background: transparent;
 }
+
 a, .btn-link {
-    color: #0366d6;
+    color: #4f46e5;
+    text-decoration: none;
+}
+
+a:hover, .btn-link:hover {
+    color: #3730a3;
+    text-decoration: underline;
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-weight: 600;
+    min-height: 44px;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .content {
@@ -35,11 +54,76 @@ a, .btn-link {
 
 .parent-horizontal-stack {
     display: flex;
-    flex-wrap: wrap;
-    /* for horizontal aligning of child divs */
-    justify-content: flex-start;
-    /* for vertical aligning */
     align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+}
+
+.parent-horizontal-stack .col-1 {
+    flex: 0 0 auto;
+}
+
+.parent-horizontal-stack .col {
+    flex: 1;
+    min-width: 0; /* Allows text to wrap */
+}
+
+.parent-horizontal-stack .col-2 {
+    flex: 0 0 auto;
+}
+
+.btn-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.editButtonStyle {
+    margin: 0;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+    .card-maincontainer {
+        padding: 12px;
+    }
+    
+    .card {
+        margin: 12px 0;
+        padding: 16px;
+    }
+    
+    .card h2 {
+        font-size: 20px;
+        margin-bottom: 12px;
+    }
+    
+    .todo-list li {
+        padding: 16px 0;
+        min-height: 60px;
+    }
+    
+    .todo-list li a {
+        padding: 16px 4px;
+        font-size: 19px;
+        font-weight: 600;
+    }
+    
+    .parent-horizontal-stack {
+        gap: 8px;
+    }
+    
+    .btn-group {
+        gap: 2px;
+    }
+    
+    .editButtonStyle {
+        min-width: 32px;
+        min-height: 32px;
+    }
 }
 
 .parent-horizontal-stack-end {
@@ -93,19 +177,81 @@ body {
 
 button {
     margin: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    font-size: 100%;
-    vertical-align: baseline;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    font-size: 16px;
     font-family: inherit;
-    font-weight: inherit;
-    color: inherit;
-    -webkit-appearance: none;
-    appearance: none;
-    -webkit-font-smoothing: antialiased;
-    -moz-font-smoothing: antialiased;
-    float: right
+    font-weight: 500;
+    color: #374151;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+.btn-sm {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-height: 40px;
+    min-width: 40px;
+}
+
+.btn-outline-success {
+    color: #10b981;
+    border: 2px solid #10b981;
+    background: white;
+}
+
+.btn-outline-success:hover {
+    background: #10b981;
+    color: white;
+}
+
+.btn-outline-warning {
+    color: #f59e0b;
+    border: 2px solid #f59e0b;
+    background: white;
+}
+
+.btn-outline-warning:hover {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-outline-danger {
+    color: #ef4444;
+    border: 2px solid #ef4444;
+    background: white;
+}
+
+.btn-outline-danger:hover {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-outline-link {
+    color: #667eea;
+    border: 2px solid #667eea;
+    background: white;
+    border-radius: 12px;
+}
+
+.btn-outline-link:hover {
+    background: #667eea;
+    color: white;
 }
 
 body {
@@ -141,56 +287,473 @@ input[type="checkbox"] {
 .edit {
     position: relative;
     margin: 0;
-    /* width: 90%; */
-    font-size: 14px;
+    font-size: 16px; /* Prevents zoom on iOS */
     font-family: inherit;
-    font-weight: inherit;
-    line-height: 1.4em;
-    border: 2;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
     outline: none;
-    color: inherit;
-    padding: 6px;
-    border: 1px solid #999;
-    box-shadow: inset 0 -1px 5px 0 rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    -webkit-font-smoothing: antialiased;
-    -moz-font-smoothing: antialiased;
+    color: #1f2937;
+    padding: 14px 16px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    min-height: 48px; /* Minimum touch target */
+}
+
+.new-todo:focus,
+.edit:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .new-todo {
-    /*padding: 20px 0px 16px 60px;*/
-    border: none;
-    background: rgba(0, 0, 0, 0.003);
-    box-shadow: inset 0 -2px 1px rgba(0,0,0,0.03);
-    width: inherit;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.9);
 }
 
 .card {
-    margin-top: 25px;
-    margin-bottom:10px;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.6);
-    transition: 0.3s;
-    border-radius: 8px; /* 5px rounded corners */
-    background-color: whitesmoke;
-    padding:1.3rem;
+    margin: 16px 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    transition: all 0.3s ease;
 }
 
-    /* On mouse-over, add a deeper shadow */
-    .card:hover {
-        box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
-    }
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card h2 {
+    color: #1f2937;
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.card h6 {
+    color: #6b7280;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    margin: 20px 0;
+}
 
 
 /* Add some padding inside the card container */
 .card-maincontainer {
-    padding:1.3rem;
+    padding: 16px;
+    max-width: 100%;
+    margin: 0 auto;
 }
+
 .card-container {
-    padding: 10px 8px;
+    padding: 12px;
 }
 
 .card-last {
-    margin-bottom: 100px;
+    margin-bottom: 80px; /* Extra space for mobile navigation */
+}
+
+/* Improved mobile viewport and touch */
+.content {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+}
+
+/* Better mobile form layout */
+.row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.row .col {
+    flex: 1;
+}
+
+.row .col-2 {
+    flex: 0 0 auto;
+}
+
+/* Loading component styling */
+.loading-component {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+/* iOS safe area support */
+@supports (padding: max(0px)) {
+    .card-maincontainer {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+}
+
+/* Syncfusion dropdown improvements */
+.e-dropdownlist .e-input-group {
+    border-radius: 12px !important;
+    border: 2px solid #e5e7eb !important;
+    min-height: 48px !important;
+    background: white !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+.e-dropdownlist .e-input-group:focus-within,
+.e-dropdownlist .e-input-group.e-input-focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+    background: rgba(102, 126, 234, 0.02) !important;
+}
+
+.e-dropdownlist.e-success .e-input-group {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+    background: rgba(16, 185, 129, 0.02) !important;
+}
+
+.e-dropdownlist .e-input {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: #1f2937 !important;
+    padding: 12px 16px !important;
+    line-height: 1.5 !important;
+}
+
+.e-dropdownlist .e-input::placeholder {
+    color: #9ca3af !important;
+    font-weight: 400 !important;
+}
+
+.e-autocomplete .e-input-group {
+    border-radius: 12px !important;
+    border: 2px solid #e5e7eb !important;
+    min-height: 48px !important;
+    background: white !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+.e-autocomplete .e-input-group:focus-within,
+.e-autocomplete .e-input-group.e-input-focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+}
+
+.e-autocomplete .e-input {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: #1f2937 !important;
+    padding: 12px 16px !important;
+    line-height: 1.5 !important;
+}
+
+.e-autocomplete .e-input::placeholder {
+    color: #9ca3af !important;
+    font-weight: 400 !important;
+}
+
+/* Mobile dropdown improvements */
+@media (max-width: 768px) {
+    .e-dropdownlist .e-input-group,
+    .e-autocomplete .e-input-group {
+        min-height: 52px !important;
+    }
+    
+    .e-dropdownlist .e-input,
+    .e-autocomplete .e-input {
+        font-size: 16px !important;
+        padding: 14px 16px !important;
+    }
+}
+
+/* Syncfusion popup styling */
+.e-popup.e-ddl.e-popup-open,
+.e-popup.e-autocomplete.e-popup-open {
+    border-radius: 12px !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: blur(10px) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.e-list-item:hover {
+    background: rgba(102, 126, 234, 0.1) !important;
+}
+
+.e-list-item.e-item-focus,
+.e-list-item.e-active {
+    background: rgba(102, 126, 234, 0.15) !important;
+    color: #1f2937 !important;
+}
+
+/* Button improvements */
+.btn {
+    font-weight: 600;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.btn-outline-info {
+    color: #667eea;
+    border-color: #667eea;
+    background: white;
+}
+
+.btn-outline-info:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Add item button styling */
+.btn-add-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-add-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: scale(0);
+    transition: transform 0.2s ease;
+}
+
+.btn-add-item:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    color: white;
+}
+
+.btn-add-item:hover::before {
+    transform: scale(1);
+}
+
+.btn-add-item:active {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+@media (max-width: 768px) {
+    .btn-add-item {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+}
+
+/* Responsive button text */
+@media (max-width: 576px) {
+    .btn .d-none.d-sm-inline {
+        display: none !important;
+    }
+}
+
+/* Shopping list title styling */
+.shopping-list-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .shopping-list-title {
+        font-size: 20px;
+    }
+}
+
+/* Initial loading screen styling */
+.initial-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* Admin dropdown styling */
+.admin-dropdown {
+    position: relative;
+}
+
+.dropdown-trigger {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+}
+
+.dropdown-arrow {
+    margin-left: 8px;
+    font-size: 12px;
+    transition: transform 0.3s ease;
+}
+
+.admin-dropdown:hover .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.admin-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 220px;
+    background: rgba(30, 32, 46, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.admin-dropdown:hover .admin-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.admin-dropdown-menu .dropdown-item {
+    display: block;
+    color: rgba(255, 255, 255, 0.9) !important;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin: 4px 8px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.admin-dropdown-menu .dropdown-item:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    transform: translateX(4px);
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.app-logo {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: bounceIn 1s ease-out;
+}
+
+.loading-content h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 24px 0;
+    letter-spacing: 1px;
+}
+
+.loading-content p {
+    font-size: 16px;
+    opacity: 0.9;
+    margin: 16px 0 0 0;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 24px 0;
+}
+
+.spinner-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    animation: pulse 1.4s ease-in-out infinite both;
+}
+
+.spinner-dot:nth-child(1) { animation-delay: -0.32s; }
+.spinner-dot:nth-child(2) { animation-delay: -0.16s; }
+.spinner-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes pulse {
+    0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .artical-card {
@@ -225,47 +788,96 @@ label[for='toggle-all'] {
     margin: 0;
     padding: 0;
     list-style: none;
-    width:100%
+    width: 100%;
 }
 
-    .todo-list li {
-        position: relative;
-        font-size: 14px;
-        border-bottom: 1px solid #ededed;
-        vertical-align: central
-    }
+.todo-list li {
+    position: relative;
+    font-size: 16px;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+    padding: 20px 0;
+    display: flex;
+    align-items: center;
+    min-height: 68px;
+}
 
-        .todo-list li:last-child {
-            border-bottom: none;
-        }
+.todo-list li:last-child {
+    border-bottom: none;
+}
 
-        .todo-list li.editing {
-            border-bottom: none;
-            padding: 0;
-        }
+.todo-list li.editing {
+    border-bottom: none;
+    padding: 12px 0;
+}
 
-            .todo-list li.editing .edit {
-                display: block;
-                padding: 13px 17px 12px 17px;
-            }
+.todo-list li.editing .edit {
+    display: block;
+    padding: 12px 16px;
+    border-radius: 8px;
+}
 
-            .todo-list li.editing .view {
-                display: none;
-            }
+.todo-list li.editing .view {
+    display: none;
+}
 
-        .todo-list li a {
-            white-space: pre-line;
-            word-break: break-all;
-            padding: 5px 5px 5px 0px;
-            display: block;
-            line-height: 1.2;
-            transition: color 0.4s;
-        }
+.todo-list li a {
+    flex: 1;
+    white-space: pre-line;
+    word-break: break-word;
+    padding: 16px 8px;
+    display: block;
+    line-height: 1.4;
+    transition: color 0.2s ease;
+    color: #1f2937;
+    font-weight: 600;
+    font-size: 18px;
+    text-decoration: none;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
 
-        .todo-list li.completed a {
-            color: #d9d9d9;
-            text-decoration: line-through;
-        }
+.todo-list li a:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 8px;
+}
+
+.todo-list li.completed a {
+    color: #9ca3af;
+    text-decoration: line-through;
+}
+
+.todo-list li input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.badge-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.text-success {
+    color: #10b981 !important;
+}
+
+.text-muted {
+    color: #6b7280;
+    font-size: 14px;
+    margin-bottom: 16px;
+    text-align: center;
+}
 
         .todo-list li .vareInputEdit {
             /*margin: 10px 10px;

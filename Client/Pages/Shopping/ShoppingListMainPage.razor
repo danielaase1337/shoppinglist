@@ -7,17 +7,6 @@
 
     <div class="row card">
         <h2>Handlelister</h2>
-        @if (ShoppingLists != null && ShoppingLists.Any())
-        {
-            var activeLists = ShoppingLists.Where(l => !l.IsDone).Count();
-            if (activeLists > 0)
-            {
-                <p class="text-muted">
-                    <i class="fas fa-bolt text-success"></i> 
-                    @activeLists aktive lister preloadet for rask tilgang
-                </p>
-            }
-        }
         <div class="row">
             <div class="col">
                 <input class="new-todo" placeholder="Navn på listen?" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler">
@@ -58,10 +47,6 @@
                                     {
                                         <a href="@(GetItemNavLink(l.Id))">
                                             @l.Name
-                                            @if (!l.IsDone)
-                                            {
-                                                <span class="badge badge-success ms-2" title="Aktiv liste - preloadet for rask tilgang">⚡</span>
-                                            }
                                         </a>
                                     }
                                 </div>
