@@ -1,0 +1,741 @@
+@page "/categories"
+@using BlazorApp.Client.Common
+@using BlazorApp.Client.Shared
+@using BlazorApp.Client.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject HttpClient Http
+@inject ISettings Settings
+@inject IJSRuntime JSRuntime
+@inject IDataCacheService DataCache
+
+<div class="card-maincontainer container-sm">
+    
+    @if (AllCategories != null && AllItems != null)
+    {
+        <!-- Page Header -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h2>Administrer Kategorier</h2>
+                    <p class="text-muted">Organisér kategorier og varene som tilhører dem</p>
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-success" @onclick="SaveCategoryConfiguration" disabled="@isUpdating">
+                        @if (isUpdating)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i> <span>Lagrer...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save"></i> <span>Lagre</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Category -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Legg til ny kategori</h5>
+                    <div class="row">
+                        <div class="col">
+                            <input class="form-control" placeholder="Navn på kategori..." @bind="@newCategoryName" @onkeyup="OnKeyUpNewCategoryHandler">
+                        </div>
+                        <div class="col-2">
+                            <button type="button" class="btn btn-outline-success" @onclick="AddNewCategory">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories and Items -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5>Kategorier og tilhørende varer</h5>
+                    
+                    @if (AllCategories.Any())
+                    {
+                        <div class="category-container">
+                            @foreach (var category in AllCategories.OrderBy(c => c.Name))
+                            {
+                                <div class="category-item card-item @(currentDropTarget?.Id == category.Id ? "can-drop" : "")">
+                                    <div class="category-header">
+                                        <div class="row align-items-center">
+                                            <div class="col">
+                                                @if (category.EditClicked)
+                                                {
+                                                    <input class="form-control editing" @bind-value="@category.Name" @onkeyup="@(e => HandleCategoryNameKeyUp(e, category))" />
+                                                }
+                                                else
+                                                {
+                                                    <h6 class="category-title" @ondblclick="@(() => EnableEdit(category))">
+                                                        <i class="fas fa-tag"></i> @category.Name
+                                                        <span class="badge badge-info ms-2">@GetItemsInCategory(category.Id).Count() varer</span>
+                                                    </h6>
+                                                }
+                                            </div>
+                                            <div class="col-auto">
+                                                @if (category.EditClicked)
+                                                {
+                                                    <div class="btn-group" role="group">
+                                                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="@(() => SaveCategory(category))">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-warning" @onclick="@(() => CancelEdit(category))">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="btn-group" role="group">
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="@(() => EnableEdit(category))">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteCategory(category))">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Items in this category -->
+                                    <div class="category-items drop-zone @(currentDropTarget?.Id == category.Id ? "drag-over" : "")" 
+                                         @ondragover="@HandleDragOver"
+                                         @ondragover:preventDefault="true"
+                                         @ondrop="@(() => HandleItemDrop(category))"
+                                         @ondrop:preventDefault="true"
+                                         @ondragenter="@(() => HandleDragEnter(category))"
+                                         @ondragenter:preventDefault="true"
+                                         @ondragleave="@HandleDragLeave"
+                                         @ondragleave:preventDefault="true">
+                                        @if (GetItemsInCategory(category.Id).Any())
+                                        {
+                                            <div class="items-grid">
+                                                @foreach (var item in GetItemsInCategory(category.Id).OrderBy(i => i.Name))
+                                                {
+                                                    <div class="item-chip @(draggedItem?.Id == item.Id ? "dragging" : "")"
+                                                         draggable="true"
+                                                         @ondragstart="@(() => HandleItemDragStart(item))"
+                                                         @ondragend="@HandleDragEnd"
+                                                         @ondragend:preventDefault="true">
+                                                        <span class="item-name">@item.Name</span>
+                                                        @if (!string.IsNullOrEmpty(item.Unit))
+                                                        {
+                                                            <small class="item-unit">(@item.Unit)</small>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="empty-category @(currentDropTarget?.Id == category.Id ? "drag-over" : "")">
+                                                <i class="fas fa-box-open text-muted"></i>
+                                                <small class="text-muted">Ingen varer i denne kategorien. Dra varer hit for å flytte dem.</small>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Uncategorized Items -->
+                        @if (GetUncategorizedItems().Any())
+                        {
+                            <div class="card mt-3">
+                                <div class="row">
+                                    <div class="col">
+                                        <h6 class="text-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> Varer uten kategori
+                                            <span class="badge badge-warning ms-2">@GetUncategorizedItems().Count() varer</span>
+                                        </h6>
+                                        <div class="items-grid uncategorized-zone">
+                                            @foreach (var item in GetUncategorizedItems().OrderBy(i => i.Name))
+                                            {
+                                                <div class="item-chip uncategorized"
+                                                     draggable="true"
+                                                     @ondragstart="@(() => HandleItemDragStart(item))"
+                                                     @ondragend="@HandleDragEnd"
+                                                     @ondragend:preventDefault="true">
+                                                    <span class="item-name">@item.Name</span>
+                                                    @if (!string.IsNullOrEmpty(item.Unit))
+                                                    {
+                                                        <small class="item-unit">(@item.Unit)</small>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <p>Ingen kategorier funnet. Legg til din første kategori ovenfor.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+</div>
+
+<style>
+    .category-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .category-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        background: #fafafa;
+        transition: all 0.3s ease;
+    }
+
+    .category-header {
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .category-title {
+        margin: 0;
+        color: #333;
+        cursor: pointer;
+    }
+
+    .category-title:hover {
+        color: #0066cc;
+    }
+
+    .category-items {
+        min-height: 80px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+
+    .category-items.drop-zone {
+        border: 2px dashed transparent;
+        padding: 10px;
+    }
+
+    .category-items.drop-zone.drag-over {
+        border-color: #007bff;
+        background-color: #e7f3ff;
+        transform: scale(1.02);
+    }
+
+    .items-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        min-height: 40px;
+    }
+
+    .item-chip {
+        background: #007bff;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        cursor: grab;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: all 0.2s ease;
+        opacity: 1;
+    }
+
+    .item-chip:hover {
+        background: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+    }
+
+    .item-chip.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+        cursor: grabbing;
+        z-index: 1000;
+    }
+
+    .item-chip.uncategorized {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .item-chip.uncategorized:hover {
+        background: #e0a800;
+    }
+
+    .item-chip:active {
+        cursor: grabbing;
+    }
+
+    .item-name {
+        font-weight: 500;
+    }
+
+    .item-unit {
+        opacity: 0.8;
+        font-style: italic;
+    }
+
+    .empty-category {
+        text-align: center;
+        padding: 2rem;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        background: #f8f9fa;
+        transition: all 0.2s ease;
+        min-height: 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .empty-category:hover {
+        border-color: #007bff;
+        background: #e7f3ff;
+    }
+
+    .empty-category.drag-over {
+        border-color: #28a745;
+        background: #d4edda;
+        transform: scale(1.05);
+    }
+
+    .uncategorized-zone {
+        background: #fff3cd;
+        border: 2px dashed #ffc107;
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 60px;
+    }
+
+    .editing {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+    }
+
+    .badge-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+
+    .badge-warning {
+        background-color: #ffc107;
+        color: #212529;
+    }
+
+    .card-item {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: box-shadow 0.2s ease;
+    }
+
+    .card-item:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    /* Visual indicators for drag states */
+    .category-item.can-drop {
+        border-color: #28a745;
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+    }
+
+    .drag-helper {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        background: #007bff;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        opacity: 0.8;
+        transform: translate(-50%, -50%);
+    }
+</style>
+
+@code {
+    private ICollection<ItemCategoryModel>? AllCategories { get; set; }
+    private ICollection<ShopItemModel>? AllItems { get; set; }
+    
+    // New category form
+    private string newCategoryName = "";
+    
+    // Drag and drop
+    private ShopItemModel? draggedItem;
+    private ItemCategoryModel? currentDropTarget;
+    private bool isUpdating = false;
+    
+    // Edit state
+    private string originalCategoryName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Console.WriteLine("🏷️ CategoryManagementPage: Checking cache for instant loading...");
+            var startTime = DateTime.Now;
+
+            // Try to get cached data first for instant display
+            var cachedCategories = await DataCache.GetCategoriesAsync();
+            var cachedItems = await DataCache.GetItemsAsync();
+            
+            if (cachedCategories?.Any() == true && cachedItems?.Any() == true)
+            {
+                // Instant load from cache
+                AllCategories = cachedCategories;
+                AllItems = cachedItems;
+                var cacheLoadTime = DateTime.Now - startTime;
+                Console.WriteLine($"⚡ Instant load: {AllCategories.Count()} categories and {AllItems.Count()} items from cache in {cacheLoadTime.TotalMilliseconds:F0}ms");
+                StateHasChanged(); // Update UI immediately
+                return;
+            }
+            
+            Console.WriteLine("🏷️ No cached data, loading in parallel from API...");
+
+            // Load categories and items in parallel if no cache
+            var categoriesTask = DataCache.GetCategoriesAsync(forceRefresh: true);
+            var itemsTask = DataCache.GetItemsAsync(forceRefresh: true);
+
+            await Task.WhenAll(categoriesTask, itemsTask);
+
+            AllCategories = await categoriesTask;
+            AllItems = await itemsTask;
+
+            var loadTime = DateTime.Now - startTime;
+            Console.WriteLine($"🏷️ Category management page loaded from API in {loadTime.TotalMilliseconds:F0}ms");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading category management: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            AllCategories = await Http.GetFromJsonAsync<ICollection<ItemCategoryModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private async Task LoadItems()
+    {
+        try
+        {
+            AllItems = await Http.GetFromJsonAsync<ICollection<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading items: {ex.Message}");
+        }
+    }
+
+    private async Task OnKeyUpNewCategoryHandler(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await AddNewCategory();
+        }
+    }
+
+    private async Task AddNewCategory()
+    {
+        if (string.IsNullOrWhiteSpace(newCategoryName) || AllCategories == null) return;
+
+        try
+        {
+            var newCategory = new ItemCategoryModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = newCategoryName.Trim()
+            };
+
+            var response = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys), newCategory);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var createdCategory = await response.Content.ReadFromJsonAsync<ItemCategoryModel>();
+                if (createdCategory != null)
+                {
+                    AllCategories.Add(createdCategory);
+                    newCategoryName = "";
+                    
+                    // Invalidate cache so other pages get fresh data
+                    DataCache.InvalidateCategoriesCache();
+                    
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding category: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<ShopItemModel> GetItemsInCategory(string categoryId)
+    {
+        if (AllItems == null) return Enumerable.Empty<ShopItemModel>();
+        
+        return AllItems.Where(item => item.ItemCategory?.Id == categoryId);
+    }
+
+    private IEnumerable<ShopItemModel> GetUncategorizedItems()
+    {
+        if (AllItems == null) return Enumerable.Empty<ShopItemModel>();
+        
+        return AllItems.Where(item => item.ItemCategory == null || string.IsNullOrEmpty(item.ItemCategory.Id));
+    }
+
+    private void EnableEdit(ItemCategoryModel category)
+    {
+        // Cancel other edits first
+        if (AllCategories != null)
+        {
+            foreach (var cat in AllCategories)
+            {
+                cat.EditClicked = false;
+            }
+        }
+
+        originalCategoryName = category.Name;
+        category.EditClicked = true;
+        StateHasChanged();
+    }
+
+    private void CancelEdit(ItemCategoryModel category)
+    {
+        category.Name = originalCategoryName;
+        category.EditClicked = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleCategoryNameKeyUp(KeyboardEventArgs args, ItemCategoryModel category)
+    {
+        if (args.Key == "Enter")
+        {
+            await SaveCategory(category);
+        }
+        else if (args.Key == "Escape")
+        {
+            CancelEdit(category);
+        }
+    }
+
+    private async Task SaveCategory(ItemCategoryModel category)
+    {
+        if (string.IsNullOrWhiteSpace(category.Name)) return;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.itemcategorys), category);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                category.EditClicked = false;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving category: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCategory(ItemCategoryModel category)
+    {
+        if (AllCategories == null) return;
+
+        // Check if category has items
+        var itemsInCategory = GetItemsInCategory(category.Id).ToList();
+        if (itemsInCategory.Any())
+        {
+            var confirmMessage = $"Kategorien '{category.Name}' inneholder {itemsInCategory.Count} varer. Er du sikker på at du vil slette den? Varene vil bli ukategoriserte.";
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", confirmMessage))
+            {
+                return;
+            }
+        }
+        else
+        {
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Er du sikker på at du vil slette kategorien '{category.Name}'?"))
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var response = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.itemcategory, category.Id));
+            
+            if (response.IsSuccessStatusCode)
+            {
+                AllCategories.Remove(category);
+                
+                // Remove category reference from items
+                if (AllItems != null)
+                {
+                    foreach (var item in itemsInCategory)
+                    {
+                        item.ItemCategory = new ItemCategoryModel(); // Empty category instead of null
+                    }
+                }
+                
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting category: {ex.Message}");
+        }
+    }
+
+    // Drag and Drop functionality
+    private void HandleItemDragStart(ShopItemModel item)
+    {
+        draggedItem = item;
+        Console.WriteLine($"Started dragging item: {item.Name}");
+        StateHasChanged();
+    }
+
+    private void HandleDragOver(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
+    {
+        args.DataTransfer.DropEffect = "move";
+    }
+
+    private void HandleDragEnter(ItemCategoryModel category)
+    {
+        if (draggedItem != null && draggedItem.ItemCategory?.Id != category.Id)
+        {
+            currentDropTarget = category;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleDragLeave(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
+    {
+        // Small delay to prevent flickering when moving between child elements
+        Task.Delay(50).ContinueWith(_ =>
+        {
+            if (currentDropTarget != null)
+            {
+                currentDropTarget = null;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void HandleDragEnd(Microsoft.AspNetCore.Components.Web.DragEventArgs args)
+    {
+        currentDropTarget = null;
+        StateHasChanged();
+    }
+
+    private async Task HandleItemDrop(ItemCategoryModel targetCategory)
+    {
+        if (draggedItem == null || isUpdating) return;
+
+        var itemName = draggedItem.Name;
+        Console.WriteLine($"Dropping item {itemName} into category {targetCategory.Name}");
+
+        // Store original category for potential rollback
+        var originalCategory = draggedItem.ItemCategory;
+        
+        // Set updating state
+        isUpdating = true;
+
+        try
+        {
+            // Optimistic UI update - show change immediately
+            draggedItem.ItemCategory = new ItemCategoryModel 
+            { 
+                Id = targetCategory.Id, 
+                Name = targetCategory.Name 
+            };
+            
+            // Update UI immediately for better UX
+            StateHasChanged();
+            Console.WriteLine($"⚡ UI updated optimistically - {itemName} moved to {targetCategory.Name}");
+
+            // Save to API in background
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems), draggedItem);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"✅ Database updated successfully - {itemName} in {targetCategory.Name}");
+                
+                // Invalidate items cache so other pages see the change
+                DataCache.InvalidateItemsCache();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ API Error {response.StatusCode}: {errorContent}");
+                
+                // Rollback UI change on API failure
+                draggedItem.ItemCategory = originalCategory;
+                StateHasChanged();
+                Console.WriteLine($"🔄 Rolled back UI change for {itemName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Exception during drop: {ex.Message}");
+            
+            // Rollback UI change on exception
+            if (draggedItem != null)
+            {
+                draggedItem.ItemCategory = originalCategory;
+                StateHasChanged();
+                Console.WriteLine($"🔄 Rolled back UI change due to exception");
+            }
+        }
+        finally
+        {
+            // Always clear drag state and updating flag
+            draggedItem = null;
+            currentDropTarget = null;
+            isUpdating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveCategoryConfiguration()
+    {
+        // This could be used for batch operations if needed
+        Console.WriteLine("Save category configuration - implement if needed for batch operations");
+        await Task.CompletedTask;
+    }
+}

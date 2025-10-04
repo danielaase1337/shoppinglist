@@ -3,30 +3,7 @@
 @inject HttpClient http
 
 <div class="container-sm" >
-
-    @*<div class="card">*@
-    
-    @*<AuthorizeView>
-        <NotAuthorized>
-            <article style="color:white">
-                Hei!
-                <br />
-                For å kunne redigerer eller se handlelistene må du nok logge inn.
-                <br />
-                <br />
-                <div class="btn btn-primary">
-                    <a href="authentication/login" style="color:white">Logg inn</a>
-                </div>
-            </article>
-        </NotAuthorized>
-        <Authorized>
-            <BlazorHomepage.Client.Pages.ShoppingList.ShoppingListMainPage>
-            </BlazorHomepage.Client.Pages.ShoppingList.ShoppingListMainPage>
-        </Authorized>
-    </AuthorizeView>*@
-  
     <ShoppingListMainPage></ShoppingListMainPage>
-    @*</div>*@
 </div>
 
 @code

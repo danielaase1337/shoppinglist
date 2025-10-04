@@ -1,7 +1,4 @@
-﻿@*@using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Components.WebAssembly.Authentication*@
-@inject NavigationManager Navigation
-@*@inject SignOutSessionStateManager SignOutManager*@
+﻿@inject NavigationManager Navigation
 
 
 <nav class="navbar navbar-expand-sm navbar-dark">
@@ -16,32 +13,27 @@
 
     <div class="@NavMenuCssClass" id="toggler" @onclick="ToggleNavMenu">
         <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
-          @*  <AuthorizeView>
-                <Authorized>*@
-                    @*<li>*@
-                        <NavLink class="nav-link" href="shoppinglist">
-                            <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
-                        </NavLink>
-                        
-                        <NavLink class="nav-link" href="admin">
-                            <span class="oi oi-arrow-circle-top" aria-hidden="true"></span>Admin
-                        </NavLink>
-                    @*</li>*@
-@*
-                    <NavLink class="nav-link" href="/managemyshops">
-                        <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
-                    </NavLink>*@
+            <NavLink class="nav-link" href="shoppinglist">
+                <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
+            </NavLink>
 
-                   @* <NavLink class="nav-link" href="#" @onclick="BeginSignOut">
-                        <span @onclick="BeginSignOut" class="oi oi-account-logout"></span>Logg ut
-                    </NavLink>*@
-               @* </Authorized>
-                <NotAuthorized>
-                    <NavLink class="nav-link" href="authentication/login">
-                        <span class="oi oi-account-login"></span> Logg inn
+            @* Admin functions as a CSS-only dropdown *@
+            <li class="nav-item admin-dropdown">
+                <span class="nav-link dropdown-trigger">
+                    <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Admin <span class="dropdown-arrow">▼</span>
+                </span>
+                <div class="admin-dropdown-menu">
+                    <NavLink class="dropdown-item" href="/managemyshops">
+                        <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
                     </NavLink>
-                </NotAuthorized>
-            </AuthorizeView>*@
+                    <NavLink class="dropdown-item" href="/items">
+                        <span class="oi oi-list" aria-hidden="true" style="margin:2px"></span> Administrer varer
+                    </NavLink>
+                    <NavLink class="dropdown-item" href="/categories">
+                        <span class="oi oi-tags" aria-hidden="true" style="margin:2px"></span> Administrer kategorier
+                    </NavLink>
+                </div>
+            </li>
 
         </ul>
     </div>
@@ -57,10 +49,4 @@
     {
         collapseNavMenu = !collapseNavMenu;
     }
-
-    //private async Task BeginSignOut(MouseEventArgs args)
-    //{
-    //    await SignOutManager.SetSignOutState();
-    //    Navigation.NavigateTo("authentication/logout");
-    //}
 }

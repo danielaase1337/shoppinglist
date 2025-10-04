@@ -1,5 +1,6 @@
 using BlazorApp.Client;
 using BlazorApp.Client.Common;
+using BlazorApp.Client.Services;
 
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -13,5 +14,7 @@ Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("ODQ2MzcxQDMyMzAy
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.Configuration["API_Prefix"] ?? builder.HostEnvironment.BaseAddress) });
 
 builder.Services.AddSingleton<ISettings, Settings>();
+builder.Services.AddSingleton<IDataCacheService, DataCacheService>();
+builder.Services.AddSingleton<IBackgroundPreloadService, BackgroundPreloadService>();
 builder.Services.AddSyncfusionBlazor();
 await builder.Build().RunAsync();
