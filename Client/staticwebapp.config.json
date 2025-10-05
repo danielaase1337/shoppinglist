@@ -11,5 +11,8 @@
   },
   "mimeTypes": {
     ".json": "application/json"
+  },
+  "platform": {
+    "apiRuntime": "dotnet-isolated:8.0"
   }
 }
