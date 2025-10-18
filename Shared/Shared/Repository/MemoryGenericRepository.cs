@@ -328,6 +328,97 @@ namespace Shared.Repository
                     if (category is TEntity categoryEntity) await Insert(categoryEntity);
                 }
             }
+
+            // Initialize FrequentShoppingList test data with FireStore models
+            if (type == typeof(FrequentShoppingList))
+            {
+                var ukehandel = new FrequentShoppingList
+                {
+                    Id = "frequent-ukehandel",
+                    Name = "Standard Ukehandel",
+                    Description = "Varer som alltid må være med på ukeshandlingen",
+                    Items = new List<FrequentShoppingItem>
+                    {
+                        new FrequentShoppingItem
+                        {
+                            Id = "frequent-item-1",
+                            Name = "Melk",
+                            Varen = new ShopItem 
+                            { 
+                                Id = "milk-1", 
+                                Name = "Melk", 
+                                Unit = "Liter",
+                                ItemCategory = new ItemCategory { Id = "dairy", Name = "Meieri" }
+                            },
+                            StandardMengde = 3
+                        },
+                        new FrequentShoppingItem
+                        {
+                            Id = "frequent-item-2", 
+                            Name = "Brød",
+                            Varen = new ShopItem 
+                            { 
+                                Id = "bread-1", 
+                                Name = "Brød", 
+                                Unit = "Stk",
+                                ItemCategory = new ItemCategory { Id = "bakery", Name = "Bakeri" }
+                            },
+                            StandardMengde = 2
+                        },
+                        new FrequentShoppingItem
+                        {
+                            Id = "frequent-item-3",
+                            Name = "Yoghurt",
+                            Varen = new ShopItem 
+                            { 
+                                Id = "yogurt-1", 
+                                Name = "Yoghurt", 
+                                Unit = "Stk",
+                                ItemCategory = new ItemCategory { Id = "dairy", Name = "Meieri" }
+                            },
+                            StandardMengde = 4
+                        }
+                    }
+                };
+                if (ukehandel is TEntity ukehandelEntity) await Insert(ukehandelEntity);
+
+                var trippeltrumf = new FrequentShoppingList
+                {
+                    Id = "frequent-trippeltrumf",
+                    Name = "Trippeltrumf Varer",
+                    Description = "Ekstra varer for trippeltrumf uker",
+                    Items = new List<FrequentShoppingItem>
+                    {
+                        new FrequentShoppingItem
+                        {
+                            Id = "frequent-item-4",
+                            Name = "Laks",
+                            Varen = new ShopItem 
+                            { 
+                                Id = "salmon-1", 
+                                Name = "Laks", 
+                                Unit = "Kg",
+                                ItemCategory = new ItemCategory { Id = "fish", Name = "Fisk" }
+                            },
+                            StandardMengde = 2
+                        },
+                        new FrequentShoppingItem
+                        {
+                            Id = "frequent-item-5",
+                            Name = "Toalettpapir",
+                            Varen = new ShopItem 
+                            { 
+                                Id = "toilet-paper-1", 
+                                Name = "Toalettpapir", 
+                                Unit = "Pakke",
+                                ItemCategory = new ItemCategory { Id = "household", Name = "Husholdning" }
+                            },
+                            StandardMengde = 3
+                        }
+                    }
+                };
+                if (trippeltrumf is TEntity trippeltrumfEntity) await Insert(trippeltrumfEntity);
+            }
         }
 
         public async Task<bool> Delete(TEntity entityToDelete)
