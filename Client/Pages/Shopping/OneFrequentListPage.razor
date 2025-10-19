@@ -190,7 +190,11 @@
             StandardMengde = 1
         };
 
-        ThisFrequentList.Items.Add(newItem);
+        // Add new item at the top instead of bottom
+        var itemsList = ThisFrequentList.Items.ToList();
+        itemsList.Insert(0, newItem);
+        ThisFrequentList.Items = itemsList;
+        
         Console.WriteLine($"✅ Added {selectedItem.Name} to frequent list");
         
         // Clear selection before saving to avoid issues

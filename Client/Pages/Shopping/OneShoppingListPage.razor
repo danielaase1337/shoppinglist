@@ -354,7 +354,11 @@ else
     private async Task AddVare(ShopItemModel shopItem)
     {
         ShoppingListItemModel newItem = new ShoppingListItemModel() { Mengde = 1, IsDone = false, Varen = shopItem };
-        ThisShoppingList.ShoppingItems.Add(newItem);
+        
+        // Add new item at the top instead of bottom
+        var itemsList = ThisShoppingList.ShoppingItems.ToList();
+        itemsList.Insert(0, newItem);
+        ThisShoppingList.ShoppingItems = itemsList;
 
         await UpdateShoppinglist(ThisShoppingList);
 
