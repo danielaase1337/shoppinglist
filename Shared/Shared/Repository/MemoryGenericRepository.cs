@@ -501,6 +501,12 @@ namespace Shared.Repository
         {
             return await Task.Run(() =>
             {
+                // Ensure entity has an ID
+                if (string.IsNullOrEmpty(entityToUpdate.Id))
+                {
+                    throw new ArgumentException("Entity must have an ID to be updated", nameof(entityToUpdate));
+                }
+
                 if (_data.TryGetValue(entityToUpdate.Id, out TEntity exiting))
                 {
                     _data[entityToUpdate.Id] = entityToUpdate;
@@ -512,16 +518,9 @@ namespace Shared.Repository
 
         protected async Task<string> GetNextID()
         {
-            return await Task.Run(() =>
-            {
-                int next = 1;
-                if (_data.Count > 0)
-                {
-                    var nextS = _data.Keys.Max(k => k);
-                    next = int.Parse(nextS) + 1;
-                }
-                return next.ToString();
-            });
+            // Generate a new GUID for the entity ID
+            // This avoids issues with non-numeric existing IDs like "test-list-1"
+            return await Task.Run(() => Guid.NewGuid().ToString());
         }
     }
 }

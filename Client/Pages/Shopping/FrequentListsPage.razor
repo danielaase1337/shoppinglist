@@ -1,251 +1,180 @@
 @page "/frequent-lists"
-@inject HttpClient Http;
+@inject HttpClient Http
+@inject ISettings Settings
 @inject BlazorApp.Client.Services.IDataCacheService DataCache
 
 <div class="card-maincontainer container-sm">
     <div class="row card">
-        <h2>Hyppige Handlelister</h2>
-        <p>Administrer lister med varer som handles ofte - perfekt for ukentlig rutine og spesielle kampanjer.</p>
-    </div>
-
-    <!-- Add New Frequent List -->
-    <div class="row card">
-        <h3>Lag Ny Hyppig Liste</h3>
+        <h2>Hyppige Lister</h2>
+        
         <div class="row">
-            <div class="col-8">
-                <input class="form-control" placeholder="Navn på liste (f.eks. 'Standard Ukehandel')" @bind="@_newListName">
-            </div>
-            <div class="col-4">
-                <input class="form-control" placeholder="Beskrivelse" @bind="@_newListDescription">
-            </div>
-        </div>
-        <div class="row mt-2">
             <div class="col">
-                <button type="button" class="btn btn-primary" @onclick="@AddFrequentList" disabled="@(string.IsNullOrWhiteSpace(_newListName))">
-                    <i class="fas fa-plus"></i> Lag Ny Liste
-                </button>
+                <input class="new-todo" placeholder="Navn på listen?" @bind="@_newListName" @onkeyup="OnKeyUpNewListHandler">
+            </div>
+            <div class="col-2">
+                <button type="button" class="btn-sm btn-outline-link"><i class="fas fa-check" @onclick="@AddList"></i></button>
             </div>
         </div>
     </div>
 
-    <!-- Frequent Lists Display -->
-    @if (FrequentLists != null)
+    @if (_frequentLists != null)
     {
-        @if (!FrequentLists.Any())
+        @if (!_frequentLists.Any())
         {
             <div class="row card">
-                <h6>Det finnes ingen hyppige lister ennå!</h6>
-                <p>Lag din første liste for å komme i gang.</p>
+                <h6>Det finnes ingen hyppige lister!</h6>
             </div>
         }
         else
         {
-            @foreach (var list in FrequentLists)
-            {
-                <div class="row card">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            @if (list.EditClicked)
-                            {
-                                <input class="form-control" @bind="@list.Name" style="width: 300px; display: inline-block;" />
-                                <input class="form-control mt-1" @bind="@list.Description" style="width: 300px; display: inline-block;" placeholder="Beskrivelse" />
-                            }
-                            else
-                            {
-                                <h4>@list.Name</h4>
-                                <p class="text-muted">@list.Description</p>
-                            }
-                        </div>
-                        <div>
-                            @if (list.EditClicked)
-                            {
-                                <button type="button" class="btn btn-sm btn-success me-1" @onclick="@(e => SaveFrequentList(list))">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-secondary me-1" @onclick="@(e => { list.EditClicked = false; })">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            }
-                            else
-                            {
-                                <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="@(e => { list.EditClicked = true; })">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                            }
-                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(e => DeleteFrequentList(list))">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Items in this frequent list -->
-                    <div class="mt-3">
-                        <h5>Varer i listen (@(list.Items?.Count ?? 0) varer)</h5>
-                        @if (list.Items != null && list.Items.Any())
-                        {
-                            <div class="row">
-                                @foreach (var item in list.Items)
+            <div class="row card">
+                <ul class="todo-list">
+                    @foreach (var list in _frequentLists)
+                    {
+                        <li class="@list.CssComleteEditClassName">
+                            <div class="parent-horizontal-stack">
+                                <div class="col">
+                                    @if (list.EditClicked)
+                                    {
+                                        <input class="editing" @bind-value="@list.Name" />
+                                    }
+                                    else
+                                    {
+                                        <a href="@GetItemNavLink(list.Id)">
+                                            @list.Name
+                                        </a>
+                                    }
+                                </div>
+
+                                @if (list.EditClicked)
                                 {
-                                    <div class="col-md-4 col-sm-6 mb-2">
-                                        <div class="card p-2">
-                                            <div class="d-flex justify-content-between">
-                                                <span><strong>@item.Varen?.Name</strong></span>
-                                                <span class="badge bg-primary">@item.StandardMengde @item.Varen?.Unit</span>
-                                            </div>
-                                        </div>
+                                    <div class="btn-group" role="group" aria-label="Basic example">
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => SaveChanges(list))"><i class="fas fa-check"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { list.EditClicked = false; })"><i class="fas fa-times"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(list))"><i class="fas fa-ban"></i></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-2">
+                                        <button @onclick="@(e => { list.EditClicked = true; })"><i class="fas fa-edit"></i></button>
                                     </div>
                                 }
                             </div>
-                        }
-                        else
-                        {
-                            <p class="text-muted">Ingen varer lagt til ennå. Du kan administrere varer via hovedsystemet.</p>
-                        }
-                    </div>
-                </div>
-            }
+                        </li>
+                    }
+                </ul>
+            </div>
         }
     }
     else
     {
-        <div class="row card">
-            <div class="text-center">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Laster...</span>
-                </div>
-                <p>Laster hyppige lister...</p>
-            </div>
-        </div>
+        <LoadingComponent />
     }
 </div>
 
-@code
-{
-    private ICollection<FrequentShoppingListModel> FrequentLists = new List<FrequentShoppingListModel>();
+@code {
+    private List<FrequentShoppingListModel>? _frequentLists;
     private string _newListName = string.Empty;
-    private string _newListDescription = string.Empty;
 
-    [Inject]
-    public ISettings Settings { get; set; } = null!;
+    private string GetItemNavLink(string listId)
+    {
+        return $"frequent-lists/{listId}";
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine("🔄 FrequentListsPage: Loading frequent lists...");
-        
-        try
-        {
-            await LoadFrequentLists();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error loading frequent lists: {ex.Message}");
-            FrequentLists = new List<FrequentShoppingListModel>();
-        }
+        await LoadLists();
     }
 
-    private async Task LoadFrequentLists()
+    private async Task LoadLists()
     {
         try
         {
-            var response = await Http.GetAsync(Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists));
-            if (response.IsSuccessStatusCode)
-            {
-                FrequentLists = await response.Content.ReadFromJsonAsync<ICollection<FrequentShoppingListModel>>() ?? new List<FrequentShoppingListModel>();
-                Console.WriteLine($"✅ Loaded {FrequentLists.Count} frequent lists");
-                StateHasChanged();
-            }
-            else
-            {
-                Console.WriteLine($"❌ Failed to load frequent lists: {response.StatusCode}");
-                FrequentLists = new List<FrequentShoppingListModel>();
-            }
+            _frequentLists = (await DataCache.GetFrequentListsAsync()).ToList();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Exception loading frequent lists: {ex.Message}");
-            FrequentLists = new List<FrequentShoppingListModel>();
+            Console.WriteLine($"Error loading frequent lists: {ex.Message}");
+            _frequentLists = new List<FrequentShoppingListModel>();
         }
     }
 
-    private async Task AddFrequentList()
+    private async Task AddList()
     {
         if (string.IsNullOrWhiteSpace(_newListName)) return;
 
         try
         {
-            var newList = new FrequentShoppingListModel()
+            var newList = new FrequentShoppingListModel
             {
-                Name = _newListName.Trim(),
-                Description = _newListDescription.Trim(),
+                Id = Guid.NewGuid().ToString(),
+                Name = _newListName,
                 Items = new List<FrequentShoppingItemModel>()
             };
 
-            var response = await Http.PostAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists), newList);
+            var apiUrl = Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists);
+            var response = await Http.PostAsJsonAsync(apiUrl, newList);
+
             if (response.IsSuccessStatusCode)
             {
-                var createdList = await response.Content.ReadFromJsonAsync<FrequentShoppingListModel>();
-                if (createdList != null)
-                {
-                    FrequentLists.Add(createdList);
-                    Console.WriteLine($"✅ Added new frequent list: {createdList.Name}");
-                    
-                    // Clear form
-                    _newListName = string.Empty;
-                    _newListDescription = string.Empty;
-                    StateHasChanged();
-                }
-            }
-            else
-            {
-                Console.WriteLine($"❌ Failed to create frequent list: {response.StatusCode}");
+                _newListName = string.Empty;
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Exception creating frequent list: {ex.Message}");
+            Console.WriteLine($"Error adding list: {ex.Message}");
         }
     }
 
-    private async Task SaveFrequentList(FrequentShoppingListModel list)
+    private async Task SaveChanges(FrequentShoppingListModel list)
     {
         try
         {
-            list.EditClicked = false;
-            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists), list);
+            var apiUrl = Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists);
+            var response = await Http.PutAsJsonAsync(apiUrl, list);
+
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"✅ Updated frequent list: {list.Name}");
-            }
-            else
-            {
-                Console.WriteLine($"❌ Failed to update frequent list: {response.StatusCode}");
+                list.EditClicked = false;
+                DataCache.InvalidateFrequentListCache(list.Id);
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Exception updating frequent list: {ex.Message}");
+            Console.WriteLine($"Error saving changes: {ex.Message}");
         }
     }
 
-    private async Task DeleteFrequentList(FrequentShoppingListModel list)
+    private async Task DeleteList(FrequentShoppingListModel list)
     {
         try
         {
-            var response = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.FrequentShoppingList, list.Id));
+            var apiUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.FrequentShoppingList, list.Id);
+            var response = await Http.DeleteAsync(apiUrl);
+
             if (response.IsSuccessStatusCode)
             {
-                FrequentLists.Remove(list);
-                Console.WriteLine($"✅ Deleted frequent list: {list.Name}");
-                StateHasChanged();
-            }
-            else
-            {
-                Console.WriteLine($"❌ Failed to delete frequent list: {response.StatusCode}");
+                DataCache.InvalidateFrequentListCache(list.Id);
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Exception deleting frequent list: {ex.Message}");
+            Console.WriteLine($"Error deleting list: {ex.Message}");
+        }
+    }
+
+    private async void OnKeyUpNewListHandler(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddList();
         }
     }
 }

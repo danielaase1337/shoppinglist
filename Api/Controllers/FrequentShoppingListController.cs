@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Shared.HandlelisteModels;
 using Shared.FireStoreDataModels;
 using Shared.Repository;
-using System.Text.Json;
 
 namespace Api.Controllers
 {
@@ -41,8 +40,7 @@ namespace Api.Controllers
                 }
                 else if (req.Method == "POST")
                 {
-                    var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                    var newListModel = JsonSerializer.Deserialize<FrequentShoppingListModel>(requestBody);
+                    var newListModel = await req.ReadFromJsonAsync<FrequentShoppingListModel>();
                     
                     if (newListModel == null)
                     {
@@ -61,13 +59,22 @@ namespace Api.Controllers
                 }
                 else if (req.Method == "PUT")
                 {
-                    var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                    var updateListModel = JsonSerializer.Deserialize<FrequentShoppingListModel>(requestBody);
+                    var updateListModel = await req.ReadFromJsonAsync<FrequentShoppingListModel>();
                     
                     if (updateListModel == null)
                     {
                         response = req.CreateResponse(HttpStatusCode.BadRequest);
                         await response.WriteStringAsync("Invalid request body");
+                        return response;
+                    }
+
+                    // Log to check if ID exists
+                    _logger.LogInformation($"Updating frequent list. ID: {updateListModel.Id ?? "NULL"}, Name: {updateListModel.Name}, Items count: {updateListModel.Items?.Count ?? 0}");
+                    
+                    if (string.IsNullOrEmpty(updateListModel.Id))
+                    {
+                        response = req.CreateResponse(HttpStatusCode.BadRequest);
+                        await response.WriteStringAsync("Frequent list must have an ID");
                         return response;
                     }
 
@@ -89,7 +96,7 @@ namespace Api.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in FrequentShoppingListController.RunAll");
-                return GetErroRespons(ex.Message, req);
+                return await GetErroRespons(ex.Message, req);
             }
         }
 
@@ -138,7 +145,7 @@ namespace Api.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in FrequentShoppingListController.RunOne");
-                return GetErroRespons(ex.Message, req);
+                return await GetErroRespons(ex.Message, req);
             }
         }
     }

@@ -13,12 +13,18 @@ namespace BlazorApp.Client.Services
         Task<ShoppingListModel?> GetShoppingListAsync(string id, bool forceRefresh = false);
         Task<ShopModel?> GetShopAsync(string id, bool forceRefresh = false);
         
+        // Frequent Shopping Lists
+        Task<ICollection<FrequentShoppingListModel>> GetFrequentListsAsync(bool forceRefresh = false);
+        Task<FrequentShoppingListModel?> GetFrequentListAsync(string id, bool forceRefresh = false);
+        
         void InvalidateItemsCache();
         void InvalidateCategoriesCache();
         void InvalidateShopsCache();
         void InvalidateShoppingListsCache();
         void InvalidateShoppingListCache(string id);
         void InvalidateShopCache(string id);
+        void InvalidateFrequentListsCache();
+        void InvalidateFrequentListCache(string id);
         void InvalidateAllCaches();
 
         // Background preloading
@@ -38,6 +44,8 @@ namespace BlazorApp.Client.Services
         private ICollection<ShoppingListModel>? _cachedShoppingLists;
         private readonly Dictionary<string, ShoppingListModel> _cachedShoppingListDetails = new();
         private readonly Dictionary<string, ShopModel> _cachedShopDetails = new();
+        private ICollection<FrequentShoppingListModel>? _cachedFrequentLists;
+        private readonly Dictionary<string, FrequentShoppingListModel> _cachedFrequentListDetails = new();
         
         // Cache timestamps for TTL
         private DateTime? _itemsCacheTime;
@@ -46,6 +54,8 @@ namespace BlazorApp.Client.Services
         private DateTime? _shoppingListsCacheTime;
         private readonly Dictionary<string, DateTime> _shoppingListDetailsCacheTime = new();
         private readonly Dictionary<string, DateTime> _shopDetailsCacheTime = new();
+        private DateTime? _frequentListsCacheTime;
+        private readonly Dictionary<string, DateTime> _frequentListDetailsCacheTime = new();
         
         // Cache TTL (Time To Live) - 5 minutes for most data
         private readonly TimeSpan _cacheTtl = TimeSpan.FromMinutes(5);
@@ -251,6 +261,8 @@ namespace BlazorApp.Client.Services
             _cachedShoppingLists = null;
             _cachedShoppingListDetails.Clear();
             _cachedShopDetails.Clear();
+            _cachedFrequentLists = null;
+            _cachedFrequentListDetails.Clear();
             
             _itemsCacheTime = null;
             _categoriesCacheTime = null;
@@ -258,6 +270,8 @@ namespace BlazorApp.Client.Services
             _shoppingListsCacheTime = null;
             _shoppingListDetailsCacheTime.Clear();
             _shopDetailsCacheTime.Clear();
+            _frequentListsCacheTime = null;
+            _frequentListDetailsCacheTime.Clear();
         }
 
         // Background preloading for active shopping lists
@@ -330,6 +344,71 @@ namespace BlazorApp.Client.Services
             {
                 Console.WriteLine($"❌ Error during fast core data preload: {ex.Message}");
             }
+        }
+
+        // Frequent Shopping Lists methods
+        public async Task<ICollection<FrequentShoppingListModel>> GetFrequentListsAsync(bool forceRefresh = false)
+        {
+            if (!forceRefresh && _cachedFrequentLists != null && IsCacheValid(_frequentListsCacheTime))
+            {
+                Console.WriteLine("🎯 Using cached frequent lists");
+                return _cachedFrequentLists;
+            }
+
+            try
+            {
+                Console.WriteLine("🌐 Fetching frequent lists from API");
+                _cachedFrequentLists = await _httpClient.GetFromJsonAsync<List<FrequentShoppingListModel>>(_settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists)) ?? new List<FrequentShoppingListModel>();
+                _frequentListsCacheTime = DateTime.Now;
+                return _cachedFrequentLists;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error loading frequent lists: {ex.Message}");
+                return _cachedFrequentLists ?? new List<FrequentShoppingListModel>();
+            }
+        }
+
+        public async Task<FrequentShoppingListModel?> GetFrequentListAsync(string id, bool forceRefresh = false)
+        {
+            if (!forceRefresh && _cachedFrequentListDetails.TryGetValue(id, out var cached) && IsCacheValid(_frequentListDetailsCacheTime.GetValueOrDefault(id), _detailsCacheTtl))
+            {
+                Console.WriteLine($"🎯 Using cached frequent list detail for {id}");
+                return cached;
+            }
+
+            try
+            {
+                Console.WriteLine($"🌐 Fetching frequent list {id} from API");
+                var list = await _httpClient.GetFromJsonAsync<FrequentShoppingListModel>(_settings.GetApiUrlId(ShoppingListKeysEnum.FrequentShoppingList, id));
+                
+                if (list != null)
+                {
+                    _cachedFrequentListDetails[id] = list;
+                    _frequentListDetailsCacheTime[id] = DateTime.Now;
+                }
+                
+                return list;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error loading frequent list {id}: {ex.Message}");
+                return _cachedFrequentListDetails.GetValueOrDefault(id);
+            }
+        }
+
+        public void InvalidateFrequentListsCache()
+        {
+            Console.WriteLine("🗑️ Invalidating frequent lists cache");
+            _cachedFrequentLists = null;
+            _frequentListsCacheTime = null;
+        }
+
+        public void InvalidateFrequentListCache(string id)
+        {
+            Console.WriteLine($"🗑️ Invalidating frequent list cache for {id}");
+            _cachedFrequentListDetails.Remove(id);
+            _frequentListDetailsCacheTime.Remove(id);
         }
 
         private bool IsCacheValid(DateTime? cacheTime, TimeSpan? customTtl = null)

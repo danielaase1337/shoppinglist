@@ -9,16 +9,16 @@ namespace Api.Controllers
     {
      
 
-        protected HttpResponseData GetErroRespons(string message, HttpRequestData req)
+        protected async Task<HttpResponseData> GetErroRespons(string message, HttpRequestData req)
         {
             var errorRespons = req.CreateResponse(HttpStatusCode.InternalServerError);
-            errorRespons.WriteString(message);
+            await errorRespons.WriteStringAsync(message);
             return errorRespons;
         }
-        protected HttpResponseData GetNoContentRespons(string v, HttpRequestData req)
+        protected async Task<HttpResponseData> GetNoContentRespons(string v, HttpRequestData req)
         {
             var errorRespons = req.CreateResponse(HttpStatusCode.BadRequest);
-            errorRespons.WriteString(v);
+            await errorRespons.WriteStringAsync(v);
             return errorRespons;
         }
     }

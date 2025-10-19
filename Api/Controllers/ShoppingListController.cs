@@ -42,7 +42,7 @@ namespace Api.Controllers
                     {
                         _logger.Log(LogLevel.Error, $"Could not get any stored lists Error: {req.ReadAsString()}");
                         
-                        return GetErroRespons("could not get any stored lists", req);
+                        return await GetErroRespons("could not get any stored lists", req);
                     }
                     else if (!result.Any())
                     {
@@ -62,7 +62,7 @@ namespace Api.Controllers
                     if (addRes == null)
                     {
                         _logger.Log(LogLevel.Warning, $"Could not get shoppinglists");
-                        return GetErroRespons("could not get shoppinglist", req);
+                        return await GetErroRespons("could not get shoppinglist", req);
                     }
                     else
                     {
@@ -76,7 +76,7 @@ namespace Api.Controllers
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
                     var addRes = await repo.Update(shoppinglist);
                     if (addRes == null)
-                        return GetErroRespons("Could not update shoppinglist", req);
+                        return await GetErroRespons("Could not update shoppinglist", req);
                     else
                     {
                         await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));
@@ -90,7 +90,7 @@ namespace Api.Controllers
             {
                 var msg = $"Something went wrong in execution of shoppinglists, method type {req.Method}";
                 _logger.LogError(e, msg);
-                return GetErroRespons(msg, req);
+                return await GetErroRespons(msg, req);
             }
 
         }
