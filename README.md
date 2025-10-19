@@ -1,72 +1,146 @@
-# Shopping List Application (Handleliste)
+# 📱 Handleliste-applikasjon 
 
-A comprehensive **Blazor WebAssembly** shopping list application with **Azure Functions** backend and **Google Firestore** database. Features intelligent shop-specific item sorting, natural alphanumeric sorting, and timestamp-based list management.
+Smart handleliste-håndtering med butikk-spesifikk sortering og template-funksjonalitet.
 
-## Technology Stack
+## 🌐 Live Application
 
-- **Frontend**: Blazor WebAssembly (.NET 9) with Syncfusion UI components
-- **Backend**: Azure Functions v4 (.NET 9) with AutoMapper and repository pattern
-- **Database**: Google Cloud Firestore (NoSQL)
-- **Testing**: xUnit with Playwright for E2E tests (143 total tests)
+- **Production URL**: [Your Azure Static Web App URL here]
+- **Development**: `https://localhost:7073` (Client) + `http://localhost:7072` (API)
 
-## Key Features
+## � Applikasjonsoversikt
 
-### 🛒 Shopping List Management
-- **Multiple Shopping Lists**: Create and manage multiple shopping lists with timestamps
-- **Frequent Lists**: Pre-defined templates for recurring shopping needs
-- **Smart Sorting**: 
-  - Active lists appear first, completed lists at the bottom
-  - Natural alphanumeric sorting (e.g., "Uke 1", "Uke 10", "Uke 42" sort correctly)
-  - Newest lists first within each category
-- **Item Status Tracking**: Mark items and entire lists as completed
+Dette er en **3-lags Blazor WebAssembly applikasjon** for smart handleliste-håndtering med butikk-spesifikk sortering og template-funksjonalitet.
 
-### 🏪 Shop-Specific Sorting
-- **Custom Shop Layouts**: Define shops with shelves and their traversal order
-- **Automatic Item Sorting**: Items automatically sort based on shelf order when shopping at a specific store
-- **Category Management**: Organize items into categories linked to shop shelves
+### 🏗️ Teknisk Arkitektur
+- **Frontend**: Blazor WebAssembly (.NET 8.0) med Syncfusion UI-komponenter
+- **Backend**: Azure Functions v4 (.NET 8.0) 
+- **Database**: Google Cloud Firestore (produksjon) / In-Memory (utvikling)
+- **Deployment**: Azure Static Web Apps med GitHub Actions
 
-### 📊 Data Management
-- **Timestamp Tracking**: `LastModified` property on all entities with automatic migration for legacy data
-- **Lazy Migration**: Existing data automatically gets timestamps on first access
-- **Dual Model Architecture**: Separate Firestore data models and DTO models for clean architecture
+## 🛒 Hovedfunksjonalitet
 
-### 🧪 Testing Infrastructure
-- **Unit Tests**: 126 tests covering API and Client logic
-  - 65 API controller tests
-  - 61 Client component tests (including natural sorting and list ordering)
-- **E2E Tests**: 20 Playwright tests for critical user workflows
-- **Test Coverage**: Comprehensive coverage of sorting algorithms, CRUD operations, and UI interactions
+### 1. **Smart Handlelister**
+- ✅ Opprett og administrer multiple handlelister
+- ✅ Legg til varer med mengde og enhet
+- ✅ Marker varer som fullført under shopping
+- ✅ Rediger og slett lister og varer
+- ✅ Persistent lagring av alle endringer
 
-## Getting Started
+### 2. **Template/Mal System** 🆕
+- ✅ **Lag maler**: Opprett standard handlelister som kan gjenbrukes
+- ✅ **Separat visning**: Maler vises i egen fane, ikke blandet med aktive lister
+- ✅ **Kopier funksjon**: Lag nye handlelister basert på maler med ett klikk
+- ✅ **Automatisk naming**: Kopierte lister får format "Malnavn - DD/MM"
+- ✅ **Reset status**: Alle varer i kopiert liste starter som ikke-fullført
 
-### Prerequisites
-- .NET 9 SDK
-- Azure Functions Core Tools
-- Google Cloud Firestore account (for production)
-- Syncfusion license key (for UI components)
+### 3. **Butikk-spesifikk Sortering** 🏪
+Applikasjonens **unike feature** - sortering basert på fysisk butikklayout:
 
-### Installation
+#### Hvordan det fungerer:
+1. **Butikker** inneholder **hyller** med sorteringsindeks
+2. **Hyller** inneholder **varekategorier** 
+3. **Varer** tilhører **kategorier**
+4. **Handlelister** sorteres automatisk etter butikkens hyllerekkefølge
 
-1. Clone the repository to your local machine
+#### Praktisk nytte:
+- 🚶‍♂️ **Effektiv shopping**: Følg naturlig gang gjennom butikken
+- 🛒 **Mindre gåing**: Unngå å gå frem og tilbake
+- ⏱️ **Tidsbesparelse**: Raskere handleturer
+- 📱 **Butikk-tilpasset**: Samme app, forskjellige butikker
 
-1. In the **Api** folder, copy `local.settings.example.json` to `local.settings.json`
+### 4. **Butikk- og Varehantering**
+- ✅ Administrer multiple butikker
+- ✅ Definer hyllestruktur per butikk
+- ✅ Kategoriser varer (Meieri, Bakeri, Kjøtt, Frukt, etc.)
+- ✅ Vareregister med enheter (Stk, Kg, Liter)
 
-1. Continue using either Visual Studio or Visual Studio Code
+## 🎯 Bruksscenarioer
 
-### Visual Studio 2022
+### **Ukentlig Rutine**
+1. Lag en **"Standard ukeshandel"** mal med faste varer
+2. Hver uke: **kopier malen** til ny aktiv liste
+3. **Tilpass listen** med spesielle behov for uken
+4. **Velg butikk** for optimal sortering
+5. **Shop systematisk** etter app-rekkefølgen
 
-Once you clone the project, open the solution in the latest release of [Visual Studio 2022](https://visualstudio.microsoft.com/vs/) with the Azure workload installed, and follow these steps:
+### **Spesielle Anledninger**
+- Lag maler for "Helgefest", "Grillmiddag", "Bakedag"
+- Kopier og tilpass etter behov
+- Alle maler lagres permanent for gjenbruk
 
-1. Right-click on the solution and select **Set Startup Projects...**.
+### **Familie/Husholdning**
+- Flere kan legge til varer i samme liste
+- Status synkroniseres automatisk
+- Historikk over fullførte lister
 
-1. Select **Multiple startup projects** and set the following actions for each project:
-    - *Api* - **Start**
-    - *Client* - **Start**
-    - *Shared* - None
+## 🚀 Unike Konkurransefortrinn
 
-1. Press **F5** to launch both the client application and the Functions API app.
+1. **Butikk-optimalisert sortering** - ingen andre handleliste-apper gjør dette
+2. **Template-system** - gjenbruk av standard lister
+3. **Teknisk robusthet** - enterprise-grade arkitektur
+4. **Norsk-tilpasset** - laget for norske butikkjeder og vaner
+5. **Utviderbar** - enkel å legge til nye butikker og features
 
-### Visual Studio Code with Azure Static Web Apps CLI for a better development experience (Optional)
+---
+
+## 🔧 Development & Technical Information
+
+### **Performance & UX**
+- ⚡ **Cache-system**: Instant loading av lister
+- 📶 **Offline-ready**: Fungerer uten internett (med cache)
+- 🔄 **Real-time sync**: Endringer synkroniseres umiddelbart
+- 📱 **Responsive**: Fungerer på mobil og desktop
+
+### **Data Management**
+- 🗄️ **Dual repository**: Memory (dev) / Firestore (prod)
+- 🔄 **AutoMapper**: Automatisk mapping mellom modeller
+- 🛡️ **Type safety**: Sterk typing i hele stacken
+- 📊 **Structured data**: Normalisert database-design
+
+### **Development & Deployment**
+- 🚀 **CI/CD**: Automatisk deployment via GitHub Actions
+- 🔧 **Hot reload**: Rask utvikling med live reload
+- 🧪 **Testable**: Abstrahert repository pattern
+- 📦 **Modular**: Klar separasjon av bekymringer
+
+## 🎨 Brukergrensesnitt
+
+### **Moderne Design**
+- 🎨 **Syncfusion UI**: Profesjonelle komponenter
+- ✨ **Smooth UX**: Intuitive interaksjoner
+- 📋 **Todo-style**: Kjent checkbox-pattern
+- 🏷️ **Color coding**: Visuell status-indikering
+
+### **Navigation**
+- 📑 **Tab-basert**: Lett bytte mellom lister og maler
+- 🔍 **Search & filter**: Finn raskt det du leter etter
+- ➕ **Quick add**: Rask registrering av nye varer
+- ✏️ **Inline editing**: Rediger direkte i listen
+
+## 📈 Mulige Utvidelser
+
+### **Kort sikt**
+- 🏪 **Flere butikker**: Rema, Coop, Meny, etc.
+- 📊 **Statistikk**: Mest kjøpte varer, utgifter
+- 🎯 **Smart forslag**: AI-baserte vareforslag
+
+### **Lang sikt**
+- 🛒 **Deling**: Del lister mellom familie/venner
+- 💰 **Prissammenligning**: Beste priser på tvers av butikker
+- 📱 **Native app**: iOS/Android versjon
+- 🤖 **Voice input**: "Legg til melk i handlelisten"
+
+---
+
+## 💻 Development Setup
+
+### Template Structure
+
+- **Client**: The Blazor WebAssembly sample application
+- **Api**: A C# Azure Functions API, which the Blazor application will call
+- **Shared**: A C# class library with a shared data model between the Blazor and Functions application
+
+### Visual Studio Code with Azure Static Web Apps CLI (Optional)
 
 1. Install the [Azure Static Web Apps CLI](https://www.npmjs.com/package/@azure/static-web-apps-cli) and [Azure Functions Core Tools CLI](https://www.npmjs.com/package/azure-functions-core-tools).
 
@@ -86,149 +160,7 @@ Once you clone the project, open the solution in the latest release of [Visual S
 
 1. Enter Ctrl-C to stop the Static Web Apps CLI.
 
-## Project Structure
-
-```
-shoppinglist/
-├── Client/                          # Blazor WebAssembly Frontend
-│   ├── Pages/
-│   │   ├── Shopping/
-│   │   │   ├── ShoppingListMainPage.razor      # Main list overview with smart sorting
-│   │   │   ├── OneShoppingListPage.razor       # Individual list with shop-specific sorting
-│   │   │   ├── OneFrequentListPage.razor       # Frequent list templates
-│   │   │   ├── ManageMyShopsPage.razor         # Shop management
-│   │   │   └── OneShopManagmentPage.razor      # Shop shelf configuration
-│   │   └── Admin/
-│   │       └── AdminDataBase.razor              # Database administration
-│   ├── Common/
-│   │   ├── NaturalSortComparer.cs              # Natural alphanumeric sorting algorithm
-│   │   └── ISettings.cs                         # API URL management
-│   └── Shared/
-│       ├── NewNavComponent.razor                # Navigation with Admin dropdown
-│       └── ShoppingListComponents/
-│           ├── OneShoppingListItemComponent.razor
-│           └── ListSummaryFooter.razor
-├── Api/                             # Azure Functions Backend
-│   ├── Controllers/
-│   │   ├── ShoppingListController.cs            # CRUD + timestamp migration
-│   │   ├── ShopsController.cs                   # Shop and shelf management
-│   │   ├── ShopsItemsController.cs              # Item management
-│   │   └── ShopItemCategoryController.cs        # Category management
-│   ├── Program.cs                               # DI configuration (Debug/Production repos)
-│   └── ShoppingListProfile.cs                   # AutoMapper profiles
-├── Shared/
-│   ├── FireStoreDataModels/                     # Database entities with [FirestoreData]
-│   │   ├── ShoppingList.cs
-│   │   ├── Shop.cs
-│   │   ├── ShopItem.cs
-│   │   └── ItemCategory.cs
-│   ├── HandlelisteModels/                       # DTO models for API/UI
-│   ├── BaseModels/
-│   │   └── EntityBase.cs                        # Base with Id, Name, LastModified
-│   └── Repository/
-│       ├── IGenericRepository.cs
-│       ├── GoogleFireBaseGenericRepository.cs   # Production Firestore implementation
-│       └── MemoryGenericRepository.cs           # Debug in-memory implementation
-├── Client.Tests/                    # Unit Tests (xUnit)
-│   ├── NaturalSortComparerTests.cs              # 11 tests for natural sorting
-│   ├── ShoppingListSortingTests.cs              # 3 tests for list ordering
-│   └── ...                                       # 47 additional client tests
-├── Api.Tests/                       # API Tests (xUnit)
-│   └── Controllers/
-│       ├── ShoppingListControllerTests.cs       # Including timestamp migration tests
-│       └── ...                                   # 65 total API tests
-└── Client.Tests.Playwright/         # E2E Tests
-    └── Tests/
-        ├── ShoppingListSortingTests.cs          # 7 E2E sorting tests
-        ├── NavigationTests.cs
-        └── ...                                   # 20 total E2E tests
-```
-
-## Architecture & Design Patterns
-
-### Dual Model Pattern
-The application uses **two parallel model hierarchies** for clean separation:
-
-```csharp
-// Database models (Firestore attributes)
-namespace Shared.FireStoreDataModels {
-    [FirestoreData]
-    public class ShopItem : EntityBase {
-        [FirestoreProperty]
-        public ItemCategory ItemCategory { get; set; }
-    }
-}
-
-// DTO models (for API/UI)
-namespace Shared.HandlelisteModels {
-    public class ShopItemModel : EntityBase {
-        public ItemCategoryModel ItemCategory { get; set; }
-    }
-}
-```
-
-**AutoMapper** handles all conversions with `.ReverseMap()` in `Api/ShoppingListProfile.cs`.
-
-### Repository Pattern
-```csharp
-public interface IGenericRepository<T> {
-    Task<IEnumerable<T>> Get();
-    Task<T> Get(string id);
-    Task<T> Insert(T entity);
-    Task Update(T entity);
-    Task Delete(string id);
-}
-```
-
-**Two implementations**:
-- `MemoryGenericRepository<T>`: In-memory for DEBUG mode and testing
-- `GoogleFireBaseGenericRepository<T>`: Firestore for production
-
-### Sorting Algorithms
-
-#### Natural Alphanumeric Sorting
-`NaturalSortComparer` class handles proper sorting of mixed text and numbers:
-```csharp
-// Sorts correctly: "Uke 1", "Uke 2", "Uke 10", "Uke 41", "Uke 42"
-// Not incorrect: "Uke 1", "Uke 10", "Uke 2", "Uke 41", "Uke 42"
-```
-
-Uses regex to split strings into numeric and text parts, comparing numbers numerically.
-
-#### Shopping List Sorting (Three-Level)
-In `ShoppingListMainPage.razor`:
-```csharp
-AvailableShoppingLists = AvailableShoppingLists
-    .OrderBy(f => f.IsDone)                           // Active lists first (false < true)
-    .ThenByDescending(f => f.LastModified)            // Newest first within each group
-    .ThenBy(f => f.Name, new NaturalSortComparer())   // Natural alphanumeric by name
-    .ToList();
-```
-
-#### Shop-Specific Item Sorting
-In `OneShoppingListPage.razor` - `SortShoppingList()`:
-1. Select shop from dropdown
-2. Build category index based on shelf `SortIndex`
-3. Assign sort indices to items based on their category
-4. Sort items by ascending index (follows shelf traversal order)
-
-### Timestamp & Migration Strategy
-- **EntityBase**: All entities inherit `LastModified` (DateTime?)
-- **Lazy Migration**: API checks for null `LastModified` on GET, sets to `DateTime.UtcNow` and updates
-- **Automatic Tracking**: POST/PUT operations automatically set `LastModified`
-
-### Navigation Structure
-```
-Main Menu:
-├── Handlelister (Shopping Lists)
-└── Admin (Dropdown)
-    ├── Hyppige Lister (Frequent Lists)
-    ├── Håndter butikker (Manage Shops)
-    ├── Administrer varer (Manage Items)
-    └── Administrer kategorier (Manage Categories)
-```
-
-## Google Firestore Configuration
+## 🔐 Google Firestore Configuration
 
 This application uses Google Cloud Firestore as the production database.
 
@@ -260,89 +192,11 @@ This application uses Google Cloud Firestore as the production database.
 
 Switch between modes by changing the build configuration in `Api/Program.cs`.
 
-## Testing
-
-### Running Tests
-
-```bash
-# Run all unit tests (API + Client)
-dotnet test
-
-# Run only API tests
-dotnet test Api.Tests/Api.Tests.csproj
-
-# Run only Client tests
-dotnet test Client.Tests/Client.Tests.csproj
-
-# Run specific test class
-dotnet test --filter "FullyQualifiedName~ShoppingListSortingTests"
-
-# Run E2E tests (requires running application)
-dotnet test Client.Tests.Playwright/Client.Tests.Playwright.csproj
-```
-
-### Test Coverage
-
-**Unit Tests: 126 tests**
-- API Controllers (65 tests)
-  - ShoppingListController: CRUD + timestamp migration (7 new tests)
-  - ShopsController: Shop and shelf management
-  - ShopsItemsController: Item management
-  - ShopItemCategoryController: Category management
-  
-- Client Components (61 tests)
-  - NaturalSortComparer: 11 tests for natural sorting edge cases
-  - ShoppingListSorting: 3 tests for multi-level list sorting
-  - Component logic tests
-
-**E2E Tests: 20 Playwright tests**
-- Navigation and page loading
-- Shopping list sorting behavior
-- Item management workflows
-- Shop-specific sorting verification
-
-## Recent Enhancements (2024-2025)
-
-### ✅ Smart List Sorting
-- **Three-level sorting**: Active/Completed status → Timestamp → Natural name
-- **Natural alphanumeric sorting**: Handles "Uke 1" through "Uke 43" correctly
-- **Completed lists at bottom**: Active lists prioritized in main view
-
-### ✅ Timestamp System
-- **LastModified tracking**: All entities now track last modification time
-- **Lazy migration**: Existing data automatically gets timestamps
-- **Automatic updates**: POST/PUT operations set timestamps
-
-### ✅ UI/UX Improvements
-- **Newest items at top**: New shopping list items insert at position 0
-- **Improved navigation**: Frequent Lists moved to Admin dropdown
-- **Status persistence**: Fixed IsDone checkbox binding and API endpoint
-
-### ✅ Testing Infrastructure
-- **Comprehensive test suite**: 143 total tests (126 unit + 17 E2E)
-- **Natural sort tests**: 11 tests covering edge cases
-- **Migration tests**: Verify timestamp migration logic
-- **E2E coverage**: Critical user workflows
-
-## Deploy to Azure Static Web Apps
+## 🚀 Deploy to Azure Static Web Apps
 
 This application can be deployed to [Azure Static Web Apps](https://docs.microsoft.com/azure/static-web-apps), to learn how, check out [our quickstart guide](https://aka.ms/blazor-swa/quickstart).
 
-### Deployment Notes
-- Set `GOOGLE_CREDENTIALS` environment variable with JSON content (not file path)
-- Configure Syncfusion license key in application settings
-- Ensure Azure Functions runtime is set to .NET 9 isolated process
+---
 
-## Contributing
-
-When extending functionality:
-- Maintain the **dual model pattern** (Firestore + DTO)
-- Follow the **repository interface** for data access
-- Use **AutoMapper for all conversions** between model types
-- Add tests for new features
-- Follow existing architectural patterns
-- Make **minimum necessary changes**
-
-## License
-
-This project is licensed under the MIT License.
+*Opprettet: Oktober 2025*  
+*Teknologi: Blazor WebAssembly + Azure Functions + Firestore*
