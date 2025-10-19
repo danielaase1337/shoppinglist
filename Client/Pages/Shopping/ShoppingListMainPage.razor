@@ -37,7 +37,7 @@
                         <li class="@l.CssComleteEditClassName">
                             <div class="parent-horizontal-stack">
                                 <div class="col-1">
-                                    <input type="checkbox" value="@l.IsDone" @onchange="@(f => ListeChecked(l, f))" />
+                                    <input type="checkbox" checked="@l.IsDone" @onchange="@(f => ListeChecked(l, f))" />
                                 </div>
                                 <div class="col">
                                     @if (l.EditClicked)
@@ -189,7 +189,7 @@
         if (value?.Value != null && value.Value is bool bValue)
         {
             l.IsDone = bValue;
-            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), l);
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), l);
             //await ShoppingListDataManager.Update(l);
             
             if (response.IsSuccessStatusCode)
@@ -200,6 +200,10 @@
                 
                 // Re-sort after status change
                 SortShoppingLists();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Failed to update shopping list completion: {l.Name}. Status: {response.StatusCode}");
             }
         }
     }
@@ -216,13 +220,16 @@
     {
         var naturalComparer = new NaturalSortComparer();
         
-        // Sort by LastModified (newest first), then by natural alphanumeric name
+        // Sort with completed lists at the bottom
+        // 1. Active lists (IsDone = false): Newest first, then natural name sort
+        // 2. Completed lists (IsDone = true): Newest first, then natural name sort
         ShoppingLists = ShoppingLists
-            .OrderByDescending(f => f.LastModified ?? DateTime.MinValue)  // Newest first
-            .ThenBy(f => f.Name, naturalComparer)                          // Natural sort for same dates
+            .OrderBy(f => f.IsDone)                                        // Active (false) first, completed (true) last
+            .ThenByDescending(f => f.LastModified ?? DateTime.MinValue)   // Within each group: newest first
+            .ThenBy(f => f.Name, naturalComparer)                          // Within same date: natural sort
             .ToList();
             
-        Console.WriteLine($"📊 Sorted {ShoppingLists.Count} shopping lists by date and name");
+        Console.WriteLine($"📊 Sorted {ShoppingLists.Count} shopping lists (active first, then completed)");
     }
     
     private void OrderLists()

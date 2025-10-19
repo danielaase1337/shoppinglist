@@ -413,7 +413,7 @@ else
         {
             showH2LabelStyle = "";
             showEditHeader = "hidden";
-            await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), ThisShoppingList);
+            await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
 
         }
     }
