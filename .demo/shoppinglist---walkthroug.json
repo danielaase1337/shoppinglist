@@ -1,0 +1,19 @@
+{
+  "$schema": "https://demotime.show/demo-time.schema.json",
+  "title": "Shoppinglist - walkthroug",
+  "description": "Dette er en gjennomgang av den nye handlelisten min ",
+  "version": 2,
+  "demos": [
+    {
+      "id": "demo-mgffcj3p-57x4",
+      "title": "Hei",
+      "steps": [],
+      "description": "Hei, dette er første slide",
+      "notes": {
+        "path": ".demo/notes/demo-mgffcj3p-57x4_notes.md",
+        "showOnTrigger": true
+      }
+    }
+  ],
+  "timer": 5
+}

@@ -1,4 +1,5 @@
 ﻿@page "/shoppinglist"
+@using BlazorApp.Client.Common
 @inject HttpClient Http;
 @inject BlazorApp.Client.Services.IDataCacheService DataCache
 @inject BlazorApp.Client.Services.IBackgroundPreloadService BackgroundPreload
@@ -36,7 +37,7 @@
                         <li class="@l.CssComleteEditClassName">
                             <div class="parent-horizontal-stack">
                                 <div class="col-1">
-                                    <input type="checkbox" value="@l.IsDone" @onchange="@(f => ListeChecked(l, f))" />
+                                    <input type="checkbox" checked="@l.IsDone" @onchange="@(f => ListeChecked(l, f))" />
                                 </div>
                                 <div class="col">
                                     @if (l.EditClicked)
@@ -105,6 +106,7 @@
             if (ShoppingLists.Any())
             {
                 Console.WriteLine($"⚡ Instant load: {ShoppingLists.Count} shopping lists from cache");
+                SortShoppingLists(); // Sort after loading
                 StateHasChanged(); // Immediately update UI
             }
             else
@@ -113,6 +115,7 @@
                 // If no cache, force refresh to get data
                 ShoppingLists = await DataCache.GetShoppingListsAsync(forceRefresh: true) ?? new List<ShoppingListModel>();
                 Console.WriteLine($"📋 Loaded {ShoppingLists.Count} shopping lists from API");
+                SortShoppingLists(); // Sort after loading
             }
         }
         catch (Exception ex)
@@ -136,6 +139,9 @@
             // Invalidate cache so other pages see the changes
             DataCache.InvalidateShoppingListsCache();
             Console.WriteLine($"✅ Updated shopping list: {item.Name}");
+            
+            // Re-sort after update
+            SortShoppingLists();
         }
     }
 
@@ -169,11 +175,12 @@
                 // Invalidate cache so other pages see the new list
                 DataCache.InvalidateShoppingListsCache();
                 Console.WriteLine($"✅ Added new shopping list: {shoppinglist.Name}");
+                
+                // Re-sort after adding
+                SortShoppingLists();
             }
         }
         _newListName = string.Empty;
-
-        OrderLists();
     }
 
 
@@ -182,7 +189,7 @@
         if (value?.Value != null && value.Value is bool bValue)
         {
             l.IsDone = bValue;
-            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), l);
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), l);
             //await ShoppingListDataManager.Update(l);
             
             if (response.IsSuccessStatusCode)
@@ -190,6 +197,13 @@
                 // Invalidate cache when list completion status changes
                 DataCache.InvalidateShoppingListsCache();
                 Console.WriteLine($"✅ Updated shopping list completion: {l.Name} = {bValue}");
+                
+                // Re-sort after status change
+                SortShoppingLists();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Failed to update shopping list completion: {l.Name}. Status: {response.StatusCode}");
             }
         }
     }
@@ -201,9 +215,27 @@
             (args.Code != null && args.Code.Equals("Enter")))
             await AddList();
     }
+    
+    private void SortShoppingLists()
+    {
+        var naturalComparer = new NaturalSortComparer();
+        
+        // Sort with completed lists at the bottom
+        // 1. Active lists (IsDone = false): Newest first, then natural name sort
+        // 2. Completed lists (IsDone = true): Newest first, then natural name sort
+        ShoppingLists = ShoppingLists
+            .OrderBy(f => f.IsDone)                                        // Active (false) first, completed (true) last
+            .ThenByDescending(f => f.LastModified ?? DateTime.MinValue)   // Within each group: newest first
+            .ThenBy(f => f.Name, naturalComparer)                          // Within same date: natural sort
+            .ToList();
+            
+        Console.WriteLine($"📊 Sorted {ShoppingLists.Count} shopping lists (active first, then completed)");
+    }
+    
     private void OrderLists()
     {
-        ShoppingLists = ShoppingLists.OrderBy(f => f.Name).ToList();
+        // Use the new sorting method
+        SortShoppingLists();
     }
 
 }

@@ -1,0 +1,265 @@
+@page "/frequent-lists/{id}"
+@inject HttpClient Http
+@inject ISettings Settings
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
+
+<div class="card-maincontainer container-sm">
+    @if (ThisFrequentList != null)
+    {
+        <!-- Header Section -->
+        <div class="card">
+            <div class="row align-items-center mb-3">
+                <div class="col">
+                    <h5 class="shopping-list-title @showH2LabelStyle" @ondblclick="@ListHeaderDoubleClickHandler">@ThisFrequentList.Name</h5>
+                    <input class="@showEditHeader" @bind-value="@ThisFrequentList.Name" @onkeyup="@ListHeaderKeyUpHandler" />
+                </div>
+            </div>
+
+            <!-- Add Item Section -->
+            <div class="row align-items-center mb-4">
+                <div class="col">
+                    <SfAutoComplete TValue="string"
+                                    TItem="ShopItemModel"
+                                    DataSource="@AvailableItems"
+                                    Placeholder="Legg til vare i listen..."
+                                    @bind-Value="@autoValue"
+                                    FilterType="FilterType.Contains"
+                                    Width="100%"
+                                    PopupHeight="300px"
+                                    Highlight>
+                        <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                        <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                            ValueChange="@SelectedItemChanged"></AutoCompleteEvents>
+                    </SfAutoComplete>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-add-item" title="Legg til vare" @onclick="@AddSelectedItem">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items List -->
+        @if (!ThisFrequentList.Items.Any())
+        {
+            <div class="card">
+                <div class="row">
+                    <h6>Listen er tom. Legg til varer for å komme i gang.</h6>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="row">
+                    <ul class="todo-list">
+                        @foreach (var item in ThisFrequentList.Items)
+                        {
+                            <li>
+                                <div class="parent-horizontal-stack">
+                                    <div class="col">
+                                        <span>@item.Varen?.Name</span>
+                                    </div>
+                                    <div class="col-3">
+                                        <input class="vareInputEdit" 
+                                               type="number" 
+                                               @bind-value="item.StandardMengde" 
+                                               @onfocusout="@SaveListChanges"
+                                               placeholder="Antall" />
+                                        <span class="ms-1">@item.Varen?.Unit</span>
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="commandBtns" @onclick="@(e => DeleteItem(item))">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        <!-- Footer Summary -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <span class="todo-count">
+                        <strong>@ThisFrequentList.Items.Count</strong> varer i listen
+                    </span>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-primary" @onclick="@SaveListChanges">
+                        <i class="fas fa-save"></i> Lagre endringer
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private FrequentShoppingListModel? ThisFrequentList;
+    private ICollection<ShopItemModel> AvailableItems = new List<ShopItemModel>();
+    private ShopItemModel? selectedItem;
+    private string autoValue = string.Empty;
+    private string showEditHeader = "hidden";
+    private string showH2LabelStyle = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrEmpty(Id)) return;
+
+        await LoadFrequentList();
+        await LoadAvailableItems();
+    }
+
+    private async Task LoadFrequentList()
+    {
+        try
+        {
+            ThisFrequentList = await DataCache.GetFrequentListAsync(Id);
+            
+            if (ThisFrequentList != null && ThisFrequentList.Items == null)
+            {
+                ThisFrequentList.Items = new List<FrequentShoppingItemModel>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading frequent list: {ex.Message}");
+            ThisFrequentList = null;
+        }
+    }
+
+    private async Task LoadAvailableItems()
+    {
+        try
+        {
+            AvailableItems = await DataCache.GetItemsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading available items: {ex.Message}");
+            AvailableItems = new List<ShopItemModel>();
+        }
+    }
+
+    private async Task SelectedItemChanged(ChangeEventArgs<string, ShopItemModel> args)
+    {
+        if (args == null) return;
+        if (args.ItemData is ShopItemModel item)
+        {
+            if (item.IsValid())
+            {
+                selectedItem = item;
+                await AddSelectedItem();
+                autoValue = string.Empty;
+            }
+        }
+    }
+
+    private async Task AddSelectedItem()
+    {
+        if (selectedItem == null || ThisFrequentList == null) return;
+
+        // Check if item already exists in list
+        if (ThisFrequentList.Items.Any(i => i.Varen?.Id == selectedItem.Id))
+        {
+            Console.WriteLine($"⚠️ Item {selectedItem.Name} already exists in list");
+            autoValue = string.Empty;
+            selectedItem = null;
+            StateHasChanged();
+            return;
+        }
+
+        var newItem = new FrequentShoppingItemModel
+        {
+            Id = Guid.NewGuid().ToString(), // Generate ID for new item
+            Name = selectedItem.Name,
+            Varen = selectedItem,
+            StandardMengde = 1
+        };
+
+        // Add new item at the top instead of bottom
+        var itemsList = ThisFrequentList.Items.ToList();
+        itemsList.Insert(0, newItem);
+        ThisFrequentList.Items = itemsList;
+        
+        Console.WriteLine($"✅ Added {selectedItem.Name} to frequent list");
+        
+        // Clear selection before saving to avoid issues
+        var itemName = selectedItem.Name;
+        autoValue = string.Empty;
+        selectedItem = null;
+        
+        await SaveListChanges();
+        StateHasChanged();
+    }
+
+    private async Task DeleteItem(FrequentShoppingItemModel item)
+    {
+        if (ThisFrequentList == null) return;
+
+        ThisFrequentList.Items.Remove(item);
+        await SaveListChanges();
+    }
+
+    private async Task SaveListChanges()
+    {
+        if (ThisFrequentList == null) return;
+
+        try
+        {
+            var apiUrl = Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists);
+            var response = await Http.PutAsJsonAsync(apiUrl, ThisFrequentList);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("✅ Frequent list saved successfully");
+                
+                // Invalidate cache so other pages see the updated list
+                DataCache.InvalidateFrequentListCache(Id);
+                DataCache.InvalidateFrequentListsCache();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Failed to save: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving frequent list: {ex.Message}");
+        }
+    }
+
+    private void ListHeaderDoubleClickHandler()
+    {
+        showEditHeader = "";
+        showH2LabelStyle = "hidden";
+    }
+
+    private async Task ListHeaderKeyUpHandler(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            showEditHeader = "hidden";
+            showH2LabelStyle = "";
+            await SaveListChanges();
+        }
+        else if (e.Key == "Escape")
+        {
+            showEditHeader = "hidden";
+            showH2LabelStyle = "";
+        }
+    }
+}

@@ -35,7 +35,7 @@ namespace Api.Controllers
                     var resultingShops = await repository.Get();
                     if (resultingShops == null)
                     {
-                        return GetErroRespons("Could not get shops", req);
+                        return await GetErroRespons("Could not get shops", req);
                     }
 
                     var okResult = req.CreateResponse(HttpStatusCode.OK);
@@ -48,7 +48,7 @@ namespace Api.Controllers
                 else
                 {
                     var newShop = req.ReadFromJsonAsync<ShopModel>();
-                    if (newShop.Result == null) return GetErroRespons("No content in shop body", req);
+                    if (newShop.Result == null) return await GetErroRespons("No content in shop body", req);
                     Shop updatOrInsert = mapper.Map<Shop>(newShop.Result);
                     if (req.Method == "POST")
                     {
@@ -60,7 +60,7 @@ namespace Api.Controllers
                     }
                     if (updatOrInsert == null)
                     {
-                        return GetErroRespons($"Error in updating or inserting shot into database, base method is {req.Method}", req);
+                        return await GetErroRespons($"Error in updating or inserting shot into database, base method is {req.Method}", req);
 
                     }
                     var okRespons = req.CreateResponse(HttpStatusCode.OK);
@@ -72,7 +72,7 @@ namespace Api.Controllers
             catch (System.Exception e)
             {
                 _logger.LogError(e, $"Something went wrong in shops controller, in medtod {req.Method}");
-                return GetErroRespons(e.Message, req);
+                return await GetErroRespons(e.Message, req);
                 throw;
             }
         }
@@ -89,7 +89,7 @@ namespace Api.Controllers
                     var res = await repository.Get(id);
                     if (res == null)
                     {
-                        return GetErroRespons("could not load shop from db", req);
+                        return await GetErroRespons("could not load shop from db", req);
 
                     }
                     await response.WriteAsJsonAsync(mapper.Map<ShopModel>(res));
@@ -100,7 +100,7 @@ namespace Api.Controllers
                     var res = await repository.Delete(id);
                     if (!res)
                     {
-                        return GetErroRespons("could not delete shop from db", req);
+                        return await GetErroRespons("could not delete shop from db", req);
 
                     }
                     return req.CreateResponse(HttpStatusCode.NoContent);
@@ -112,7 +112,7 @@ namespace Api.Controllers
             {
                 var msg = $"something went wrong in the shop call to id {id} - method type {req.Method}";
                 _logger.LogError(e, msg);
-                return GetErroRespons(msg, req);
+                return await GetErroRespons(msg, req);
             }
         }
 

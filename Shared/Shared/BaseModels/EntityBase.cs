@@ -1,4 +1,5 @@
 ﻿using Google.Cloud.Firestore;
+using System;
 
 namespace Shared.BaseModels
 {
@@ -10,6 +11,9 @@ namespace Shared.BaseModels
 
         [FirestoreProperty]
         public string Name { get; set; }
+
+        [FirestoreProperty]
+        public DateTime? LastModified { get; set; }
 
         public string CssComleteEditClassName
         {

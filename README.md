@@ -162,7 +162,7 @@ Applikasjonens **unike feature** - sortering basert på fysisk butikklayout:
 
 ## 🔐 Google Firestore Configuration
 
-This application uses Google Cloud Firestore as the production database. To test with real Firestore data locally:
+This application uses Google Cloud Firestore as the production database.
 
 ### Local Development Setup
 
@@ -186,18 +186,8 @@ This application uses Google Cloud Firestore as the production database. To test
    
    This allows seamless switching between local development (file path) and cloud deployment (JSON content).
 
-### Code Implementation
-```csharp
-var json = Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS");
-if(Path.IsPathFullyQualified(json)) // Check if env var is a file path
-{
-    json = File.ReadAllText(json);   // Read JSON from file
-}
-// Use json content for Firestore authentication
-```
-
 ### Debug vs Production Data
-- **Debug mode**: Uses `MemoryGenericRepository` with in-memory test data
+- **Debug mode** (`#if DEBUG`): Uses `MemoryGenericRepository` with in-memory test data
 - **Production mode**: Uses `GoogleFireBaseGenericRepository` with live Firestore data
 
 Switch between modes by changing the build configuration in `Api/Program.cs`.

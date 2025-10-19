@@ -32,7 +32,7 @@ namespace Api.Controllers
                 var itemCategories = await repository.Get();
                 if (itemCategories == null)
                 {
-                    return GetErroRespons("Could not load items categorys", req);
+                    return await GetErroRespons("Could not load items categorys", req);
                 }
                 await okRespons.WriteAsJsonAsync(itemCategories);
 
@@ -42,7 +42,7 @@ namespace Api.Controllers
                 var frombody = await req.ReadFromJsonAsync<ItemCategoryModel>();
                 if (frombody == null)
                 {
-                    return GetErroRespons("could not read item category from body", req);
+                    return await GetErroRespons("could not read item category from body", req);
 
                 }
                 var toInsert = mapper.Map<ItemCategory>(frombody);
@@ -51,7 +51,7 @@ namespace Api.Controllers
                     var newItemCat = await repository.Insert(toInsert);
                     if (newItemCat == null)
                     {
-                        return GetErroRespons("could not add item category", req);
+                        return await GetErroRespons("could not add item category", req);
                     }
                     else
                         await okRespons.WriteAsJsonAsync(mapper.Map<ItemCategory>(newItemCat));
@@ -61,7 +61,7 @@ namespace Api.Controllers
                     var newItemCat = await repository.Update(toInsert);
                     if (newItemCat == null)
                     {
-                        return GetErroRespons("could not add item category", req);
+                        return await GetErroRespons("could not add item category", req);
                     }
                     else
                     {
@@ -81,7 +81,7 @@ namespace Api.Controllers
                 var itemCategories = await repository.Get(id);
                 if (itemCategories == null)
                 {
-                    return GetErroRespons("Could not load items categorys", req);
+                    return await GetErroRespons("Could not load items categorys", req);
                 }
                 await okRespons.WriteAsJsonAsync(mapper.Map<ItemCategory>(itemCategories));
 
@@ -92,7 +92,7 @@ namespace Api.Controllers
                 if (deleteResult)
                     return req.CreateResponse(HttpStatusCode.NoContent);
                 else
-                    return GetErroRespons($"Could not delete item {id}", req);
+                    return await GetErroRespons($"Could not delete item {id}", req);
             }
             return req.CreateResponse(HttpStatusCode.NoContent);
         }

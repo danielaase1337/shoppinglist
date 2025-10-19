@@ -1,0 +1,180 @@
+@page "/frequent-lists"
+@inject HttpClient Http
+@inject ISettings Settings
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
+
+<div class="card-maincontainer container-sm">
+    <div class="row card">
+        <h2>Hyppige Lister</h2>
+        
+        <div class="row">
+            <div class="col">
+                <input class="new-todo" placeholder="Navn på listen?" @bind="@_newListName" @onkeyup="OnKeyUpNewListHandler">
+            </div>
+            <div class="col-2">
+                <button type="button" class="btn-sm btn-outline-link"><i class="fas fa-check" @onclick="@AddList"></i></button>
+            </div>
+        </div>
+    </div>
+
+    @if (_frequentLists != null)
+    {
+        @if (!_frequentLists.Any())
+        {
+            <div class="row card">
+                <h6>Det finnes ingen hyppige lister!</h6>
+            </div>
+        }
+        else
+        {
+            <div class="row card">
+                <ul class="todo-list">
+                    @foreach (var list in _frequentLists)
+                    {
+                        <li class="@list.CssComleteEditClassName">
+                            <div class="parent-horizontal-stack">
+                                <div class="col">
+                                    @if (list.EditClicked)
+                                    {
+                                        <input class="editing" @bind-value="@list.Name" />
+                                    }
+                                    else
+                                    {
+                                        <a href="@GetItemNavLink(list.Id)">
+                                            @list.Name
+                                        </a>
+                                    }
+                                </div>
+
+                                @if (list.EditClicked)
+                                {
+                                    <div class="btn-group" role="group" aria-label="Basic example">
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => SaveChanges(list))"><i class="fas fa-check"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { list.EditClicked = false; })"><i class="fas fa-times"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(list))"><i class="fas fa-ban"></i></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-2">
+                                        <button @onclick="@(e => { list.EditClicked = true; })"><i class="fas fa-edit"></i></button>
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+    else
+    {
+        <LoadingComponent />
+    }
+</div>
+
+@code {
+    private List<FrequentShoppingListModel>? _frequentLists;
+    private string _newListName = string.Empty;
+
+    private string GetItemNavLink(string listId)
+    {
+        return $"frequent-lists/{listId}";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLists();
+    }
+
+    private async Task LoadLists()
+    {
+        try
+        {
+            _frequentLists = (await DataCache.GetFrequentListsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading frequent lists: {ex.Message}");
+            _frequentLists = new List<FrequentShoppingListModel>();
+        }
+    }
+
+    private async Task AddList()
+    {
+        if (string.IsNullOrWhiteSpace(_newListName)) return;
+
+        try
+        {
+            var newList = new FrequentShoppingListModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = _newListName,
+                Items = new List<FrequentShoppingItemModel>()
+            };
+
+            var apiUrl = Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists);
+            var response = await Http.PostAsJsonAsync(apiUrl, newList);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _newListName = string.Empty;
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding list: {ex.Message}");
+        }
+    }
+
+    private async Task SaveChanges(FrequentShoppingListModel list)
+    {
+        try
+        {
+            var apiUrl = Settings.GetApiUrl(ShoppingListKeysEnum.FrequentShoppingLists);
+            var response = await Http.PutAsJsonAsync(apiUrl, list);
+
+            if (response.IsSuccessStatusCode)
+            {
+                list.EditClicked = false;
+                DataCache.InvalidateFrequentListCache(list.Id);
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving changes: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteList(FrequentShoppingListModel list)
+    {
+        try
+        {
+            var apiUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.FrequentShoppingList, list.Id);
+            var response = await Http.DeleteAsync(apiUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                DataCache.InvalidateFrequentListCache(list.Id);
+                DataCache.InvalidateFrequentListsCache();
+                await LoadLists();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting list: {ex.Message}");
+        }
+    }
+
+    private async void OnKeyUpNewListHandler(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddList();
+        }
+    }
+}

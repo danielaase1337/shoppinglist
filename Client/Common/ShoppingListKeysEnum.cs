@@ -17,7 +17,9 @@ namespace BlazorApp.Client.Common
         ShopItem = 5,
         shopItems = 6,
         itemcategory = 7,
-        itemcategorys = 8
+        itemcategorys = 8,
+        FrequentShoppingList = 9,
+        FrequentShoppingLists = 10
 
 
     }

@@ -42,7 +42,7 @@ namespace Api.Controllers
                     {
                         _logger.Log(LogLevel.Error, $"Could not get any stored lists Error: {req.ReadAsString()}");
                         
-                        return GetErroRespons("could not get any stored lists", req);
+                        return await GetErroRespons("could not get any stored lists", req);
                     }
                     else if (!result.Any())
                     {
@@ -50,6 +50,25 @@ namespace Api.Controllers
                         await response.WriteAsJsonAsync(new List<ShoppingListModel>());
                         return response;
                     }
+                    
+                    // Migration: Set LastModified for existing lists without timestamp
+                    bool hasUpdates = false;
+                    foreach (var list in result)
+                    {
+                        if (!list.LastModified.HasValue)
+                        {
+                            list.LastModified = DateTime.UtcNow;
+                            await repo.Update(list);
+                            hasUpdates = true;
+                            _logger.LogInformation($"Migrated LastModified for list: {list.Name}");
+                        }
+                    }
+                    
+                    if (hasUpdates)
+                    {
+                        _logger.LogInformation("✅ Migration completed: Added LastModified to existing lists");
+                    }
+                    
                     var shoppingListModel = mapper.Map<ShoppingListModel[]>(result);
                     await response.WriteAsJsonAsync(shoppingListModel);
                     return response;
@@ -58,11 +77,15 @@ namespace Api.Controllers
                 {
                     var requestBody = await req.ReadFromJsonAsync<ShoppingListModel>();
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
+                    
+                    // Set LastModified timestamp
+                    shoppinglist.LastModified = DateTime.UtcNow;
+                    
                     var addRes = await repo.Insert(shoppinglist);
                     if (addRes == null)
                     {
                         _logger.Log(LogLevel.Warning, $"Could not get shoppinglists");
-                        return GetErroRespons("could not get shoppinglist", req);
+                        return await GetErroRespons("could not get shoppinglist", req);
                     }
                     else
                     {
@@ -74,9 +97,13 @@ namespace Api.Controllers
                 {
                     var requestBody = await req.ReadFromJsonAsync<ShoppingListModel>();
                     var shoppinglist = mapper.Map<ShoppingList>(requestBody);
+                    
+                    // Update LastModified timestamp
+                    shoppinglist.LastModified = DateTime.UtcNow;
+                    
                     var addRes = await repo.Update(shoppinglist);
                     if (addRes == null)
-                        return GetErroRespons("Could not update shoppinglist", req);
+                        return await GetErroRespons("Could not update shoppinglist", req);
                     else
                     {
                         await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));
@@ -90,7 +117,7 @@ namespace Api.Controllers
             {
                 var msg = $"Something went wrong in execution of shoppinglists, method type {req.Method}";
                 _logger.LogError(e, msg);
-                return GetErroRespons(msg, req);
+                return await GetErroRespons(msg, req);
             }
 
         }
@@ -107,6 +134,15 @@ namespace Api.Controllers
                     var res = req.CreateResponse(HttpStatusCode.InternalServerError);
                     return res;
                 }
+                
+                // Migration: Set LastModified for existing list without timestamp
+                if (!result.LastModified.HasValue)
+                {
+                    result.LastModified = DateTime.UtcNow;
+                    await repo.Update(result);
+                    _logger.LogInformation($"Migrated LastModified for list: {result.Name}");
+                }
+                
                 var shoppingListModel = mapper.Map<ShoppingListModel>(result);
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 await response.WriteAsJsonAsync(shoppingListModel);

@@ -79,6 +79,26 @@
                 </div>
             </div>
 
+            <div class="row align-items-center mb-3">
+                <div class="col">
+                    <SfDropDownList TValue="string" 
+                                  TItem="FrequentShoppingListModel" 
+                                  Placeholder="Importer fra hyppig liste..." 
+                                  DataSource="@FrequentLists" 
+                                  @bind-Index="@frequentListIndex" 
+                                  Width="100%"
+                                  PopupHeight="300px">
+                        <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
+                        <DropDownListEvents TValue="string" TItem="FrequentShoppingListModel" ValueChange="OnFrequentListSelected"></DropDownListEvents>
+                    </SfDropDownList>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary" @onclick="ImportFromFrequentList" disabled="@(frequentListIndex == null || frequentListIndex < 0)" title="Importer varer fra valgt liste">
+                        <i class="fas fa-file-import"></i> Importer
+                    </button>
+                </div>
+            </div>
+
             <div class="row align-items-center mb-4">
                 <div class="col">
                     <SfAutoComplete TValue="string"
@@ -172,6 +192,11 @@ else
     string showH2LabelStyle = "";
     string dropdownText = "Velg buikk";
 
+    // Frequent Lists for import
+    ICollection<FrequentShoppingListModel> FrequentLists = new List<FrequentShoppingListModel>();
+    int? frequentListIndex = null;
+    FrequentShoppingListModel? selectedFrequentList = null;
+
     [Parameter]
     public string Id { get; set; }
 
@@ -204,9 +229,10 @@ else
             var itemsTask = DataCache.GetItemsAsync();
             var categoriesTask = DataCache.GetCategoriesAsync();
             var shopsTask = DataCache.GetShopsAsync();
+            var frequentListsTask = LoadFrequentLists();
 
             // Wait for all tasks to complete
-            await Task.WhenAll(shoppingListTask, itemsTask, categoriesTask, shopsTask);
+            await Task.WhenAll(shoppingListTask, itemsTask, categoriesTask, shopsTask, frequentListsTask);
 
             // Assign results
             ThisShoppingList = await shoppingListTask;
@@ -228,6 +254,93 @@ else
         }
     }
 
+    private async Task LoadFrequentLists()
+    {
+        try
+        {
+            FrequentLists = await DataCache.GetFrequentListsAsync();
+            Console.WriteLine($"📋 Loaded {FrequentLists.Count} frequent lists for import");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading frequent lists: {ex.Message}");
+            FrequentLists = new List<FrequentShoppingListModel>();
+        }
+    }
+
+    private void OnFrequentListSelected(ChangeEventArgs<string, FrequentShoppingListModel> args)
+    {
+        if (args.ItemData != null)
+        {
+            selectedFrequentList = args.ItemData;
+            Console.WriteLine($"📝 Selected frequent list: {selectedFrequentList.Name}");
+        }
+    }
+
+    private async Task ImportFromFrequentList()
+    {
+        if (selectedFrequentList == null || ThisShoppingList == null)
+        {
+            Console.WriteLine("⚠️ No frequent list selected or shopping list not loaded");
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine($"📥 Importing {selectedFrequentList.Items?.Count ?? 0} items from '{selectedFrequentList.Name}'");
+            
+            int addedCount = 0;
+            int skippedCount = 0;
+
+            if (selectedFrequentList.Items != null)
+            {
+                foreach (var frequentItem in selectedFrequentList.Items)
+                {
+                    if (frequentItem.Varen == null) continue;
+
+                    // Check if item already exists in shopping list
+                    var existingItem = ThisShoppingList.ShoppingItems
+                        .FirstOrDefault(si => si.Varen?.Id == frequentItem.Varen.Id);
+
+                    if (existingItem != null)
+                    {
+                        // Item exists, optionally update quantity
+                        existingItem.Mengde += frequentItem.StandardMengde;
+                        skippedCount++;
+                        Console.WriteLine($"  ➕ Updated quantity for: {frequentItem.Varen.Name}");
+                    }
+                    else
+                    {
+                        // Add new item with standard quantity
+                        var newItem = new ShoppingListItemModel
+                        {
+                            Varen = frequentItem.Varen,
+                            Mengde = frequentItem.StandardMengde,
+                            IsDone = false
+                        };
+                        ThisShoppingList.ShoppingItems.Add(newItem);
+                        addedCount++;
+                        Console.WriteLine($"  ✅ Added: {frequentItem.Varen.Name} (x{frequentItem.StandardMengde})");
+                    }
+                }
+            }
+
+            // Save updated shopping list
+            await UpdateShoppinglist(ThisShoppingList);
+            FilterList(activeListFiler);
+
+            // Reset selection
+            frequentListIndex = null;
+            selectedFrequentList = null;
+
+            Console.WriteLine($"✅ Import complete: {addedCount} added, {skippedCount} updated");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error importing from frequent list: {ex.Message}");
+        }
+    }
+
     public async Task DeleteVare(ShoppingListItemModel m)
     {
         ThisShoppingList.ShoppingItems.Remove(m);
@@ -241,7 +354,11 @@ else
     private async Task AddVare(ShopItemModel shopItem)
     {
         ShoppingListItemModel newItem = new ShoppingListItemModel() { Mengde = 1, IsDone = false, Varen = shopItem };
-        ThisShoppingList.ShoppingItems.Add(newItem);
+        
+        // Add new item at the top instead of bottom
+        var itemsList = ThisShoppingList.ShoppingItems.ToList();
+        itemsList.Insert(0, newItem);
+        ThisShoppingList.ShoppingItems = itemsList;
 
         await UpdateShoppinglist(ThisShoppingList);
 
@@ -296,7 +413,7 @@ else
         {
             showH2LabelStyle = "";
             showEditHeader = "hidden";
-            await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingList), ThisShoppingList);
+            await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
 
         }
     }
@@ -352,6 +469,9 @@ else
     }
     private async Task UpdateShoppinglist (ShoppingListModel liste)
     {
+        // Update LastModified timestamp before saving
+        liste.LastModified = DateTime.UtcNow;
+        
         await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
     }
 

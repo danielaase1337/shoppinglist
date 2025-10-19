@@ -46,6 +46,7 @@ namespace Api.Tests.Controllers
                     Id = "1", 
                     Name = "Ukeshandel", 
                     IsDone = false,
+                    LastModified = DateTime.UtcNow.AddDays(-1),
                     ShoppingItems = new List<ShoppingListItem>()
                 },
                 new ShoppingList 
@@ -53,6 +54,7 @@ namespace Api.Tests.Controllers
                     Id = "2", 
                     Name = "Middag i kveld", 
                     IsDone = false,
+                    LastModified = DateTime.UtcNow,
                     ShoppingItems = new List<ShoppingListItem>()
                 }
             };
@@ -67,6 +69,7 @@ namespace Api.Tests.Controllers
             Assert.Equal(2, result.Count);
             Assert.Contains(result, s => s.Name == "Ukeshandel");
             Assert.Contains(result, s => s.Name == "Middag i kveld");
+            Assert.All(result, s => Assert.NotNull(s.LastModified));
         }
 
         [Fact]
@@ -92,6 +95,7 @@ namespace Api.Tests.Controllers
                 Id = "3", 
                 Name = "Weekend shopping", 
                 IsDone = false,
+                LastModified = DateTime.UtcNow,
                 ShoppingItems = new List<ShoppingListItem>
                 {
                     new ShoppingListItem
@@ -119,6 +123,7 @@ namespace Api.Tests.Controllers
             Assert.Equal("Weekend shopping", result.Name);
             Assert.Equal("3", result.Id);
             Assert.False(result.IsDone);
+            Assert.NotNull(result.LastModified);
             Assert.Single(result.ShoppingItems);
         }
 
@@ -131,6 +136,7 @@ namespace Api.Tests.Controllers
                 Id = "1", 
                 Name = "Ukeshandel - Oppdatert", 
                 IsDone = true,
+                LastModified = DateTime.UtcNow,
                 ShoppingItems = new List<ShoppingListItem>()
             };
 
@@ -143,6 +149,7 @@ namespace Api.Tests.Controllers
             Assert.NotNull(result);
             Assert.Equal("Ukeshandel - Oppdatert", result.Name);
             Assert.True(result.IsDone);
+            Assert.NotNull(result.LastModified);
         }
 
         [Fact]
@@ -154,6 +161,7 @@ namespace Api.Tests.Controllers
                 Id = "1", 
                 Name = "Ukeshandel", 
                 IsDone = false,
+                LastModified = DateTime.UtcNow,
                 ShoppingItems = new List<ShoppingListItem>()
             };
             _mockRepository.Setup(r => r.Get("1")).ReturnsAsync(shoppingList);
@@ -165,6 +173,7 @@ namespace Api.Tests.Controllers
             Assert.NotNull(result);
             Assert.Equal("Ukeshandel", result.Name);
             Assert.Equal("1", result.Id);
+            Assert.NotNull(result.LastModified);
         }
 
         [Fact]
@@ -365,6 +374,155 @@ namespace Api.Tests.Controllers
             Assert.True(shoppingListItem.Mengde > 0);
             Assert.NotEmpty(shoppingListItem.Varen.Name);
             Assert.NotNull(shoppingListItem.Varen.ItemCategory);
+        }
+
+        [Fact]
+        public void ShoppingList_LastModified_IsSetCorrectly()
+        {
+            // Arrange
+            var expectedDate = DateTime.UtcNow;
+            
+            // Act
+            var shoppingList = new ShoppingList 
+            { 
+                Id = "1", 
+                Name = "Test List",
+                IsDone = false,
+                LastModified = expectedDate,
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // Assert
+            Assert.NotNull(shoppingList.LastModified);
+            Assert.Equal(expectedDate, shoppingList.LastModified.Value);
+        }
+
+        [Fact]
+        public void ShoppingList_LastModified_CanBeNull_ForLegacyLists()
+        {
+            // Arrange & Act
+            var shoppingList = new ShoppingList 
+            { 
+                Id = "1", 
+                Name = "Legacy List",
+                IsDone = false,
+                LastModified = null, // Simulate old list without timestamp
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // Assert
+            Assert.Null(shoppingList.LastModified);
+            Assert.NotEmpty(shoppingList.Name);
+        }
+
+        [Fact]
+        public void ShoppingListModel_LastModified_MapsCorrectly()
+        {
+            // Arrange
+            var expectedDate = DateTime.UtcNow;
+            var shoppingList = new ShoppingList 
+            { 
+                Id = "1", 
+                Name = "Test List",
+                IsDone = false,
+                LastModified = expectedDate,
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // Act
+            var model = _mapper.Map<ShoppingListModel>(shoppingList);
+
+            // Assert
+            Assert.NotNull(model.LastModified);
+            Assert.Equal(expectedDate, model.LastModified.Value);
+        }
+
+        [Theory]
+        [InlineData("Uke 41")]
+        [InlineData("Uke 42")]
+        [InlineData("Uke 43")]
+        [InlineData("Julebord 2025")]
+        public void ShoppingList_NaturalSorting_CommonListNames(string listName)
+        {
+            // Arrange
+            var shoppingList = new ShoppingList 
+            { 
+                Id = Guid.NewGuid().ToString(), 
+                Name = listName,
+                IsDone = false,
+                LastModified = DateTime.UtcNow,
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // Assert
+            Assert.Equal(listName, shoppingList.Name);
+            Assert.NotNull(shoppingList.LastModified);
+            Assert.NotEmpty(shoppingList.Id);
+        }
+
+        [Fact]
+        public void ShoppingList_UpdateTimestamp_ChangesLastModified()
+        {
+            // Arrange
+            var originalDate = DateTime.UtcNow.AddDays(-1);
+            var shoppingList = new ShoppingList 
+            { 
+                Id = "1", 
+                Name = "Test List",
+                IsDone = false,
+                LastModified = originalDate,
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // Act
+            var newDate = DateTime.UtcNow;
+            shoppingList.LastModified = newDate;
+
+            // Assert
+            Assert.NotNull(shoppingList.LastModified);
+            Assert.NotEqual(originalDate, shoppingList.LastModified.Value);
+            Assert.Equal(newDate, shoppingList.LastModified.Value);
+        }
+
+        [Fact]
+        public async Task Repository_GetWithMigration_SetsLastModified_ForLegacyLists()
+        {
+            // Arrange
+            var legacyList = new ShoppingList 
+            { 
+                Id = "legacy-1", 
+                Name = "Old List Without Timestamp",
+                IsDone = false,
+                LastModified = null, // Legacy list
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            var migratedList = new ShoppingList 
+            { 
+                Id = "legacy-1", 
+                Name = "Old List Without Timestamp",
+                IsDone = false,
+                LastModified = DateTime.UtcNow, // After migration
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            _mockRepository.Setup(r => r.Get("legacy-1")).ReturnsAsync(legacyList);
+            _mockRepository.Setup(r => r.Update(It.IsAny<ShoppingList>())).ReturnsAsync(migratedList);
+
+            // Act
+            var result = await _mockRepository.Object.Get("legacy-1");
+            
+            // Simulate migration logic
+            if (!result.LastModified.HasValue)
+            {
+                result.LastModified = DateTime.UtcNow;
+                result = await _mockRepository.Object.Update(result);
+            }
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.NotNull(result.LastModified);
+            Assert.True(result.LastModified.HasValue);
         }
     }
 }

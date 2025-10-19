@@ -58,9 +58,20 @@ ShopItem (Vare)
 ```
 
 ### Arv og Base-klasser
-- **EntityBase**: Base-klasse for alle entiteter med `Id`, `Name`, og UI-relaterte properties
+- **EntityBase**: Base-klasse for alle entiteter med `Id`, `Name`, `LastModified` (DateTime?), og UI-relaterte properties
 - **FireStoreCommonBase**: Base for Firestore-spesifikke entiteter
 - **ShoppingListBaseModel**: Base for shopping list-relaterte modeller
+
+### Tidsstempel-system
+Alle entiteter har `LastModified` property:
+```csharp
+[FirestoreProperty]
+public DateTime? LastModified { get; set; }
+```
+
+- **Automatisk oppdatering**: POST/PUT operasjoner setter `LastModified = DateTime.UtcNow`
+- **Lazy migration**: GET operasjoner setter timestamp for legacy data uten `LastModified`
+- **Sortering**: Brukes for å sortere lister (nyeste først)
 
 ### Mapping-strategi
 Applikasjonen bruker **AutoMapper** med separate modeller for:
@@ -69,7 +80,7 @@ Applikasjonen bruker **AutoMapper** med separate modeller for:
 
 ## Sorteringslogikk (Hovedfunksjonalitet)
 
-### Eksisterende implementasjon
+### 1. Butikk-spesifikk Vare-sortering
 Sorteringslogikken finnes i `OneShoppingListPage.razor` i `SortShoppingList()` metoden:
 
 ```csharp
@@ -108,11 +119,44 @@ void SortShoppingList()
 }
 ```
 
-### Sorteringslogikk Forklart
+#### Butikk-spesifikk Sortering Forklart
 1. **Butikk-valg**: Bruker velger en spesifikk butikk fra dropdown
 2. **Hylle-rekkefølge**: Hver hylle har en `SortIndex` som definerer rekkefølgen i butikken
 3. **Kategori-indeksering**: Varekategorier får tildelt sorteringsindeks basert på hvilken hylle de tilhører
 4. **Vare-sortering**: Varer i handlelisten sorteres etter deres kategori-indeks
+
+### 2. Smart Handleliste-sortering (Flere nivåer)
+I `ShoppingListMainPage.razor` - `SortShoppingLists()` metoden:
+
+```csharp
+AvailableShoppingLists = AvailableShoppingLists
+    .OrderBy(f => f.IsDone)                           // Nivå 1: Aktive først (false < true)
+    .ThenByDescending(f => f.LastModified)            // Nivå 2: Nyeste først
+    .ThenBy(f => f.Name, new NaturalSortComparer())   // Nivå 3: Natural alfabetisk sortering
+    .ToList();
+```
+
+#### Sorteringsadferd
+- **Aktive lister** (IsDone=false) vises øverst
+- **Ferdige lister** (IsDone=true) vises nederst
+- Innen hver gruppe: nyeste først, deretter alfabetisk med natural sortering
+
+### 3. Natural Alfanumerisk Sortering
+**Implementasjon**: `Client/Common/NaturalSortComparer.cs`
+
+Implementerer `IComparer<string>` for korrekt sortering av blandet tekst og tall:
+```csharp
+// Korrekt sortering: "Uke 1", "Uke 2", "Uke 10", "Uke 41", "Uke 42"
+// Uten natural sort: "Uke 1", "Uke 10", "Uke 2", "Uke 41", "Uke 42"
+```
+
+**Algoritme**:
+1. Regex deler strenger i nummer/tekst-segmenter
+2. Tall sammenlignes numerisk (int.Parse)
+3. Tekst sammenlignes alfabetisk (case-insensitive)
+4. Håndterer null-strenger
+
+**Test-dekning**: 11 enhetstester dekker edge cases (nulls, case-sensitivity, mixed formats)
 
 ## API-struktur og Endepunkter
 
@@ -144,20 +188,37 @@ Pages/
 ├── Admin/
 │   └── AdminDataBase.razor
 └── Shopping/
-    ├── ManageMyShopsPage.razor      - Butikk-administrasjon
-    ├── OneShopManagmentPage.razor   - Enkelt butikk-setup
-    ├── OneShoppingListPage.razor    - Hovedkomponent for handleliste
+    ├── ManageMyShopsPage.razor         - Butikk-administrasjon
+    ├── OneShopManagmentPage.razor      - Enkelt butikk-setup
+    ├── OneShoppingListPage.razor       - Enkelt handleliste (butikk-sortering + nye varer øverst)
+    ├── OneFrequentListPage.razor       - Hyppige lister (nye varer øverst)
     ├── PersonalShopPathManagement.razor
-    └── ShoppingListMainPage.razor   - Oversikt over alle lister
+    └── ShoppingListMainPage.razor      - Oversikt (multi-level sortering)
+
+Common/
+├── NaturalSortComparer.cs              - Natural alfanumerisk sortering
+├── ISettings.cs                        - API URL management
+└── ShoppingListKeysEnum.cs
 
 Shared/
 ├── ConfirmDelete.razor
 ├── LoadingComponent.razor
 ├── MainLayout.razor
-├── NewNavComponent.razor
+├── NewNavComponent.razor               - Navigasjon med Admin dropdown
 └── ShoppingListComponents/
     ├── ListSummaryFooter.razor
     └── OneShoppingListItemComponent.razor
+```
+
+### Navigasjonsstruktur
+```
+Hovedmeny:
+├── Handlelister
+└── Admin (Dropdown)
+    ├── Hyppige Lister
+    ├── Håndter butikker
+    ├── Administrer varer
+    └── Administrer kategorier
 ```
 
 ### State Management og Data Flow
@@ -199,20 +260,89 @@ Shared/
 - **MemoryGenericRepository**: In-memory implementasjon for testing
 - **IGoogleDbContext**: Database context interface
 
-## Forbedringspunkter og Anbefalinger
+## Testing Infrastruktur
 
-### Eksisterende Utfordringer
-1. **Manglende controller for Shelf-entiteter** - Ingen API for hyllehåndtering
-2. **Sorteringslogikk kun på client-side** - Bør flyttes til backend
-3. **Ingen validering av butikk-hylle relasjoner**
-4. **Begrenset error handling** i frontend
+### Omfattende Test-suite (143 tester totalt)
 
-### Foreslåtte Forbedringer
-1. **Legg til ShelfController** for full CRUD på hyller
-2. **Implementer server-side sortering** med cached resultater
-3. **Legg til validering** av data-integritet
-4. **Forbedre error handling** og bruker-feedback
-5. **Legge til enhetstester** for sorteringslogikk
+#### Enhetstester - API (65 tester)
+**Lokasjon**: `Api.Tests/Controllers/`
+
+- `ShoppingListControllerTests.cs`:
+  - Standard CRUD operasjoner
+  - **LastModified_IsSetOnCreation**: Verifiserer timestamp på POST
+  - **LastModified_IsUpdatedOnUpdate**: Verifiserer timestamp på PUT
+  - **Migration_SetsLastModifiedForLegacyLists**: Tester lazy migration
+  - 7 totale tester for timestamp-funksjonalitet
+
+- `ShopsControllerTests.cs`: Butikk og hylle-administrasjon
+- `ShopsItemsControllerTests.cs`: Vare CRUD operasjoner
+- `ShopItemCategoryControllerTests.cs`: Kategori-administrasjon
+
+#### Enhetstester - Client (61 tester)
+**Lokasjon**: `Client.Tests/`
+
+- `NaturalSortComparerTests.cs` (11 tester):
+  - `BasicNumberSorting_SortsNumerically`: "Item 1" < "Item 10" < "Item 100"
+  - `WeekNumbers_SortCorrectly`: "Uke 1" til "Uke 43"
+  - `MixedCaseInsensitive_SortsCorrectly`
+  - `NullStrings_HandledGracefully`
+  - Edge cases og spesielle tegn
+
+- `ShoppingListSortingTests.cs` (3 tester):
+  - `ActiveLists_AppearBeforeCompletedLists`: Verifiserer IsDone=false kommer først
+  - `WithinSameDate_UsesNaturalSorting`: Verifiserer natural sort når timestamps er like
+  - `MixedActiveAndCompleted_SortsCorrectly`: Komplekst scenario
+
+- Ytterligere komponent og service tester (47 tester)
+
+#### E2E Tester - Playwright (20 tester)
+**Lokasjon**: `Client.Tests.Playwright/Tests/`
+
+- `ShoppingListSortingTests.cs` (7 tester):
+  - Butikk-spesifikk sortering verifikasjon
+  - Natural sortering i UI
+  - Syncfusion komponent interaksjoner
+  
+- `NavigationTests.cs`: Sidelasting og routing
+- `DebugTests.cs`: Konsoll-feil deteksjon
+- `PageInspectionTests.cs`: UI element verifikasjon
+
+### Kjøre Tester
+```bash
+# Alle tester
+dotnet test
+
+# Spesifikk test-klasse
+dotnet test --filter "FullyQualifiedName~NaturalSortComparerTests"
+
+# Kun Client tester
+dotnet test Client.Tests/Client.Tests.csproj
+
+# E2E tester (krever kjørende app)
+dotnet test Client.Tests.Playwright/Client.Tests.Playwright.csproj
+```
+
+## Implementerte Funksjoner og Status
+
+### ✅ Ferdigstilte Funksjoner:
+1. ✅ **Testing infrastruktur** - 143 omfattende tester (enhet + E2E)
+2. ✅ **Natural alfanumerisk sortering** - Håndterer "Uke 1" til "Uke 43"
+3. ✅ **Tidsstempel sporing** - LastModified med lazy migration
+4. ✅ **Smart liste-sortering** - Multi-level: IsDone → Dato → Navn
+5. ✅ **Vare innsettings-rekkefølge** - Nye varer på toppen
+6. ✅ **IsDone persistering** - Fikset checkbox binding og API endepunkt
+7. ✅ **Navigasjonsforbedringer** - Hyppige Lister i Admin dropdown
+
+### 🔄 Kjente Begrensninger:
+1. **Ingen Shelf API endepunkt** - Hylle-administrasjon skjer gjennom Shop entiteter
+2. **Firestore ytelse** - Kunne dratt nytte av caching-strategier
+3. **Client-side sortering** - Kjerne sorteringslogikk kjører i Blazor, ikke API (by design)
+
+### 📋 Fremtidige Vurderinger:
+- Legge til visuell separator mellom aktive og ferdige lister
+- Implementere data caching for ofte brukte butikker/hyller
+- Vurdere backend sortering API for store datasett
+- Legge til bulk-operasjoner for liste-administrasjon
 
 ## Deployment og Konfiguration
 
