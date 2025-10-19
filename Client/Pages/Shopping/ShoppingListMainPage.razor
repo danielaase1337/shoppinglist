@@ -1,4 +1,5 @@
 ﻿@page "/shoppinglist"
+@using BlazorApp.Client.Common
 @inject HttpClient Http;
 @inject BlazorApp.Client.Services.IDataCacheService DataCache
 @inject BlazorApp.Client.Services.IBackgroundPreloadService BackgroundPreload
@@ -105,6 +106,7 @@
             if (ShoppingLists.Any())
             {
                 Console.WriteLine($"⚡ Instant load: {ShoppingLists.Count} shopping lists from cache");
+                SortShoppingLists(); // Sort after loading
                 StateHasChanged(); // Immediately update UI
             }
             else
@@ -113,6 +115,7 @@
                 // If no cache, force refresh to get data
                 ShoppingLists = await DataCache.GetShoppingListsAsync(forceRefresh: true) ?? new List<ShoppingListModel>();
                 Console.WriteLine($"📋 Loaded {ShoppingLists.Count} shopping lists from API");
+                SortShoppingLists(); // Sort after loading
             }
         }
         catch (Exception ex)
@@ -136,6 +139,9 @@
             // Invalidate cache so other pages see the changes
             DataCache.InvalidateShoppingListsCache();
             Console.WriteLine($"✅ Updated shopping list: {item.Name}");
+            
+            // Re-sort after update
+            SortShoppingLists();
         }
     }
 
@@ -169,11 +175,12 @@
                 // Invalidate cache so other pages see the new list
                 DataCache.InvalidateShoppingListsCache();
                 Console.WriteLine($"✅ Added new shopping list: {shoppinglist.Name}");
+                
+                // Re-sort after adding
+                SortShoppingLists();
             }
         }
         _newListName = string.Empty;
-
-        OrderLists();
     }
 
 
@@ -190,6 +197,9 @@
                 // Invalidate cache when list completion status changes
                 DataCache.InvalidateShoppingListsCache();
                 Console.WriteLine($"✅ Updated shopping list completion: {l.Name} = {bValue}");
+                
+                // Re-sort after status change
+                SortShoppingLists();
             }
         }
     }
@@ -201,9 +211,24 @@
             (args.Code != null && args.Code.Equals("Enter")))
             await AddList();
     }
+    
+    private void SortShoppingLists()
+    {
+        var naturalComparer = new NaturalSortComparer();
+        
+        // Sort by LastModified (newest first), then by natural alphanumeric name
+        ShoppingLists = ShoppingLists
+            .OrderByDescending(f => f.LastModified ?? DateTime.MinValue)  // Newest first
+            .ThenBy(f => f.Name, naturalComparer)                          // Natural sort for same dates
+            .ToList();
+            
+        Console.WriteLine($"📊 Sorted {ShoppingLists.Count} shopping lists by date and name");
+    }
+    
     private void OrderLists()
     {
-        ShoppingLists = ShoppingLists.OrderBy(f => f.Name).ToList();
+        // Use the new sorting method
+        SortShoppingLists();
     }
 
 }

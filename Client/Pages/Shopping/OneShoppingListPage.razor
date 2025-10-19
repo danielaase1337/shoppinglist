@@ -469,6 +469,9 @@ else
     }
     private async Task UpdateShoppinglist (ShoppingListModel liste)
     {
+        // Update LastModified timestamp before saving
+        liste.LastModified = DateTime.UtcNow;
+        
         await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
     }
 
