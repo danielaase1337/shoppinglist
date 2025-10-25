@@ -1053,3 +1053,30 @@ html .clear-completed:active {
         bottom: 20px;
     }
 }
+
+/* Collapsible section animations */
+.collapse-section {
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.collapse-section.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+}
+
+/* Toggle button styling */
+.btn-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.btn-toggle:hover {
+    transform: scale(1.1);
+}
+
+.btn-toggle i {
+    transition: transform 0.3s ease;
+}
