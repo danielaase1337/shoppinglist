@@ -62,7 +62,15 @@
                     <h5 class="shopping-list-title @showH2LabelStyle" @ondblclick="@ListHeaderKeyUpEventHandler">@ThisShoppingList.Name</h5>
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
                 </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-outline-info" @onclick="ToggleAddItemsSection" title="@(showAddItemsSection ? "Skjul legg til varer" : "Vis legg til varer")">
+                        <i class="fas @(showAddItemsSection ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                    </button>
+                </div>
             </div>
+
+            @if (showAddItemsSection)
+            {
 
             <div class="row align-items-center mb-3">
                 <div class="col-12">
@@ -121,6 +129,7 @@
                     </button>
                 </div>
             </div>
+            }
         </div>
 
         @if (!ThisShoppingListItems.Any())
@@ -191,6 +200,7 @@ else
     string showEditHeader = "hidden";
     string showH2LabelStyle = "";
     string dropdownText = "Velg buikk";
+    bool showAddItemsSection = true; // Controls visibility of add items section
 
     // Frequent Lists for import
     ICollection<FrequentShoppingListModel> FrequentLists = new List<FrequentShoppingListModel>();
@@ -417,6 +427,13 @@ else
 
         }
     }
+
+    void ToggleAddItemsSection()
+    {
+        showAddItemsSection = !showAddItemsSection;
+        Console.WriteLine($"🔄 Add items section toggled: {(showAddItemsSection ? "visible" : "hidden")}");
+    }
+
     async Task SelectedShopItemChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel> newValue)
     {
         if (newValue == null) return;
