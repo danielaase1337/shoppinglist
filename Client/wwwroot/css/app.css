@@ -25,9 +25,9 @@ a:hover, .btn-link:hover {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
     border-radius: 12px;
-    padding: 12px 24px;
+    padding: 10px 20px;
     font-weight: 600;
-    min-height: 44px;
+    min-height: 40px;
     transition: all 0.2s ease;
 }
 
@@ -55,9 +55,9 @@ a:hover, .btn-link:hover {
 .parent-horizontal-stack {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
-    min-height: 44px;
+    min-height: 40px;
 }
 
 .parent-horizontal-stack .col-1 {
@@ -81,39 +81,39 @@ a:hover, .btn-link:hover {
 
 .editButtonStyle {
     margin: 0;
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 32px;
+    min-height: 32px;
 }
 
 /* Mobile-specific improvements */
 @media (max-width: 768px) {
     .card-maincontainer {
-        padding: 12px;
+        padding: 8px;
     }
     
     .card {
-        margin: 12px 0;
-        padding: 16px;
+        margin: 8px 0;
+        padding: 12px;
     }
     
     .card h2 {
-        font-size: 20px;
-        margin-bottom: 12px;
+        font-size: 18px;
+        margin-bottom: 10px;
     }
     
     .todo-list li {
-        padding: 16px 0;
-        min-height: 60px;
+        padding: 4px 0;
+        min-height: 36px;
     }
     
     .todo-list li a {
-        padding: 16px 4px;
-        font-size: 19px;
+        padding: 4px 4px;
+        font-size: 16px;
         font-weight: 600;
     }
     
     .parent-horizontal-stack {
-        gap: 8px;
+        gap: 6px;
     }
     
     .btn-group {
@@ -121,8 +121,8 @@ a:hover, .btn-link:hover {
     }
     
     .editButtonStyle {
-        min-width: 32px;
-        min-height: 32px;
+        min-width: 28px;
+        min-height: 28px;
     }
 }
 
@@ -177,18 +177,18 @@ body {
 
 button {
     margin: 0;
-    padding: 12px;
+    padding: 10px;
     border: none;
     background: transparent;
-    font-size: 16px;
+    font-size: 14px;
     font-family: inherit;
     font-weight: 500;
     color: #374151;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 40px;
+    min-width: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -203,10 +203,10 @@ button:active {
 }
 
 .btn-sm {
-    padding: 8px 12px;
-    font-size: 14px;
-    min-height: 40px;
-    min-width: 40px;
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 36px;
+    min-width: 36px;
 }
 
 .btn-outline-success {
@@ -255,8 +255,8 @@ button:active {
 }
 
 body {
-    font: 12px 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    line-height: 1.4em;
+    font: 11px 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    line-height: 1.3em;
     background: #f5f5f5;
     color: #4d4d4d;
     min-width: 230px;
@@ -287,19 +287,19 @@ input[type="checkbox"] {
 .edit {
     position: relative;
     margin: 0;
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 14px; /* Prevents zoom on iOS */
     font-family: inherit;
     font-weight: 500;
-    line-height: 1.5;
+    line-height: 1.4;
     border: 2px solid #e5e7eb;
     border-radius: 12px;
     outline: none;
     color: #1f2937;
-    padding: 14px 16px;
+    padding: 12px 14px;
     background: white;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
-    min-height: 48px; /* Minimum touch target */
+    min-height: 44px; /* Minimum touch target */
 }
 
 .new-todo:focus,
@@ -314,13 +314,13 @@ input[type="checkbox"] {
 }
 
 .card {
-    margin: 16px 0;
+    margin: 12px 0;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    padding: 20px;
+    padding: 16px;
     transition: all 0.3s ease;
 }
 
@@ -331,30 +331,30 @@ input[type="checkbox"] {
 
 .card h2 {
     color: #1f2937;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     text-align: center;
 }
 
 .card h6 {
     color: #6b7280;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     text-align: center;
-    margin: 20px 0;
+    margin: 16px 0;
 }
 
 
 /* Add some padding inside the card container */
 .card-maincontainer {
-    padding: 16px;
+    padding: 12px;
     max-width: 100%;
     margin: 0 auto;
 }
 
 .card-container {
-    padding: 12px;
+    padding: 8px;
 }
 
 .card-last {
@@ -371,7 +371,7 @@ input[type="checkbox"] {
 .row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
 }
 
@@ -404,7 +404,7 @@ input[type="checkbox"] {
 .e-dropdownlist .e-input-group {
     border-radius: 12px !important;
     border: 2px solid #e5e7eb !important;
-    min-height: 48px !important;
+    min-height: 44px !important;
     background: white !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
     transition: all 0.2s ease !important;
@@ -424,11 +424,11 @@ input[type="checkbox"] {
 }
 
 .e-dropdownlist .e-input {
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
     color: #1f2937 !important;
-    padding: 12px 16px !important;
-    line-height: 1.5 !important;
+    padding: 10px 14px !important;
+    line-height: 1.4 !important;
 }
 
 .e-dropdownlist .e-input::placeholder {
@@ -439,7 +439,7 @@ input[type="checkbox"] {
 .e-autocomplete .e-input-group {
     border-radius: 12px !important;
     border: 2px solid #e5e7eb !important;
-    min-height: 48px !important;
+    min-height: 44px !important;
     background: white !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
     transition: all 0.2s ease !important;
@@ -452,11 +452,11 @@ input[type="checkbox"] {
 }
 
 .e-autocomplete .e-input {
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
     color: #1f2937 !important;
-    padding: 12px 16px !important;
-    line-height: 1.5 !important;
+    padding: 10px 14px !important;
+    line-height: 1.4 !important;
 }
 
 .e-autocomplete .e-input::placeholder {
@@ -468,13 +468,13 @@ input[type="checkbox"] {
 @media (max-width: 768px) {
     .e-dropdownlist .e-input-group,
     .e-autocomplete .e-input-group {
-        min-height: 52px !important;
+        min-height: 48px !important;
     }
     
     .e-dropdownlist .e-input,
     .e-autocomplete .e-input {
-        font-size: 16px !important;
-        padding: 14px 16px !important;
+        font-size: 14px !important;
+        padding: 12px 14px !important;
     }
 }
 
@@ -584,7 +584,7 @@ input[type="checkbox"] {
 
 /* Shopping list title styling */
 .shopping-list-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: #1f2937;
     margin: 0;
@@ -592,7 +592,7 @@ input[type="checkbox"] {
 
 @media (max-width: 768px) {
     .shopping-list-title {
-        font-size: 20px;
+        font-size: 18px;
     }
 }
 
@@ -793,12 +793,12 @@ label[for='toggle-all'] {
 
 .todo-list li {
     position: relative;
-    font-size: 16px;
+    font-size: 14px;
     border-bottom: 1px solid rgba(229, 231, 235, 0.8);
-    padding: 20px 0;
+    padding: 5px 0;
     display: flex;
     align-items: center;
-    min-height: 68px;
+    min-height: 40px;
 }
 
 .todo-list li:last-child {
@@ -807,12 +807,12 @@ label[for='toggle-all'] {
 
 .todo-list li.editing {
     border-bottom: none;
-    padding: 12px 0;
+    padding: 5px 0;
 }
 
 .todo-list li.editing .edit {
     display: block;
-    padding: 12px 16px;
+    padding: 8px 12px;
     border-radius: 8px;
 }
 
@@ -824,15 +824,15 @@ label[for='toggle-all'] {
     flex: 1;
     white-space: pre-line;
     word-break: break-word;
-    padding: 16px 8px;
+    padding: 5px 8px;
     display: block;
-    line-height: 1.4;
+    line-height: 1.2;
     transition: color 0.2s ease;
     color: #1f2937;
     font-weight: 600;
-    font-size: 18px;
+    font-size: 16px;
     text-decoration: none;
-    min-height: 44px;
+    min-height: 36px;
     display: flex;
     align-items: center;
 }
