@@ -488,6 +488,71 @@ input[type="checkbox"] {
     background: rgba(255, 255, 255, 0.95) !important;
 }
 
+/* Compact controls for secondary inputs */
+.compact-control {
+    margin-bottom: 8px !important;
+}
+
+.compact-control .e-input-group {
+    min-height: 36px !important;
+}
+
+.compact-control .e-input {
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+}
+
+.compact-control .btn-sm {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    min-height: 36px !important;
+}
+
+/* Large primary input for adding items */
+.primary-input .e-input-group {
+    min-height: 56px !important;
+    border-width: 2px !important;
+}
+
+.primary-input .e-input {
+    font-size: 18px !important;
+    padding: 14px 16px !important;
+    font-weight: 500 !important;
+}
+
+.primary-input .e-input::placeholder {
+    font-size: 18px !important;
+}
+
+.primary-input .btn-lg {
+    min-height: 56px !important;
+    width: 56px !important;
+    font-size: 20px !important;
+}
+
+@media (max-width: 768px) {
+    .compact-control .e-input-group {
+        min-height: 40px !important;
+    }
+    
+    .compact-control .e-input {
+        font-size: 13px !important;
+    }
+    
+    .primary-input .e-input-group {
+        min-height: 52px !important;
+    }
+    
+    .primary-input .e-input {
+        font-size: 16px !important;
+    }
+    
+    .primary-input .btn-lg {
+        min-height: 52px !important;
+        width: 52px !important;
+    }
+}
+
 .e-list-item:hover {
     background: rgba(102, 126, 234, 0.1) !important;
 }
