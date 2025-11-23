@@ -63,7 +63,7 @@
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-sm btn-outline-info" @onclick="ToggleAddItemsSection" title="@(showAddItemsSection ? "Skjul legg til varer" : "Vis legg til varer")">
+                    <button class="btn btn-sm btn-outline-info" @onclick="ToggleAddItemsSection" title="@(showAddItemsSection ? "Skjul ekstra alternativer" : "Vis ekstra alternativer")">
                         <i class="fas @(showAddItemsSection ? "fa-chevron-up" : "fa-chevron-down")"></i>
                     </button>
                 </div>
@@ -72,7 +72,7 @@
             @if (showAddItemsSection)
             {
 
-            <div class="row align-items-center mb-3">
+            <div class="row align-items-center mb-2 compact-control">
                 <div class="col-12">
                     <SfDropDownList TValue="string" 
                                   TItem="ShopModel" 
@@ -80,14 +80,15 @@
                                   DataSource="@AvailableShops" 
                                   @bind-Index="@shopIndex" 
                                   Width="100%"
-                                  PopupHeight="300px">
+                                  PopupHeight="300px"
+                                  CssClass="compact-dropdown">
                         <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
                         <DropDownListEvents TValue="string" TItem="ShopModel" ValueChange="OnShopSelectionChanged"></DropDownListEvents>
                     </SfDropDownList>
                 </div>
             </div>
 
-            <div class="row align-items-center mb-3">
+            <div class="row align-items-center mb-3 compact-control">
                 <div class="col">
                     <SfDropDownList TValue="string" 
                                   TItem="FrequentShoppingListModel" 
@@ -95,19 +96,21 @@
                                   DataSource="@FrequentLists" 
                                   @bind-Index="@frequentListIndex" 
                                   Width="100%"
-                                  PopupHeight="300px">
+                                  PopupHeight="300px"
+                                  CssClass="compact-dropdown">
                         <DropDownListFieldSettings Value="Id" Text="Name"></DropDownListFieldSettings>
                         <DropDownListEvents TValue="string" TItem="FrequentShoppingListModel" ValueChange="OnFrequentListSelected"></DropDownListEvents>
                     </SfDropDownList>
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-primary" @onclick="ImportFromFrequentList" disabled="@(frequentListIndex == null || frequentListIndex < 0)" title="Importer varer fra valgt liste">
-                        <i class="fas fa-file-import"></i> Importer
+                    <button class="btn btn-primary btn-sm" @onclick="ImportFromFrequentList" disabled="@(frequentListIndex == null || frequentListIndex < 0)" title="Importer varer fra valgt liste">
+                        <i class="fas fa-file-import"></i>
                     </button>
                 </div>
             </div>
+            }
 
-            <div class="row align-items-center mb-4">
+            <div class="row align-items-center mb-4 primary-input">
                 <div class="col">
                     <SfAutoComplete TValue="string"
                                 TItem="ShopItemModel"
@@ -117,6 +120,7 @@
                                 FilterType="FilterType.Contains"
                                 Width="100%"
                                 PopupHeight="300px"
+                                CssClass="large-input"
                                 Highlight>
                         <AutoCompleteFieldSettings Value="Name" Text="Name" />
                         <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
@@ -124,12 +128,11 @@
                     </SfAutoComplete>
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-add-item" title="Legg til vare">
+                    <button class="btn btn-add-item btn-lg" title="Legg til vare">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
             </div>
-            }
         </div>
 
         @if (!ThisShoppingListItems.Any())
@@ -200,7 +203,7 @@ else
     string showEditHeader = "hidden";
     string showH2LabelStyle = "";
     string dropdownText = "Velg buikk";
-    bool showAddItemsSection = true; // Controls visibility of add items section
+    bool showAddItemsSection = false; // Controls visibility of add items section
 
     // Frequent Lists for import
     ICollection<FrequentShoppingListModel> FrequentLists = new List<FrequentShoppingListModel>();
