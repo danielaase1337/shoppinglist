@@ -63,7 +63,7 @@
                     <input class="@showEditHeader" @bind-value="@ThisShoppingList.Name" @onkeyup="@(f => ListHeaderClickEventHandler(f))" />
                 </div>
                 <div class="col-auto">
-                    <button class="btn btn-sm btn-outline-info" @onclick="ToggleAddItemsSection" title="@(showAddItemsSection ? "Skjul legg til varer" : "Vis legg til varer")">
+                    <button class="btn btn-sm btn-outline-info" @onclick="ToggleAddItemsSection" title="@(showAddItemsSection ? "Skjul ekstra alternativer" : "Vis ekstra alternativer")">
                         <i class="fas @(showAddItemsSection ? "fa-chevron-up" : "fa-chevron-down")"></i>
                     </button>
                 </div>
@@ -88,7 +88,7 @@
                 </div>
             </div>
 
-            <div class="row align-items-center mb-2 compact-control">
+            <div class="row align-items-center mb-3 compact-control">
                 <div class="col">
                     <SfDropDownList TValue="string" 
                                   TItem="FrequentShoppingListModel" 
@@ -108,6 +108,7 @@
                     </button>
                 </div>
             </div>
+            }
 
             <div class="row align-items-center mb-4 primary-input">
                 <div class="col">
@@ -132,7 +133,6 @@
                     </button>
                 </div>
             </div>
-            }
         </div>
 
         @if (!ThisShoppingListItems.Any())
@@ -203,7 +203,7 @@ else
     string showEditHeader = "hidden";
     string showH2LabelStyle = "";
     string dropdownText = "Velg buikk";
-    bool showAddItemsSection = true; // Controls visibility of add items section
+    bool showAddItemsSection = false; // Controls visibility of add items section
 
     // Frequent Lists for import
     ICollection<FrequentShoppingListModel> FrequentLists = new List<FrequentShoppingListModel>();

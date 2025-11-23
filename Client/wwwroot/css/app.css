@@ -488,6 +488,13 @@ input[type="checkbox"] {
     background: rgba(255, 255, 255, 0.95) !important;
 }
 
+/* Larger dropdown items for primary input */
+.primary-input .e-dropdownbase .e-list-item {
+    font-size: 16px !important;
+    padding: 12px 16px !important;
+    min-height: 48px !important;
+}
+
 /* Compact controls for secondary inputs */
 .compact-control {
     margin-bottom: 8px !important;
@@ -510,24 +517,25 @@ input[type="checkbox"] {
 
 /* Large primary input for adding items */
 .primary-input .e-input-group {
-    min-height: 56px !important;
+    min-height: 42px !important;
     border-width: 2px !important;
 }
 
 .primary-input .e-input {
-    font-size: 18px !important;
-    padding: 14px 16px !important;
+    font-size: 16px !important;
+    padding: 8px 12px !important;
     font-weight: 500 !important;
+    line-height: 1.4 !important;
 }
 
 .primary-input .e-input::placeholder {
-    font-size: 18px !important;
+    font-size: 16px !important;
 }
 
 .primary-input .btn-lg {
-    min-height: 56px !important;
-    width: 56px !important;
-    font-size: 20px !important;
+    min-height: 42px !important;
+    width: 42px !important;
+    font-size: 18px !important;
 }
 
 @media (max-width: 768px) {
