@@ -18,6 +18,12 @@ namespace Api
             // Frequent Shopping Lists mappings
             this.CreateMap<FrequentShoppingList, FrequentShoppingListModel>().ReverseMap();
             this.CreateMap<FrequentShoppingItem, FrequentShoppingItemModel>().ReverseMap();
+            
+            // Meal Planning mappings
+            this.CreateMap<MealRecipe, MealRecipeModel>().ReverseMap();
+            this.CreateMap<MealIngredient, MealIngredientModel>().ReverseMap();
+            this.CreateMap<WeekMenu, WeekMenuModel>().ReverseMap();
+            this.CreateMap<DailyMeal, DailyMealModel>().ReverseMap();
         }
     }
 }

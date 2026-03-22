@@ -9,6 +9,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using FirestoreMealCategory = Shared.FireStoreDataModels.MealCategory;
 
 namespace Shared.Repository
 {
@@ -418,6 +419,252 @@ namespace Shared.Repository
                     }
                 };
                 if (trippeltrumf is TEntity trippeltrumfEntity) await Insert(trippeltrumfEntity);
+            }
+
+            // Initialize MealRecipe test data with FireStore models
+            if (type == typeof(MealRecipe))
+            {
+                var taco = new MealRecipe
+                {
+                    Id = "meal-1",
+                    Name = "Taco",
+                    Category = FirestoreMealCategory.KidsLike,
+                    PopularityScore = 47,
+                    LastUsed = DateTime.UtcNow.AddDays(-7),
+                    IsActive = true,
+                    Ingredients = new List<MealIngredient>
+                    {
+                        new MealIngredient
+                        {
+                            Id = "ingredient-1",
+                            Name = "Kjøttdeig",
+                            MealRecipeId = "meal-1",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "mince-1",
+                                Name = "Kjøttdeig",
+                                Unit = "Kg",
+                                ItemCategory = new ItemCategory { Id = "meat", Name = "Kjøtt" }
+                            },
+                            StandardQuantity = 500,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-2",
+                            Name = "Tacoskjell",
+                            MealRecipeId = "meal-1",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "taco-shells-1",
+                                Name = "Tacoskjell",
+                                Unit = "Pakke",
+                                ItemCategory = new ItemCategory { Id = "bakery", Name = "Bakeri" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-3",
+                            Name = "Salat",
+                            MealRecipeId = "meal-1",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "lettuce-1",
+                                Name = "Salat",
+                                Unit = "Stk",
+                                ItemCategory = new ItemCategory { Id = "vegetable", Name = "Grønnsaker" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        }
+                    }
+                };
+                if (taco is TEntity tacoEntity) await Insert(tacoEntity);
+
+                var pizza = new MealRecipe
+                {
+                    Id = "meal-2",
+                    Name = "Pizza",
+                    Category = FirestoreMealCategory.KidsLike,
+                    PopularityScore = 42,
+                    LastUsed = DateTime.UtcNow.AddDays(-15),
+                    IsActive = true,
+                    Ingredients = new List<MealIngredient>
+                    {
+                        new MealIngredient
+                        {
+                            Id = "ingredient-4",
+                            Name = "Pizzabunn",
+                            MealRecipeId = "meal-2",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "pizza-base-1",
+                                Name = "Pizzabunn",
+                                Unit = "Stk",
+                                ItemCategory = new ItemCategory { Id = "bakery", Name = "Bakeri" }
+                            },
+                            StandardQuantity = 2,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-5",
+                            Name = "Pizzasaus",
+                            MealRecipeId = "meal-2",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "pizza-sauce-1",
+                                Name = "Pizzasaus",
+                                Unit = "Boks",
+                                ItemCategory = new ItemCategory { Id = "canned", Name = "Hermetikk" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        }
+                    }
+                };
+                if (pizza is TEntity pizzaEntity) await Insert(pizzaEntity);
+
+                var fishGratin = new MealRecipe
+                {
+                    Id = "meal-3",
+                    Name = "Fiskegrateng",
+                    Category = FirestoreMealCategory.Fish,
+                    PopularityScore = 28,
+                    LastUsed = DateTime.UtcNow.AddDays(-3),
+                    IsActive = true,
+                    Ingredients = new List<MealIngredient>
+                    {
+                        new MealIngredient
+                        {
+                            Id = "ingredient-6",
+                            Name = "Torsk",
+                            MealRecipeId = "meal-3",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "cod-1",
+                                Name = "Torsk",
+                                Unit = "Kg",
+                                ItemCategory = new ItemCategory { Id = "fish", Name = "Fisk" }
+                            },
+                            StandardQuantity = 500,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-7",
+                            Name = "Fløte",
+                            MealRecipeId = "meal-3",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "cream-1",
+                                Name = "Fløte",
+                                Unit = "Liter",
+                                ItemCategory = new ItemCategory { Id = "dairy", Name = "Meieri" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        }
+                    }
+                };
+                if (fishGratin is TEntity fishGratinEntity) await Insert(fishGratinEntity);
+
+                var steak = new MealRecipe
+                {
+                    Id = "meal-4",
+                    Name = "Biff med tilbehør",
+                    Category = FirestoreMealCategory.Meat,
+                    PopularityScore = 35,
+                    LastUsed = DateTime.UtcNow.AddDays(-10),
+                    IsActive = true,
+                    Ingredients = new List<MealIngredient>
+                    {
+                        new MealIngredient
+                        {
+                            Id = "ingredient-8",
+                            Name = "Entrecôte",
+                            MealRecipeId = "meal-4",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "entrecote-1",
+                                Name = "Entrecôte",
+                                Unit = "Kg",
+                                ItemCategory = new ItemCategory { Id = "meat", Name = "Kjøtt" }
+                            },
+                            StandardQuantity = 600,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-9",
+                            Name = "Poteter",
+                            MealRecipeId = "meal-4",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "potatoes-1",
+                                Name = "Poteter",
+                                Unit = "Kg",
+                                ItemCategory = new ItemCategory { Id = "vegetable", Name = "Grønnsaker" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        }
+                    }
+                };
+                if (steak is TEntity steakEntity) await Insert(steakEntity);
+
+                var veggiePasta = new MealRecipe
+                {
+                    Id = "meal-5",
+                    Name = "Vegetarpasta",
+                    Category = FirestoreMealCategory.Vegetarian,
+                    PopularityScore = 22,
+                    LastUsed = DateTime.UtcNow.AddDays(-20),
+                    IsActive = true,
+                    Ingredients = new List<MealIngredient>
+                    {
+                        new MealIngredient
+                        {
+                            Id = "ingredient-10",
+                            Name = "Pasta",
+                            MealRecipeId = "meal-5",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "pasta-1",
+                                Name = "Pasta",
+                                Unit = "Pakke",
+                                ItemCategory = new ItemCategory { Id = "dry-goods", Name = "Tørrvarer" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        },
+                        new MealIngredient
+                        {
+                            Id = "ingredient-11",
+                            Name = "Brokkoli",
+                            MealRecipeId = "meal-5",
+                            ShopItem = new ShopItem
+                            {
+                                Id = "broccoli-1",
+                                Name = "Brokkoli",
+                                Unit = "Stk",
+                                ItemCategory = new ItemCategory { Id = "vegetable", Name = "Grønnsaker" }
+                            },
+                            StandardQuantity = 1,
+                            IsOptional = false
+                        }
+                    }
+                };
+                if (veggiePasta is TEntity veggieEntity) await Insert(veggieEntity);
+            }
+
+            // Initialize MealIngredient test data
+            if (type == typeof(MealIngredient))
+            {
+                // MealIngredient entities are created as part of MealRecipe
+                // But if queried separately, we can add individual test data here if needed
             }
         }
 
