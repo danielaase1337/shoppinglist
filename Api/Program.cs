@@ -34,7 +34,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, MemoryGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, MemoryGenericRepository<MealRecipe>>();
-                        services.AddSingleton<IGenericRepository<MealIngredient>, MemoryGenericRepository<MealIngredient>>();
+                        services.AddSingleton<IGenericRepository<WeekMenu>, MemoryGenericRepository<WeekMenu>>();
+                        // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
+                        // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }
                     else
                     {
@@ -45,7 +47,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, GoogleFireBaseGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, GoogleFireBaseGenericRepository<MealRecipe>>();
-                        services.AddSingleton<IGenericRepository<MealIngredient>, GoogleFireBaseGenericRepository<MealIngredient>>();
+                        services.AddSingleton<IGenericRepository<WeekMenu>, GoogleFireBaseGenericRepository<WeekMenu>>();
+                        // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
+                        // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }
                 })
                 .Build();
