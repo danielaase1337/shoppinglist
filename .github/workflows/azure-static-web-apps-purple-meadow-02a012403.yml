@@ -4,14 +4,43 @@ on:
   push:
     branches:
       - main
+      - 'feature-*'
+      - 'squad/**'
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
       - main
+      - 'feature-*'
+      - 'squad/**'
 
 jobs:
-  build_and_deploy_job:
+  test:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Unit Tests
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore dependencies
+        run: dotnet restore BlazorStaticWebApps.sln
+      - name: Build solution
+        run: dotnet build BlazorStaticWebApps.sln --no-restore
+      - name: Run API unit tests
+        run: dotnet test Api.Tests/Api.Tests.csproj --no-build --verbosity normal --logger "trx;LogFileName=api-test-results.trx"
+      - name: Run Client unit tests
+        run: dotnet test Client.Tests/Client.Tests.csproj --no-build --verbosity normal --logger "trx;LogFileName=client-test-results.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/*.trx"
+
+  build_and_deploy_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed' && !startsWith(github.head_ref, 'squad/'))
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
