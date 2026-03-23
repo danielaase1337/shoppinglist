@@ -74,27 +74,37 @@ namespace Api.Controllers
         [Function("itemcategory")]
         public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "itemcategory/{id}")] HttpRequestData req, object id)
         {
-            var okRespons = req.CreateResponse(HttpStatusCode.OK);
-
-            if (req.Method == "GET")
+            try
             {
-                var itemCategories = await repository.Get(id);
-                if (itemCategories == null)
+                var okRespons = req.CreateResponse(HttpStatusCode.OK);
+
+                if (req.Method == "GET")
                 {
-                    return await GetErroRespons("Could not load items categorys", req);
+                    var itemCategory = await repository.Get(id);
+                    if (itemCategory == null)
+                    {
+                        return await GetErroRespons("Could not load items categorys", req);
+                    }
+                    await okRespons.WriteAsJsonAsync(mapper.Map<ItemCategory>(itemCategory));
+                    return okRespons;
                 }
-                await okRespons.WriteAsJsonAsync(mapper.Map<ItemCategory>(itemCategories));
+                else if (req.Method == "DELETE")
+                {
+                    var deleteResult = await repository.Delete(id);
+                    if (deleteResult)
+                        return req.CreateResponse(HttpStatusCode.NoContent);
+                    else
+                        return await GetErroRespons($"Could not delete item {id}", req);
+                }
 
+                return req.CreateResponse(HttpStatusCode.NotFound);
             }
-            else if (req.Method == "DELETE")
+            catch (System.Exception e)
             {
-                var deleteResult = await repository.Delete(id);
-                if (deleteResult)
-                    return req.CreateResponse(HttpStatusCode.NoContent);
-                else
-                    return await GetErroRespons($"Could not delete item {id}", req);
+                var msg = $"An unexpected error occurred processing itemcategory/{id}, method {req.Method}";
+                _logger.LogError(e, msg);
+                return await GetErroRespons("An unexpected error occurred", req);
             }
-            return req.CreateResponse(HttpStatusCode.NoContent);
         }
     }
 }
