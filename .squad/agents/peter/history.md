@@ -12,6 +12,13 @@
 - Core shop-specific sorting runs client-side in `OneShoppingListPage.razor` via `SortShoppingList()`.
 - Norwegian property names (`Varen`, `Mengde`, `ItemCateogries`) must be preserved — backward compatibility with Firestore data.
 - Current goals: add authentication/security and improve performance.
+- Auth provider changed to Microsoft-only — GitHub dropped per Daniel (2026-03-23)
+- Family sharing model clarified: v2 uses FamilyId group ownership, NOT individual OwnerId scoping
+- Meal planning v1 is text-history based suggestion engine, NOT recipe CRUD — separate scoping issue required
+- i18n: Norwegian UI is intentional for v1; add resource file architecture for future English localization
+- Norwegian Firestore property names (Varen, Mengde, ItemCateogries) are permanent data constraints
+- Shop deletion requires safeguard UX (multi-step confirm + dependency check)
+- ManageMyShopsPage (D11): decision is to COMPLETE the page, not remove it
 
 ## PRD Synthesis — 2026-03-22
 
@@ -34,3 +41,27 @@
 ### GitHub Issue Filed
 - **Issue #15**: PRD: Shoppinglist App — Next Evolution (Auth, Meal Planning, UI, Performance)
 - URL: https://github.com/danielaase1337/shoppinglist/issues/15
+
+## PRD Decomposition — 2026-03-23
+
+### Sub-Tickets Created (18 total from PRD #15)
+- **Sprint 0 (P0 bugs):** #16 (collection keys, Ray), #17 (DI registration, Ray), #18 (CI tests, Josh), #19 (test audit, Josh), #20 (try/catch, Glenn), #21 (.Result deadlock, Glenn)
+- **Sprint 1 (Auth):** #22 (SWA config, Glenn), #23 (auth middleware, Glenn), #24 (auth UI, Blair)
+- **Sprint 2 (UI):** #25 (toast system, Blair), #26 (nav accessibility, Blair), #27 (mobile drag, Blair)
+- **Sprint 3 (Shop):** #28 (shop deletion safeguards, Blair + Glenn)
+- **Sprint 4 (Meal):** #29 (scoping only — NOT implementation, Peter)
+- **Sprint 5 (i18n):** #30 (resource file architecture, Blair)
+- **Sprint 6 (Data):** #31 (LastModified migration, Ray + Glenn), #32 (ManageMyShopsPage, Blair)
+- **Sprint 7 (Testing):** #33 (controller test rewrite, Josh)
+
+### Key Blocking Dependencies
+- Sprint 0 blocks ALL feature sprints
+- Auth chain: #22 → #23 → #24 (serial)
+- Toast (#25) blocks shop deletion UX (#28) and future meal planning UI
+- Nav fix (#26) blocks adding meal planning navigation entries
+- CI tests (#18) and audit (#19) block full test rewrite (#33)
+- Meal scoping (#29) blocks all meal implementation — Daniel must align on v1 first
+
+### Labels Created on GitHub
+- Squad labels: `squad:peter`, `squad:blair`, `squad:glenn`, `squad:ray`, `squad:josh`
+- Priority labels: `P0`, `P1`, `P2`, `P3`
