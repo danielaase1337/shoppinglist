@@ -1,7 +1,7 @@
 # Squad Decisions
 
-**Last Updated:** 2026-03-22  
-**Source:** Team audits + PRD synthesis (issue #15)
+**Last Updated:** 2026-03-23  
+**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback
 
 ---
 
@@ -147,6 +147,57 @@
 
 **Rationale:** MealIngredient is embedded in MealRecipe; no separate repository needed. Simplifies DI config and prevents confusion.
 
+**Implementation Status:** ✅ COMPLETED (2026-03-23) — PR #37 merged
+
+---
+
+### D14 — Auth Provider (UPDATED 2026-03-23)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**Update:** Microsoft provider ONLY. Remove GitHub provider from SWA auth config.
+
+**Rationale:** Simplified auth flow for family app. GitHub provider not required for v1 scope.
+
+---
+
+### D15 — Family Sharing Model (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**v1:** Single shared family — all app users share data (current behaviour, now intentional).  
+**v2:** "Family groups" model — a Family entity owns lists/menus/shops. Users belong to a Family. All family members share everything within their family. Architecture: OwnerId becomes FamilyId in v2.
+
+---
+
+### D16 — Shop Deletion Safeguards (NEW)
+**Status:** ⏸️ PENDING IMPLEMENTATION  
+**Issue:** #28  
+**Requirement:** Shop deletion requires multi-step confirmation. Before deletion, check if any ShoppingLists reference the shop's sort config and warn the user.  
+**Owner:** Blair (UI) + Glenn (API cascade check)
+
+---
+
+### D17 — OneShopManagementPage (DECISION UPDATED)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**Previous:** D11 was "complete or remove"  
+**Update:** COMPLETE ManageMyShopsPage properly. Orphan concern resolved.  
+**Owner:** Blair  
+
+---
+
+### D18 — Meal Planning v1 Scope (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**v1 Scope:** Text-based meal history parser → suggested weekly meal plan.  
+**v2 Scope:** Full recipe CRUD + link to meal plans.  
+**Constraint:** Do NOT build recipe CRUD in v1.  
+**Action:** Create separate GitHub issue for Meal Planning v1 scoping.  
+
+---
+
+### D19 — i18n / Language Strategy (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**UI Language:** Stays Norwegian for v1.  
+**Code Language:** All new code (classes, methods, variables, comments) must be English.  
+**Firestore Properties:** Existing Norwegian names (`Varen`, `Mengde`, `ItemCateogries`) must NOT be renamed — data constraint.  
+**i18n Architecture:** Add resource files so UI strings can be localized to English in a future sprint.
+
 ---
 
 ### D10 — LastModified Migration Strategy
@@ -222,16 +273,22 @@
 | D1: Auth Strategy | ✅ Decided | Peter | — |
 | D2: Data Isolation (v1) | ✅ Decided | Peter | — |
 | D3: Meal Data Model | ✅ Decided | Peter/Ray/Glenn | — |
-| D4: Collection Key Convention | ✅ Decided | Ray | Sprint 0 (bug fix) |
+| D4: Collection Key Convention | ✅ Implemented | Ray | Sprint 0 ✅ |
 | D5: Toast System | ⏸️ Pending | Blair/Peter | Sprint 1 (UI) |
 | D6: Mobile Drag Fallback | ⏸️ Pending | Blair/Peter | Sprint 2 (Mobile) |
 | D7: Admin Nav Accessibility | ⏸️ Implementation | Blair | Sprint 4 (Meal UI) |
-| D8: Auth Provider Details | ✅ Decided | Peter/Glenn | — |
-| D9: MealIngredient DI | ✅ Decided | Ray | Sprint 3 (Meal API) |
+| D8: Auth Provider Details | ✅ Decided (Updated) | Peter/Glenn | — |
+| D9: MealIngredient DI | ✅ Implemented | Ray | Sprint 0 ✅ |
 | D10: LastModified Migration | ⏸️ Pending | Ray/Glenn | Pre-launch |
-| D11: Shop Management | ⏸️ Pending | Peter | Sprint planning |
+| D11: Shop Management (Complete) | ✅ Decided (Updated) | Blair | Sprint 6 |
 | D12: Design Tokens | ⏸️ Deferred | Blair | Post-MVP |
 | D13: Dark Mode | ⏸️ Deferred | Blair | Post-MVP |
+| D14: Auth Provider (Microsoft only) | ✅ Decided (New) | Peter | — |
+| D15: Family Sharing Model | ✅ Decided (New) | Peter | — |
+| D16: Shop Deletion Safeguards | ⏸️ Pending | Blair/Glenn | Sprint 3 |
+| D17: OneShopManagementPage | ✅ Decided (New) | Blair | Sprint 6 |
+| D18: Meal Planning v1 Scope | ✅ Decided (New) | Peter | — |
+| D19: i18n / Language Strategy | ✅ Decided (New) | Peter | — |
 
 ---
 

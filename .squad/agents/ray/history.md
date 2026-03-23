@@ -14,6 +14,14 @@
 - Lazy migration: GET endpoints check for null `LastModified` and backfill with `DateTime.UtcNow`.
 - Current goals: explore Firebase Authentication integration and Firestore query performance improvements.
 
+### 2026-03-23 — Sprint 0 Bug Fixes (Issues #16 and #17) ✅ COMPLETED
+- **FIXED #16:** `GetCollectionKey()` replaced with convention-based naming: `typeof(T).Name.ToLower() + "s"`. Two backward-compat special cases kept: `Shop` → `shopcollection` (legacy collection name) and `ItemCategory` → `itemcategories` (irregular plural; convention would produce `itemcategorys`).
+- **FIXED #17:** `WeekMenu` DI registration was missing — added to both DEBUG (MemoryGenericRepository) and production (GoogleFireBaseGenericRepository) blocks. `MealIngredient` standalone repository registration removed per D3/D9 (it's embedded in MealRecipe, not a root document).
+- **TEST COVERAGE:** Added `CollectionKeyTests` (8 unit tests) in `Api.Tests/Repository/` — verifies all known entity types map to expected Firestore collection names and that no future type falls through to `"misc"`.
+- **LESSON:** `typeof(T).Name.ToLower() + "s"` is simple but not universally correct for English plurals. Irregular plurals (category → categories, not categorys) require explicit overrides. Keep the switch slim: add a new case only when the convention breaks.
+- **LESSON:** `git stash` without `--include-untracked` does not stash new untracked files. Untracked test files from other branches can leak into the working tree and confuse test counts.
+- **PRs #35 + #37 merged** (`squad/16-collection-key-fix` + `squad/17-di-registration`)
+
 ### 2025-01-22 — Full Data Architecture Review (data-findings.md)
 - **CRITICAL BUG:** `GoogleDbContext.GetCollectionKey()` only maps 4 types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all fall through to `"misc"` — they will corrupt each other in production.
 - **CRITICAL BUG:** `WeekMenu` and `DailyMeal` are not registered in `Program.cs` DI — the week menu feature is entirely unwired.
