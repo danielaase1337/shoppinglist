@@ -1,11 +1,16 @@
 using Api.Controllers;
 using AutoMapper;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
+using System.IO;
+using System.Net;
+using System.Text;
 using Xunit;
 
 namespace Api.Tests.Controllers
@@ -232,6 +237,55 @@ namespace Api.Tests.Controllers
             // Assert
             Assert.NotNull(categoryModel.Id);
             Assert.NotEmpty(categoryModel.Name);
+        }
+
+        [Fact]
+        public async Task RunOne_Get_Returns500WithGenericMessage_WhenRepositoryThrows()
+        {
+            // Arrange — repository throws to simulate an unexpected failure
+            var mockLogger = new Mock<ILogger>();
+            var mockLoggerFactory = new Mock<ILoggerFactory>();
+            mockLoggerFactory.Setup(f => f.CreateLogger(It.IsAny<string>())).Returns(mockLogger.Object);
+
+            var throwingRepo = new Mock<IGenericRepository<ItemCategory>>();
+            throwingRepo.Setup(r => r.Get(It.IsAny<object>()))
+                .ThrowsAsync(new InvalidOperationException("Firestore connection string exposed in error"));
+
+            var controller = new ShopItemCategoryController(mockLoggerFactory.Object, throwingRepo.Object, _mapper);
+
+            var mockContext = new Mock<FunctionContext>();
+            mockContext.Setup(c => c.InstanceServices).Returns(new Mock<IServiceProvider>().Object);
+
+            var responseBody = new MemoryStream();
+            var mockResponse = new Mock<HttpResponseData>(mockContext.Object);
+            mockResponse.SetupProperty(r => r.StatusCode);
+            mockResponse.Setup(r => r.Body).Returns(responseBody);
+            mockResponse.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
+
+            var mockRequest = new Mock<HttpRequestData>(mockContext.Object);
+            mockRequest.Setup(r => r.Method).Returns("GET");
+            mockRequest.Setup(r => r.CreateResponse()).Returns(mockResponse.Object);
+
+            // Act
+            var result = await controller.RunOne(mockRequest.Object, "test-id");
+
+            // Assert — status 500
+            Assert.Equal(HttpStatusCode.InternalServerError, result.StatusCode);
+
+            // Assert — response body does NOT leak internal exception details (security constraint S4)
+            responseBody.Seek(0, SeekOrigin.Begin);
+            var body = await new StreamReader(responseBody, Encoding.UTF8).ReadToEndAsync();
+            Assert.DoesNotContain("Firestore connection string exposed", body);
+
+            // Assert — exception was logged via ILogger
+            mockLogger.Verify(
+                l => l.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, _) => true),
+                    It.IsAny<InvalidOperationException>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
         }
 
         [Theory]
