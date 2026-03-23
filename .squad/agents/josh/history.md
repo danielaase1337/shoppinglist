@@ -21,3 +21,4 @@
 - [2025-01-27] No Page Object Model exists — selectors are inline per test, relying on Syncfusion CSS classes like `.e-dropdownlist`.
 - [2025-01-27] 6 of 10 application pages have no E2E coverage: FrequentListsPage, OneFrequentListPage, CategoryManagementPage, ItemManagementPage, ShopConfigurationPage, and all planned Meal pages.
 - [2025-01-27] Core user flows (create list, add item, check off, sort by shop) have zero E2E behavioral assertions.
+- [2025-01-27] **Workflow pattern — Azure SWA staging limit**: `squad/**` branches must NOT trigger `build_and_deploy_job` or `close_pull_request_job`. Azure SWA has a max number of concurrent staging environments; too many open `squad/*` PRs exceeds it. Fix: add `!startsWith(github.head_ref, 'squad/')` to both job `if` conditions. The `test` (Unit Tests) job is unaffected and runs on all branches. Only `feature-*` and `main` get preview deployments.
