@@ -701,7 +701,8 @@ input[type="checkbox"] {
     transition: transform 0.3s ease;
 }
 
-.admin-dropdown:hover .dropdown-arrow {
+.admin-dropdown:hover .dropdown-arrow,
+.admin-dropdown.open .dropdown-arrow {
     transform: rotate(180deg);
 }
 
@@ -722,7 +723,8 @@ input[type="checkbox"] {
     z-index: 1000;
 }
 
-.admin-dropdown:hover .admin-dropdown-menu {
+.admin-dropdown:hover .admin-dropdown-menu,
+.admin-dropdown.open .admin-dropdown-menu {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
