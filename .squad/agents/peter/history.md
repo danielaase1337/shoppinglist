@@ -19,6 +19,14 @@
 - Norwegian Firestore property names (Varen, Mengde, ItemCateogries) are permanent data constraints
 - Shop deletion requires safeguard UX (multi-step confirm + dependency check)
 - ManageMyShopsPage (D11): decision is to COMPLETE the page, not remove it
+- Sprint 0 (P0 bugs) successfully completed: 6 merged PRs (#34-#38) closed issues #16-#21 (2026-03-23)
+- **REGRESSION FOUND (2026-03-23):** Frequent lists invisible due to collection key fix NOT merged to main. PR #35 has fix, but `main` branch still uses hardcoded switch defaulting FrequentShoppingList to `misc` collection. Fix committed in bb35ee2 but not cherry-picked to production branch.
+
+### 2026-03-27 — Regression Fixes Complete ✅
+- **D7 (Admin Nav Accessibility):** ✅ IMPLEMENTED by Blair. Converted CSS `:hover`-only dropdown to Blazor `@onclick` toggle with `_adminOpen` state. Added ARIA attributes. Updated app.css to support both hover and click-toggle. Frequent lists now accessible on mobile.
+- **D4 (Collection Key Convention):** ✅ IMPLEMENTED by Ray. Replaced hardcoded switch in `GoogleDbContext.GetCollectionKey()` with convention: `typeof(T).Name.ToLower() + "s"`. Two backward-compat overrides: `Shop → shopcollection` (legacy), `ItemCategory → itemcategories` (irregular plural). Created `POST /api/admin/migrate-frequent-lists` endpoint for one-time data recovery from "misc" collection. Migration must run before D4 merge to main.
+- **D9 (MealIngredient DI):** ✅ RE-APPLIED by Ray. Removed orphaned `IGenericRepository<MealIngredient>` DI registration (was marked complete 2026-03-23 but not actually applied). Now correctly implements D3 (embedding strategy).
+- **Verification:** All tests passing (90 API + 61 Client). No regressions introduced.
 
 ## PRD Synthesis — 2026-03-22
 
