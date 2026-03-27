@@ -33,6 +33,7 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<ItemCategory>, MemoryGenericRepository<ItemCategory>>();
                         services.AddSingleton<IGenericRepository<Shop>, MemoryGenericRepository<Shop>>();
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, MemoryGenericRepository<FrequentShoppingList>>();
+                        services.AddSingleton<IGenericRepository<MealRecipe>, MemoryGenericRepository<MealRecipe>>();
                     }
                     else
                     {
@@ -42,6 +43,7 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<ItemCategory>, GoogleFireBaseGenericRepository<ItemCategory>>();
                         services.AddSingleton<IGenericRepository<Shop>, GoogleFireBaseGenericRepository<Shop>>();
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, GoogleFireBaseGenericRepository<FrequentShoppingList>>();
+                        services.AddSingleton<IGenericRepository<MealRecipe>, GoogleFireBaseGenericRepository<MealRecipe>>();
                     }
                 })
                 .Build();

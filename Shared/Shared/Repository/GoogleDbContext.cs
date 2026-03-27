@@ -37,15 +37,19 @@ namespace Shared.Repository
 
         public string GetCollectionKey(Type toTypeGet)
         {
-            if (toTypeGet == typeof(ShopItem))
-                return "shopitems";
-            if (toTypeGet == typeof(ItemCategory))
-                return "itemcategories";
-            if (toTypeGet == typeof(ShoppingList))
-                return "shoppinglists";
+            // Two legacy overrides where convention breaks:
+            // Shop has a legacy collection name that predates the convention.
+            // ItemCategory has an irregular plural (convention would produce "itemcategorys").
             if (toTypeGet == typeof(Shop))
                 return "shopcollection";
-            return "misc";
+            if (toTypeGet == typeof(ItemCategory))
+                return "itemcategories";
+
+            // Convention: TypeName.ToLower() + "s"
+            // ShopItem → shopitems, ShoppingList → shoppinglists,
+            // FrequentShoppingList → frequentshoppinglists, MealRecipe → mealrecipes,
+            // WeekMenu → weekmenus, DailyMeal → dailymeals, etc.
+            return toTypeGet.Name.ToLower() + "s";
         }
     }
 }
