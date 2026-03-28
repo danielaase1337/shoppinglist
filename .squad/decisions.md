@@ -347,7 +347,90 @@
 | D17: OneShopManagementPage | ✅ Decided (New) | Blair | Sprint 6 |
 | D18: Meal Planning v1 Scope | ✅ Decided (New) | Peter | — |
 | D19: i18n / Language Strategy | ✅ Decided (New) | Peter | — |
-| D20: Branching Strategy | ✅ Implemented (New) | Daniel/Peter | Sprint 0 ✅ (2026-03-28) |
+| D21: SWA Auth Config | ✅ Implemented | Peter | 2026-03-28 ✅ |
+| D22: Auth UI Pattern | ✅ Implemented | Blair | 2026-03-28 ✅ |
+| D23: API Auth Parsing | ✅ Implemented | Glenn | 2026-03-28 ✅ |
+| D24: Auth Testing | ✅ Implemented | Josh | 2026-03-28 ✅ |
+
+---
+
+## High-Priority Decisions (P1 — Required for Feature Completion) — CONTINUED
+
+### D21 — SWA Authentication Configuration
+**Status:** ✅ IMPLEMENTED (Peter, 2026-03-28)  
+**Component:** Client gateway config + Azure AD setup
+
+**Implementation:**
+- `Client/wwwroot/staticwebapp.config.json` protects all routes (`/*` requires `authenticated` role)
+- Microsoft (AAD) provider only per D14
+- Auth routes (`/.auth/login/aad`, `/.auth/logout`) remain anonymous
+- API routes (`/api/*`) remain open at SWA level (auth deferred to API middleware per D2/v1)
+- 401 → 302 redirect to login page with post-login redirect to original path
+- `Api/local.settings.example.json` documents required Azure portal setup (`AAD_CLIENT_ID`, `AAD_CLIENT_SECRET`)
+
+**Unblocks:**
+- Issue #22 (SWA config) ✅
+- Glenn can proceed with API auth parsing (Issue #23)
+- Blair can proceed with auth UI (Issue #24)
+
+---
+
+### D22 — Auth UI Implementation Pattern
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
+**Component:** Blazor auth state provider + login UI
+
+**Decision:** Use `services.AddCascadingAuthenticationState()` (cleaner than wrapper component in .NET 8+)
+
+**Implementation:**
+- `SwaAuthenticationStateProvider` calls `/.auth/me` to retrieve auth state
+- `LoginDisplay.razor` shows login link when unauthenticated, logout when authenticated
+- `App.razor` uses `AuthorizeRouteView` with `NotAuthorized` fallback
+- `Program.cs` registers auth services: `AddAuthorizationCore()`, `AddCascadingAuthenticationState()`
+- `NewNavComponent.razor` displays `LoginDisplay` in navigation
+
+**URLs:**
+- Login: `/.auth/login/aad` (Microsoft only per D14)
+- Logout: `/.auth/logout?post_logout_redirect_uri=/`
+
+**Test Status:** 4 E2E tests passing (UI validation)
+
+---
+
+### D23 — API Authentication Parsing Pattern
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-03-28)  
+**Component:** `x-ms-client-principal` header parsing
+
+**Decision:** Use `HttpRequestData` (Isolated Worker), not `HttpRequest` (ASP.NET Core)
+
+**Implementation:**
+- `ClientPrincipal.cs` — deserializes Base64 `x-ms-client-principal` header
+- `AuthExtensions.cs` — extension methods on `HttpRequestData`: `GetClientPrincipal()`, `GetCurrentUserId()`, `GetCurrentUserName()`
+- `ControllerBase` — protected helpers available to all controllers
+- `Program.cs` — startup log confirms auth infrastructure ready
+- `DebugFunction` — gated with `#if !DEBUG` (compile-time protection)
+
+**v1 Enforcement Level:** Auth parsed but NOT enforced as 401 gate (per D2 family app scope). Phase 2 will add `[Authorize]` attributes when FamilyId isolation added.
+
+**Test Status:** 7 API unit tests passing
+
+---
+
+### D24 — Auth Testing Infrastructure
+**Status:** ✅ IMPLEMENTED (Josh, 2026-03-28)  
+**Component:** Unit + E2E test fixtures and patterns
+
+**Implementation:**
+- `Api.Tests/Auth/ClientPrincipalTests.cs` — 7 unit tests for header parsing
+- `Api.Tests/Helpers/AuthTestHelpers.cs` — `TestHttpRequestData` builders (HttpRequestData mocking)
+- `Client.Tests.Playwright/Tests/AuthenticationTests.cs` — 4 passing + 3 TDD-pending E2E tests
+- Mock `/.auth/me` via `page.RouteAsync` for local E2E testing
+- `RequiresSWA` trait for tests requiring actual SWA gateway
+
+**Test Results:**
+- ✅ 7 API auth unit tests passing
+- ✅ 4 E2E UI tests passing
+- ⏳ 3 E2E tests TDD-pending (awaiting UI completion)
+- ⏳ 1 E2E test requires SWA (staging validation)
 
 ---
 

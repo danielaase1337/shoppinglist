@@ -1,18 +1,46 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/img/*.{png,jpg,gif,svg}", "/css/*", "/_framework/*", "/api/*"]
+  "_readme": "AAD_CLIENT_ID and AAD_CLIENT_SECRET must be set as Application Settings in the Azure Static Web Apps resource in the Azure portal.",
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        }
+      }
+    }
   },
   "routes": [
     {
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/logout",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["authenticated"]
     }
   ],
   "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/aad?post_login_redirect_uri={request.path}",
+      "statusCode": 302
+    },
     "404": {
       "rewrite": "/index.html",
       "statusCode": 200
     }
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/_framework/*", "/css/*", "/js/*", "/img/*", "/*.ico", "/*.png", "/*.svg"]
   }
 }

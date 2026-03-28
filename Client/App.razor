@@ -3,7 +3,17 @@
 
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    <div class="container">
+                        <div class="card card-maincontainer">
+                            <h2>🔒 Ikke logget inn</h2>
+                            <p>Du må logge inn for å bruke denne siden.</p>
+                            <a href="/.auth/login/aad?post_login_redirect_uri=/" class="btn btn-primary">Logg inn med Microsoft</a>
+                        </div>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>
