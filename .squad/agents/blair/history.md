@@ -40,7 +40,29 @@
 - **`CategoryManagementPage` optimistic UI with rollback is best-in-class** — use as reference pattern for new pages.
 - **`NaturalSortComparer` is correct and well-tested** — no changes needed.
 
-## Branching Strategy Update (2026-03-28)
+### 2026-03-28 — Auth UI Implementation ✅ COMPLETE
+
+**Decisions respected:** D1, D8, D14 (Microsoft provider ONLY via `aad` SWA path)
+
+**Files created:**
+- `Client/Auth/SwaAuthenticationStateProvider.cs` — Custom `AuthenticationStateProvider` that calls `/.auth/me` (SWA built-in endpoint). Returns unauthenticated state on error (graceful local dev handling).
+- `Client/Shared/LoginDisplay.razor` — `<AuthorizeView>` component: shows `👤 username + Logg ut` link when authenticated; shows `Logg inn` link when not.
+
+**Files modified:**
+- `Client/App.razor` — `<RouteView>` → `<AuthorizeRouteView>` with `<NotAuthorized>` fallback card.
+- `Client/Program.cs` — Added `using BlazorApp.Client.Auth`, `AddAuthorizationCore()`, `AddCascadingAuthenticationState()`, `AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>()`.
+- `Client/Shared/NewNavComponent.razor` — Added `<div class="navbar-nav ml-auto nav-auth"><LoginDisplay /></div>` inside collapsible section.
+- `Client/wwwroot/css/app.css` — Added `.nav-auth`, `.nav-user`, `.nav-login`, `.nav-logout` styles (pill-shaped, white on dark nav).
+
+**Patterns used:**
+- `AddCascadingAuthenticationState()` (.NET 8 service registration pattern — no wrapper component needed in App.razor)
+- Login URL: `/.auth/login/aad` (Microsoft/Azure AD — D14 compliant, no GitHub)
+- Logout URL: `/.auth/logout?post_logout_redirect_uri=/`
+- Auth state is read-only from SWA; no token storage in client
+
+**Note for integration:** Peter's `staticwebapp.config.json` gate + this client-side `<AuthorizeRouteView>` are two layers of defence. SWA gateway is the real enforcer; Blazor gives a nice "Ikke logget inn" fallback UX.
+
+
 
 **Broadcast by:** Peter (Lead) — Daniel Aase directive
 

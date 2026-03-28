@@ -44,3 +44,16 @@
 - PRs for feature work target `development`; only release PRs target `main`
 
 **CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
+## Auth Test Fixtures Sprint — squad/auth-workflow
+
+- **Date**: 2026-03-28
+- **Context**: Glenn built `Api/Auth/ClientPrincipal.cs` and `Api/Auth/AuthExtensions.cs` using `HttpRequestData` (Azure Functions v4 pattern) before this sprint. Adapted test helpers to match Glenn's actual implementation rather than the ASP.NET Core `HttpRequest` variant in the original task spec.
+- **Files created**:
+  - `Api.Tests/Helpers/AuthTestHelpers.cs` — builds `TestHttpRequestData` with base64-encoded `x-ms-client-principal` headers. Uses `TestHttpFactory` (existing helper) to keep mocking consistent.
+  - `Api.Tests/Auth/ClientPrincipalTests.cs` — 7 unit tests: header parse, null header, `IsAuthenticated` true/false, malformed header, `IsAuthenticated()` extension, `GetUserId()` extension. All 7 pass.
+  - `Client.Tests.Playwright/Tests/AuthenticationTests.cs` — 4 E2E tests using `page.RouteAsync` to mock `/.auth/me`. Tests: `LoginLink_IsVisible`, `LoginLink_PointsToCorrectSwaEndpoint`, `LogoutLink_IsVisible_WhenAuthenticated`, `ProtectedRoute_RedirectsToLogin` (last one marked `[Trait("Category", "RequiresSWA")]`).
+- **Key pattern**: Playwright `page.RouteAsync("**/.auth/me", ...)` intercepts and mocks the SWA auth endpoint without needing a live SWA deployment.
+- **Key decision**: E2E auth tests intentionally fail until Blair's `SwaAuthenticationStateProvider` + `LoginDisplay` components are in place — that's the intent (TDD, these tests prove the feature).
+- **`[Trait("Category", "RequiresSWA")]`**: Tests that rely on SWA gateway-level 302 redirects are tagged so CI can exclude them locally with `--filter "Category!=RequiresSWA"`.
+- **xUnit note**: `Api.Tests` has no `GlobalUsings.cs` — every test file needs explicit `using Xunit;`.
