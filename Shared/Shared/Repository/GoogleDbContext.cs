@@ -37,18 +37,13 @@ namespace Shared.Repository
 
         public string GetCollectionKey(Type toTypeGet)
         {
-            // Two legacy overrides where convention breaks:
-            // Shop has a legacy collection name that predates the convention.
-            // ItemCategory has an irregular plural (convention would produce "itemcategorys").
+            // Legacy collection names that don't follow the naming convention — preserve for backward compatibility
             if (toTypeGet == typeof(Shop))
                 return "shopcollection";
             if (toTypeGet == typeof(ItemCategory))
-                return "itemcategories";
+                return "itemcategories"; // irregular plural; convention would give "itemcategorys"
 
-            // Convention: TypeName.ToLower() + "s"
-            // ShopItem → shopitems, ShoppingList → shoppinglists,
-            // FrequentShoppingList → frequentshoppinglists, MealRecipe → mealrecipes,
-            // WeekMenu → weekmenus, DailyMeal → dailymeals, etc.
+            // Convention: lowercase type name + "s" (e.g. ShoppingList → shoppinglists, MealRecipe → mealrecipes)
             return toTypeGet.Name.ToLower() + "s";
         }
     }
