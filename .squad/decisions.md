@@ -351,6 +351,7 @@
 | D22: Auth UI Pattern | ✅ Implemented | Blair | 2026-03-28 ✅ |
 | D23: API Auth Parsing | ✅ Implemented | Glenn | 2026-03-28 ✅ |
 | D24: Auth Testing | ✅ Implemented | Josh | 2026-03-28 ✅ |
+| D25: SWA `{request.path}` scope | ✅ Implemented | Blair | 2026-03-28 ✅ |
 
 ---
 
@@ -431,6 +432,20 @@
 - ✅ 4 E2E UI tests passing
 - ⏳ 3 E2E tests TDD-pending (awaiting UI completion)
 - ⏳ 1 E2E test requires SWA (staging validation)
+
+---
+
+### D25 — SWA `{request.path}` Template Variable Scope (NEW)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
+**Issue:** Post-login redirect was using `{request.path}` template variable in `responseOverrides` block, which SWA does not expand there (only in `routes` block).
+
+**Fix Applied:**
+- Removed `?post_login_redirect_uri={request.path}` from 401 redirect in `staticwebapp.config.json`
+- SWA's built-in authentication handles post-login redirect automatically (lands on `/`)
+
+**Implementation:**
+- `Client/wwwroot/staticwebapp.config.json` — 401 `responseOverrides` entry corrected
+- Unblocks auth flow — users now land on `/` after AAD login, then navigate to destination
 
 ---
 
