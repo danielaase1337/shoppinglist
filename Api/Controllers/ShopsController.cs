@@ -47,9 +47,9 @@ namespace Api.Controllers
                 }
                 else
                 {
-                    var newShop = req.ReadFromJsonAsync<ShopModel>();
-                    if (newShop.Result == null) return await GetErroRespons("No content in shop body", req);
-                    Shop updatOrInsert = mapper.Map<Shop>(newShop.Result);
+                    var newShop = await req.ReadFromJsonAsync<ShopModel>();
+                    if (newShop == null) return await GetErroRespons("No content in shop body", req);
+                    Shop updatOrInsert = mapper.Map<Shop>(newShop);
                     if (req.Method == "POST")
                     {
                         updatOrInsert = await repository.Insert(updatOrInsert);
