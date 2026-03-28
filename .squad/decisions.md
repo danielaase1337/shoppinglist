@@ -1,7 +1,7 @@
 # Squad Decisions
 
-**Last Updated:** 2026-03-22  
-**Source:** Team audits + PRD synthesis (issue #15)
+**Last Updated:** 2026-03-23  
+**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback
 
 ---
 
@@ -67,20 +67,34 @@
 ---
 
 ### D4 — Collection Key Mapping Convention
-**Status:** ✅ DECIDED (Ray + Glenn)  
-**Choice:** Convert `GetCollectionKey()` from manual switch statement to **convention-based naming**: `typeof(T).Name.ToLower() + "s"`
+**Status:** ✅ IMPLEMENTED (Ray, 2026-03-27)  
+**Choice:** Convention-based naming in `GoogleDbContext.GetCollectionKey()`: `typeof(T).Name.ToLower() + "s"`
 
-**Current Implementation (buggy):**
-- Manual switch statement
-- FrequentShoppingList, MealRecipe, MealIngredient, WeekMenu, DailyMeal all default to `"misc"` collection
-- Silent data corruption in production
+**Implementation:**
+- Replaced manual switch statement with convention
+- Two backward-compat overrides:
+  - `Shop` → `"shopcollection"` (legacy Firestore collection name preserved)
+  - `ItemCategory` → `"itemcategories"` (irregular plural override)
+- All other types derive correctly:
+  - FrequentShoppingList → `frequentshoppinglists` (was silently routing to "misc")
+  - MealRecipe → `mealrecipes`
+  - MealIngredient → `mealingredients` (now unused due to D3 embedding)
+  - WeekMenu → `weekmenus`
+  - DailyMeal → `dailymeals`
 
-**New Implementation:**
-- Apply convention: `ShopItem` → `shopitems`, `ShoppingList` → `shoppinglists`, etc.
-- New types automatically work without switch statement update
-- Existing 4 collections already follow convention (low-risk change)
+**Migration Strategy:**
+- Created `POST /api/admin/migrate-frequent-lists` endpoint
+- Reads "misc" collection, discriminates FrequentShoppingList by "Items" field presence
+- Copies matching documents to "frequentshoppinglists", preserving document IDs
+- Deletes originals from "misc"
+- **Must run before deploying updated collection key to production**
 
-**Action:** Ray will implement this as first bug fix (P0 priority)
+**Files Changed:**
+- `Shared/Shared/Repository/GoogleDbContext.cs` — Convention-based implementation
+- `Api/Program.cs` — Removed orphaned MealIngredient DI registration (per D9)
+- `Api/Controllers/MigrateFrequentListsController.cs` — NEW migration endpoint
+
+**Validation:** ✅ 90 API tests + 61 Client tests passing
 
 ---
 
@@ -117,12 +131,20 @@
 ---
 
 ### D7 — Admin Navigation Accessibility Fix
-**Status:** ⏸️ PENDING IMPLEMENTATION  
-**Issue:** Current `NewNavComponent` admin dropdown uses CSS `:hover` only. Unreachable by keyboard and mobile touch.
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-27)  
+**Issue:** Admin dropdown used CSS `:hover`-only rendering, inaccessible on mobile/touch devices.
 
-**Constraint:** Must convert to `@onclick` toggle + `aria-expanded` before adding meal planning navigation entries
+**Fix Applied:**
+- `Client/Shared/NewNavComponent.razor` — Added `@onclick="ToggleAdminMenu"` handler on trigger span
+- Added `_adminOpen` bool state to track dropdown visibility
+- `@onclick:stopPropagation="true"` prevents nav collapse trigger from firing
+- Added `role="button"`, `aria-haspopup="true"`, `aria-expanded` for accessibility
+- `ToggleNavMenu` resets `_adminOpen` when navbar collapses
+- `Client/wwwroot/css/app.css` — Extended `.admin-dropdown:hover` selectors to also match `.admin-dropdown.open`
 
-**Scope:** This is a prerequisite for meal planning nav work (not separate sprint)
+**Result:** Hover works on desktop, click-toggle works on all devices. Fully accessible.
+
+**Scope:** Completed as prerequisite for meal planning navigation work
 
 ---
 
@@ -142,10 +164,66 @@
 ## Medium-Priority Decisions (P2 — Design Choices)
 
 ### D9 — MealIngredient Repository Registration
-**Status:** ✅ DECIDED (Ray)  
+**Status:** ✅ IMPLEMENTED (Ray, 2026-03-27)  
 **Action:** Remove `IGenericRepository<MealIngredient>` from Program.cs DI registration
 
-**Rationale:** MealIngredient is embedded in MealRecipe; no separate repository needed. Simplifies DI config and prevents confusion.
+**Rationale:** MealIngredient is embedded in MealRecipe documents per D3; no separate repository needed.
+
+**Implementation Details:**
+- Removed from both DEBUG (MemoryGenericRepository) and production (GoogleFireBaseGenericRepository) blocks
+- MealIngredient now accessed only through MealRecipe.Ingredients embedded collection
+- Prevents orphaned DI registration
+
+**Note:** D9 was marked complete on 2026-03-23 but code change was not actually applied until 2026-03-27 (Ray verified and re-applied)
+
+---
+
+### D14 — Auth Provider (UPDATED 2026-03-23)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**Update:** Microsoft provider ONLY. Remove GitHub provider from SWA auth config.
+
+**Rationale:** Simplified auth flow for family app. GitHub provider not required for v1 scope.
+
+---
+
+### D15 — Family Sharing Model (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**v1:** Single shared family — all app users share data (current behaviour, now intentional).  
+**v2:** "Family groups" model — a Family entity owns lists/menus/shops. Users belong to a Family. All family members share everything within their family. Architecture: OwnerId becomes FamilyId in v2.
+
+---
+
+### D16 — Shop Deletion Safeguards (NEW)
+**Status:** ⏸️ PENDING IMPLEMENTATION  
+**Issue:** #28  
+**Requirement:** Shop deletion requires multi-step confirmation. Before deletion, check if any ShoppingLists reference the shop's sort config and warn the user.  
+**Owner:** Blair (UI) + Glenn (API cascade check)
+
+---
+
+### D17 — OneShopManagementPage (DECISION UPDATED)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**Previous:** D11 was "complete or remove"  
+**Update:** COMPLETE ManageMyShopsPage properly. Orphan concern resolved.  
+**Owner:** Blair  
+
+---
+
+### D18 — Meal Planning v1 Scope (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**v1 Scope:** Text-based meal history parser → suggested weekly meal plan.  
+**v2 Scope:** Full recipe CRUD + link to meal plans.  
+**Constraint:** Do NOT build recipe CRUD in v1.  
+**Action:** Create separate GitHub issue for Meal Planning v1 scoping.  
+
+---
+
+### D19 — i18n / Language Strategy (NEW)
+**Status:** ✅ DECIDED (Peter + Daniel)  
+**UI Language:** Stays Norwegian for v1.  
+**Code Language:** All new code (classes, methods, variables, comments) must be English.  
+**Firestore Properties:** Existing Norwegian names (`Varen`, `Mengde`, `ItemCateogries`) must NOT be renamed — data constraint.  
+**i18n Architecture:** Add resource files so UI strings can be localized to English in a future sprint.
 
 ---
 
@@ -222,16 +300,22 @@
 | D1: Auth Strategy | ✅ Decided | Peter | — |
 | D2: Data Isolation (v1) | ✅ Decided | Peter | — |
 | D3: Meal Data Model | ✅ Decided | Peter/Ray/Glenn | — |
-| D4: Collection Key Convention | ✅ Decided | Ray | Sprint 0 (bug fix) |
+| D4: Collection Key Convention | ✅ Implemented | Ray | Sprint 0 ✅ (2026-03-27) |
 | D5: Toast System | ⏸️ Pending | Blair/Peter | Sprint 1 (UI) |
 | D6: Mobile Drag Fallback | ⏸️ Pending | Blair/Peter | Sprint 2 (Mobile) |
-| D7: Admin Nav Accessibility | ⏸️ Implementation | Blair | Sprint 4 (Meal UI) |
-| D8: Auth Provider Details | ✅ Decided | Peter/Glenn | — |
-| D9: MealIngredient DI | ✅ Decided | Ray | Sprint 3 (Meal API) |
+| D7: Admin Nav Accessibility | ✅ Implemented | Blair | Sprint 4 (Meal UI) ✅ (2026-03-27) |
+| D8: Auth Provider Details | ✅ Decided (Updated) | Peter/Glenn | — |
+| D9: MealIngredient DI | ✅ Implemented | Ray | Sprint 0 ✅ (2026-03-27) |
 | D10: LastModified Migration | ⏸️ Pending | Ray/Glenn | Pre-launch |
-| D11: Shop Management | ⏸️ Pending | Peter | Sprint planning |
+| D11: Shop Management (Complete) | ✅ Decided (Updated) | Blair | Sprint 6 |
 | D12: Design Tokens | ⏸️ Deferred | Blair | Post-MVP |
 | D13: Dark Mode | ⏸️ Deferred | Blair | Post-MVP |
+| D14: Auth Provider (Microsoft only) | ✅ Decided (New) | Peter | — |
+| D15: Family Sharing Model | ✅ Decided (New) | Peter | — |
+| D16: Shop Deletion Safeguards | ⏸️ Pending | Blair/Glenn | Sprint 3 |
+| D17: OneShopManagementPage | ✅ Decided (New) | Blair | Sprint 6 |
+| D18: Meal Planning v1 Scope | ✅ Decided (New) | Peter | — |
+| D19: i18n / Language Strategy | ✅ Decided (New) | Peter | — |
 
 ---
 
