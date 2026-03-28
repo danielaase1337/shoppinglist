@@ -62,6 +62,19 @@
 - **Sprint 6 (Data):** #31 (LastModified migration, Ray + Glenn), #32 (ManageMyShopsPage, Blair)
 - **Sprint 7 (Testing):** #33 (controller test rewrite, Josh)
 
+## Branching Strategy Update (2026-03-28)
+
+**Broadcast by:** Peter (Lead) — Daniel Aase directive
+
+**New branching strategy is in effect as of 2026-03-28:**
+- `development` is now the base branch for ALL feature branches
+- Cut new branches from `development`, not `main`
+- Merging into `development` triggers a **staging** deployment (Azure SWA staging environment)
+- Only `main` deploys to **production** — never push features directly to `main`
+- PRs for feature work target `development`; only release PRs target `main`
+
+**CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
 ### Key Blocking Dependencies
 - Sprint 0 blocks ALL feature sprints
 - Auth chain: #22 → #23 → #24 (serial)

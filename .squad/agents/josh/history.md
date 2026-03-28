@@ -30,3 +30,16 @@
 - **Azure Functions v4 note**: `WriteAsJsonAsync` and `ReadFromJsonAsync` require `IOptions<WorkerOptions>` with `Serializer = new JsonObjectSerializer()` in the `FunctionContext.InstanceServices`. Use `ServiceCollection.Configure<WorkerOptions>()` then `BuildServiceProvider()` — **not** a raw `Mock<IServiceProvider>` which returns null for the options lookup.
 - **Result**: 18 new tests pass, all call real controller code. Total Api.Tests: 91 passing.
 - **PR #38 merged** (`squad/19-controller-test-pattern`)
+
+## Branching Strategy Update (2026-03-28)
+
+**Broadcast by:** Peter (Lead) — Daniel Aase directive
+
+**New branching strategy is in effect as of 2026-03-28:**
+- `development` is now the base branch for ALL feature branches
+- Cut new branches from `development`, not `main`
+- Merging into `development` triggers a **staging** deployment (Azure SWA staging environment)
+- Only `main` deploys to **production** — never push features directly to `main`
+- PRs for feature work target `development`; only release PRs target `main`
+
+**CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.

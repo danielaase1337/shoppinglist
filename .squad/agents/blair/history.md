@@ -39,3 +39,16 @@
 - **`DataCacheService` + `BackgroundPreloadService` pattern is excellent** — preserve this; it makes the app feel fast.
 - **`CategoryManagementPage` optimistic UI with rollback is best-in-class** — use as reference pattern for new pages.
 - **`NaturalSortComparer` is correct and well-tested** — no changes needed.
+
+## Branching Strategy Update (2026-03-28)
+
+**Broadcast by:** Peter (Lead) — Daniel Aase directive
+
+**New branching strategy is in effect as of 2026-03-28:**
+- `development` is now the base branch for ALL feature branches
+- Cut new branches from `development`, not `main`
+- Merging into `development` triggers a **staging** deployment (Azure SWA staging environment)
+- Only `main` deploys to **production** — never push features directly to `main`
+- PRs for feature work target `development`; only release PRs target `main`
+
+**CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.

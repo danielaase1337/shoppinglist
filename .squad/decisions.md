@@ -227,6 +227,37 @@
 
 ---
 
+### D20 — Branching Strategy: development as Integration Branch (NEW)
+**Status:** ✅ DECIDED (Daniel Aase)  
+**Implementer:** peter-branching-strategy agent  
+**Implementation Date:** 2026-03-28
+
+**Decision:**
+- `development` is the base branch for ALL feature branches
+- Feature branches are cut from `development`, not `main`
+- Push to `development` → builds and deploys to staging environment
+- Push to `main` → builds and deploys to production (no change from before)
+- `main` receives merges from `development` only (via PR, release flow)
+
+**CI/CD Implementation:**
+- Updated `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml`
+- Added `build_and_deploy_staging` job triggered on push to `development`
+- Added `deployment_environment: "staging"` for staging deployments
+- Added `build_and_deploy_pr` job for PRs to both `main` and `development`
+- Existing production job unchanged — triggered on push to `main`
+
+**Team Impact:**
+- All agents: Cut feature branches from `development`, not `main`
+- PRs for feature work target `development`
+- Only release/hotfix PRs target `main` directly
+
+**Environment Setup Requirement:**
+- Azure Static Web Apps staging environment named "staging" must be configured in the Azure portal
+- The `deployment_environment` parameter in workflow creates a named preview environment
+- SWA Free tier supports 3 environments; Standard tier supports 10
+
+---
+
 ### D10 — LastModified Migration Strategy
 **Status:** ⏸️ PENDING DECISION  
 **Issue:** Current N+1 inline migration in ShoppingListController fires writes on every GET for un-migrated docs
@@ -316,6 +347,7 @@
 | D17: OneShopManagementPage | ✅ Decided (New) | Blair | Sprint 6 |
 | D18: Meal Planning v1 Scope | ✅ Decided (New) | Peter | — |
 | D19: i18n / Language Strategy | ✅ Decided (New) | Peter | — |
+| D20: Branching Strategy | ✅ Implemented (New) | Daniel/Peter | Sprint 0 ✅ (2026-03-28) |
 
 ---
 

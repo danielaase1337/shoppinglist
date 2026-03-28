@@ -34,6 +34,19 @@
 - **DESIGN DECISION:** Convention-based collection naming auto-derives keys for new types (MealRecipe → mealrecipes, WeekMenu → weekmenus) without code changes. Only two override cases are needed because they violate the convention (Shop's legacy collection name + ItemCategory's irregular plural). Daniel reviewed this approach on PR #35 — confirmed the convention produces correct keys for all existing types.
 - **PRs #35 + #37 merged** (`squad/16-collection-key-fix` + `squad/17-di-registration`)
 
+## Branching Strategy Update (2026-03-28)
+
+**Broadcast by:** Peter (Lead) — Daniel Aase directive
+
+**New branching strategy is in effect as of 2026-03-28:**
+- `development` is now the base branch for ALL feature branches
+- Cut new branches from `development`, not `main`
+- Merging into `development` triggers a **staging** deployment (Azure SWA staging environment)
+- Only `main` deploys to **production** — never push features directly to `main`
+- PRs for feature work target `development`; only release PRs target `main`
+
+**CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
 ### 2025-01-22 — Full Data Architecture Review (data-findings.md)
 - **CRITICAL BUG:** `GoogleDbContext.GetCollectionKey()` only maps 4 types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all fall through to `"misc"` — they will corrupt each other in production.
 - **CRITICAL BUG:** `WeekMenu` and `DailyMeal` are not registered in `Program.cs` DI — the week menu feature is entirely unwired.
