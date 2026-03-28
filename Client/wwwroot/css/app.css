@@ -683,6 +683,40 @@ input[type="checkbox"] {
     z-index: 9999;
 }
 
+/* Nav auth (login/logout display) */
+.nav-auth {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.nav-user {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.nav-login,
+.nav-logout {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.nav-login:hover,
+.nav-logout:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    text-decoration: none;
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
 /* Admin dropdown styling */
 .admin-dropdown {
     position: relative;

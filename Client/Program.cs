@@ -1,7 +1,9 @@
 using BlazorApp.Client;
+using BlazorApp.Client.Auth;
 using BlazorApp.Client.Common;
 using BlazorApp.Client.Services;
 
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Syncfusion.Blazor;
@@ -41,5 +43,8 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddSingleton<ISettings, Settings>();
 builder.Services.AddScoped<IDataCacheService, DataCacheService>();
 builder.Services.AddScoped<IBackgroundPreloadService, BackgroundPreloadService>();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
 builder.Services.AddSyncfusionBlazor();
 await builder.Build().RunAsync();
