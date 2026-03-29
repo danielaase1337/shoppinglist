@@ -94,3 +94,10 @@
 ### Labels Created on GitHub
 - Squad labels: `squad:peter`, `squad:blair`, `squad:glenn`, `squad:ray`, `squad:josh`
 - Priority labels: `P0`, `P1`, `P2`, `P3`
+
+## 2026-06-01 — Landing Page for Signed-Out Users ✅
+
+- **Landing page implemented:** Client/Pages/Landing.razor at /welcome with LandingLayout (no preload service).
+- **SWA config updated:** /welcome made anonymous; 401 redirect changed from /.auth/login/aad to /welcome.
+- **Sign-out flow fixed:** LoginDisplay.razor now redirects to /welcome instead of straight back to AAD login.
+- **Key learnings:** MainLayout cannot be used for unauthenticated pages (calls authenticated API in preload). Always use a minimal layout. SWA anonymous route must appear before /* catch-all rule.

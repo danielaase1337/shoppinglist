@@ -1016,6 +1016,121 @@ label[for='toggle-all'] {
     display: none;
 }
 
+/* ─── Landing Page ─────────────────────────────────────────────────────── */
+
+.landing-layout {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+
+.landing-page {
+    width: 100%;
+    max-width: 480px;
+}
+
+.landing-card {
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 20px;
+    padding: 48px 40px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    text-align: center;
+}
+
+.landing-logo {
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 16px;
+}
+
+.landing-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e1b4b;
+    margin: 0 0 4px;
+}
+
+.landing-subtitle {
+    font-size: 1rem;
+    color: #6b7280;
+    margin: 0 0 28px;
+    font-style: italic;
+}
+
+.landing-description {
+    text-align: left;
+    margin-bottom: 32px;
+}
+
+.landing-description p {
+    color: #374151;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.landing-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.landing-features li {
+    color: #374151;
+    font-size: 0.9rem;
+    padding: 6px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.landing-features li:last-child {
+    border-bottom: none;
+}
+
+.landing-signin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff !important;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    text-decoration: none !important;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    margin-bottom: 16px;
+}
+
+.landing-signin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+    color: #fff !important;
+}
+
+.landing-hint {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+@media (max-width: 480px) {
+    .landing-card {
+        padding: 36px 24px 32px;
+    }
+    .landing-logo {
+        font-size: 48px;
+    }
+    .landing-title {
+        font-size: 1.6rem;
+    }
+}
+
 .todo-list li.editing:last-child {
     margin-bottom: -1px;
 }

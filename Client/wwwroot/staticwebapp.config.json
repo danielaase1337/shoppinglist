@@ -21,6 +21,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/welcome",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["anonymous"]
     },
@@ -31,7 +35,7 @@
   ],
   "responseOverrides": {
     "401": {
-      "redirect": "/.auth/login/aad",
+      "redirect": "/welcome",
       "statusCode": 302
     },
     "404": {

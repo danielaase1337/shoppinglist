@@ -1,0 +1,30 @@
+@page "/welcome"
+@layout BlazorApp.Client.Shared.LandingLayout
+
+<div class="landing-page">
+    <div class="landing-card">
+        <div class="landing-logo">🛒</div>
+        <h1 class="landing-title">Handleliste</h1>
+        <p class="landing-subtitle">The Aase-broen's</p>
+
+        <div class="landing-description">
+            <p>
+                Familiens digitale handleliste — organiser dagligvarer etter hvilken butikk du handler i,
+                planlegg ukens middager og del lister med hele familien.
+            </p>
+            <ul class="landing-features">
+                <li>🏪 Sorter varer etter butikkens hyller</li>
+                <li>📋 Del lister med familien</li>
+                <li>⭐ Hyppige lister for gjenbruk</li>
+                <li>✅ Kryss av varer underveis</li>
+            </ul>
+        </div>
+
+        <a href="/.auth/login/aad?post_login_redirect_uri=/" class="landing-signin-btn">
+            <span class="ms-icon">🔑</span>
+            Logg inn med Microsoft
+        </a>
+
+        <p class="landing-hint">Kun for familiemedlemmer med Microsoft-konto.</p>
+    </div>
+</div>
