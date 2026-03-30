@@ -1,6 +1,0 @@
-fix: enforce auth fallback policy in Blazor client
-
-Set FallbackPolicy = DefaultPolicy so all routes require authentication
-by default. Public pages need [AllowAnonymous] explicitly.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
