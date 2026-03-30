@@ -58,10 +58,20 @@
 - **Auth type**: Microsoft provider only (D14). SWA injects header automatically — zero JWT library dependencies.
 - **99 API tests passing** post-change.
 
-### Issue #31 — LastModified Migration Endpoint — sprint/2
+- **Issue #31 — LastModified Migration Endpoint — sprint/2**
+- D10 resolved: Extracted inline lazy migration from `ShoppingListController` (both `RunAll` GET and `RunOne` GET) into a new one-time `GET /api/admin/migrate-lastmodified` endpoint in `Api/Controllers/AdminController.cs`.
+- Auth gate: Endpoint checks `"admin"` role in SWA-injected `x-ms-client-principal` via `GetCurrentUser(req)`. Returns `403 Forbidden` if role is absent. Uses `AuthorizationLevel.Function` as an additional layer.
+- Response shape: `{ "migratedCount": N }` — consistent with `MigrateFrequentListsController` pattern.
+- GET endpoints are now read-only: `ShoppingListController.RunAll` and `RunOne` no longer perform any writes on GET. Eliminates N+1 write pattern.
+- No new DI registrations needed: `IGenericRepository<ShoppingList>` was already registered in both debug and production blocks in `Program.cs`.
 
-- **D10 resolved**: Extracted inline lazy migration from `ShoppingListController` (both `RunAll` GET and `RunOne` GET) into a new one-time `GET /api/admin/migrate-lastmodified` endpoint in `Api/Controllers/AdminController.cs`.
-- **Auth gate**: Endpoint checks `"admin"` role in SWA-injected `x-ms-client-principal` via `GetCurrentUser(req)`. Returns `403 Forbidden` if role is absent. Uses `AuthorizationLevel.Function` as an additional layer.
-- **Response shape**: `{ "migratedCount": N }` — consistent with `MigrateFrequentListsController` pattern.
-- **GET endpoints are now read-only**: `ShoppingListController.RunAll` and `RunOne` no longer perform any writes on GET. Eliminates N+1 write pattern.
-- **No new DI registrations needed**: `IGenericRepository<ShoppingList>` was already registered in both debug and production blocks in `Program.cs`.
+### Issue #28 — Shop Deletion Safeguards — sprint/2
+
+- Added `GET /api/shop/{id}/dependencies` endpoint as `[Function("shopdependencies")]` with route `shop/{id}/dependencies`.
+- Returns `{ "dependencyCount": N, "dependentLists": ["name", ...] }` JSON.
+- **Key finding**: `ShoppingList` has NO `ShopId` property. Shop-based sort order is purely client-side (stored in client state, not persisted in Firestore). The endpoint therefore always returns `dependencyCount: 0`. Code is structured so a future `ShopId` field can plug in trivially.
+- Used `ShoppingList.ListId` field as the query hook — it's not a shop reference today, but named comment documents this for future devs.
+- Injected `IGenericRepository<ShoppingList>` into `ShopsController` constructor (already registered in both `#if DEBUG` and production DI blocks in `Program.cs` — no new registration needed).
+- Added structured `ILogger.LogInformation` for DELETE before the delete executes — logs shop name (resolved from repo) and shop id.
+- Updated `ShopsControllerTests`: added `_mockShoppingListRepo`, updated constructor call, added 4 `RunDependencies` tests, updated 2 DELETE tests to mock the `Get()` call now required for name logging.
+- 122 API tests passing post-change.
