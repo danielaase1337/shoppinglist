@@ -1,7 +1,9 @@
 ﻿@page "/managemyshops"
 @using BlazorApp.Client.Common;
+@using BlazorApp.Client.Services;
 @inject HttpClient Http
-@inject BlazorApp.Client.Services.IDataCacheService DataCache
+@inject IDataCacheService DataCache
+@inject INotificationService Notifications
 
 
 <div class="card-maincontainer container-sm">
@@ -36,7 +38,6 @@
                                     }
                                     else
                                     {
-
                                         <label>
                                             <a href="@(GetItemNavLink(l.Id))">@l.Name</a>
                                         </label>
@@ -51,17 +52,55 @@
                                 {
                                     <div class="btn-group" role="group" aria-label="Basic example">
                                         <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => StoreChange(l))"><i class="fas fa-check"></i></button>
-                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { l.EditClicked= false;  })"><i class="fas fa-times"> </i></button>
-                                        @*<button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(l))"><i class="fas fa-ban"> </i></button>    *@
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { l.EditClicked = false; })"><i class="fas fa-times"> </i></button>
                                     </div>
                                 }
                                 else
                                 {
                                     <div class="col-2">
-                                        <button class="btn btn-sm btn-outline-primary" @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="@(e => { l.EditClicked = true; })"><i class="fas fa-edit"></i></button>
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="btn btn-sm btn-danger shop-delete-btn"
+                                                title="Slett butikk"
+                                                disabled="@(_isCheckingDependencies && _deletingShopId != l.Id)"
+                                                @onclick="@(e => InitiateDelete(l))">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </div>
                                 }
                             </div>
+
+                            @if (_deletingShopId == l.Id)
+                            {
+                                <div class="shop-delete-panel">
+                                    @if (_isCheckingDependencies)
+                                    {
+                                        <p class="shop-delete-checking"><i class="fas fa-spinner fa-spin"></i> Sjekker avhengigheter...</p>
+                                    }
+                                    else if (_currentDependency != null && _currentDependency.DependencyCount > 0)
+                                    {
+                                        <p class="shop-delete-warning-text">
+                                            ⚠️ Denne butikken brukes av <strong>@_currentDependency.DependencyCount</strong> handleliste@(_currentDependency.DependencyCount == 1 ? "" : "r") for sortering. Er du sikker?
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <p class="shop-delete-warning-text">Er du sikker på at du vil slette denne butikken?</p>
+                                    }
+                                    @if (!_isCheckingDependencies)
+                                    {
+                                        <div class="shop-delete-actions">
+                                            <button class="btn btn-sm btn-danger" @onclick="@(e => ConfirmDelete(l))">
+                                                <i class="fas fa-trash"></i> Ja, slett butikken
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDelete">
+                                                Avbryt
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </li>
                     }
 
@@ -80,8 +119,19 @@
 
 @code {
 
+    private class ShopDependencyResult
+    {
+        public int DependencyCount { get; set; }
+        public List<string> DependentLists { get; set; } = new();
+    }
+
     [Inject]
     public ISettings Settings { get; set; } = null!;
+
+    private string? _deletingShopId;
+    private bool _isCheckingDependencies;
+    private ShopDependencyResult? _currentDependency;
+
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("🏪 ManageMyShopsPage: Checking cache for instant loading...");
@@ -143,6 +193,60 @@
             DataCache.InvalidateShopsCache();
             Console.WriteLine($"✅ Deleted shop: {l.Name}");
         }
+    }
+
+    private async Task InitiateDelete(ShopModel shop)
+    {
+        _deletingShopId = shop.Id;
+        _currentDependency = null;
+        _isCheckingDependencies = true;
+
+        try
+        {
+            var depUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, shop.Id) + "/dependencies";
+            var result = await Http.GetFromJsonAsync<ShopDependencyResult>(depUrl);
+            _currentDependency = result ?? new ShopDependencyResult();
+        }
+        catch
+        {
+            // Endpoint not yet deployed or error — proceed with no-dependency state
+            _currentDependency = new ShopDependencyResult();
+        }
+        finally
+        {
+            _isCheckingDependencies = false;
+        }
+    }
+
+    private async Task ConfirmDelete(ShopModel shop)
+    {
+        _deletingShopId = null;
+        _currentDependency = null;
+
+        try
+        {
+            var deleRes = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, shop.Id));
+            if (deleRes != null && deleRes.IsSuccessStatusCode)
+            {
+                MyShops?.Remove(shop);
+                DataCache.InvalidateShopsCache();
+                Notifications.Success("Butikk slettet");
+            }
+            else
+            {
+                Notifications.Error("Kunne ikke slette butikken");
+            }
+        }
+        catch
+        {
+            Notifications.Error("Kunne ikke slette butikken");
+        }
+    }
+
+    private void CancelDelete()
+    {
+        _deletingShopId = null;
+        _currentDependency = null;
     }
 
     private string GetItemNavLink(string shopId)
