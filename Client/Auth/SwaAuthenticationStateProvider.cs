@@ -37,7 +37,7 @@ public class SwaAuthenticationStateProvider : AuthenticationStateProvider
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
-            var identity = new ClaimsIdentity(claims, principal.IdentityProvider);
+            var identity = new ClaimsIdentity(claims, principal.IdentityProvider ?? "aad");
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
         catch

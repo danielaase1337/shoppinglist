@@ -75,6 +75,18 @@
 
 **Broadcast by:** Peter (Lead) — Daniel Aase directive
 
+### 2026-03-28 — Staging Auth Loop Fix ✅ COMPLETE
+
+**Root causes identified and fixed (3 issues):**
+
+1. **`ClaimsIdentity` unauthenticated when `IdentityProvider` is null** — `ClaimsIdentity.IsAuthenticated` only returns `true` when `authenticationType` is non-null/non-empty. `principal.IdentityProvider` from SWA's `/.auth/me` can be null, causing FallbackPolicy to reject authenticated users. **Fix:** `principal.IdentityProvider ?? "aad"` in `SwaAuthenticationStateProvider.cs`.
+
+2. **Missing `<Authorizing>` template caused blank screen** — While `/.auth/me` was in-flight, `AuthorizeRouteView` rendered nothing (Blazor replaced the index.html spinner, leaving a blank screen). Users saw it as "stuck loading". **Fix:** Added `<Authorizing>` spinner template in `App.razor`.
+
+3. **401 redirect to `/welcome` (non-existent Blazor page)** — `staticwebapp.config.json` pointed 401 errors at `/welcome`, but no `Welcome.razor` page exists. After SWA served `index.html`, Blazor hit a dead route. **Fix:** Changed 401 redirect to `/.auth/login/aad` (direct AAD login — no Blazor page needed). Removed dead `/welcome` anonymous route entry.
+
+**Key learning:** Never use `new ClaimsIdentity(claims, authenticationType)` without guaranteeing `authenticationType` is non-null — even if claims are populated, `IsAuthenticated` will be `false`. Always use a fallback: `provider ?? "aad"`.
+
 **New branching strategy is in effect as of 2026-03-28:**
 - `development` is now the base branch for ALL feature branches
 - Cut new branches from `development`, not `main`

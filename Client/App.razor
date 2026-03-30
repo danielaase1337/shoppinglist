@@ -4,6 +4,13 @@
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <div class="container">
+                        <div class="card card-maincontainer">
+                            <p>🔄 Sjekker innlogging...</p>
+                        </div>
+                    </div>
+                </Authorizing>
                 <NotAuthorized>
                     <div class="container">
                         <div class="card card-maincontainer">
