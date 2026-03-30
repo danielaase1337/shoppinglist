@@ -57,3 +57,14 @@
 - **Key decision**: E2E auth tests intentionally fail until Blair's `SwaAuthenticationStateProvider` + `LoginDisplay` components are in place — that's the intent (TDD, these tests prove the feature).
 - **`[Trait("Category", "RequiresSWA")]`**: Tests that rely on SWA gateway-level 302 redirects are tagged so CI can exclude them locally with `--filter "Category!=RequiresSWA"`.
 - **xUnit note**: `Api.Tests` has no `GlobalUsings.cs` — every test file needs explicit `using Xunit;`.
+
+## Issue #33 — Rewrite API Controller Tests (sprint/2)
+
+- **Date**: 2026-03-30
+- **Finding**: All Api.Tests controller tests for ShopsController, ShopsItemsController, ShopItemCategoryController, and FrequentShoppingListController called mock repository methods directly — no test exercised actual controller code.
+- **Action**: Rewrote all 4 test classes. Created FrequentShoppingListControllerTests.cs from scratch (no test file existed). All tests now instantiate real controllers and call Run(), RunAll(), or RunOne() methods.
+- **Pattern**: Use cfg.AddProfile<Api.ShoppingListProfile>() for real AutoMapper (not manually wired maps). Use TestHttpFactory helpers for HttpRequestData/HttpResponseData.
+- **ShopsController constructor change**: The controller already had an uncommitted change adding IGenericRepository<ShoppingList> as a second dependency — tests must pass it as a second mock.
+- **Migration tests**: ShoppingListControllerRealTests had 2 tests verifying GET-based lazy migration. Migration was removed in #31. Updated those tests to verify Update is NOT called during GET (removed behavior).
+- **Norwegian characters in assertions**: Avoid Norwegian chars (ø, æ, å) in Assert.Contains() body checks — WriteAsJsonAsync escapes them as \uXXXX Unicode escapes. Use ASCII-safe names in test data.
+- **Result**: 122 tests pass in Api.Tests (up from 91). Commit: 7bdf205 on sprint/2.
