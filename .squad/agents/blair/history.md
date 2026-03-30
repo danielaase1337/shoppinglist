@@ -102,6 +102,22 @@
 
 ## Learnings
 
+### 2026-04-03 — Complete ManageMyShopsPage (#32) ✅ COMPLETE
+
+**Completed `OneShopManagmentPage.razor` (`/managemyshops/{Id}`):**
+
+- Replaced title stub with a full shop detail page.
+- Inline name editing: click edit → input bound to `_editName`, Enter/Escape shortcuts, save fires PUT to `api/shops`.
+- Shelf list: ordered by `SortIndex`, shows category badge tags, up/down reorder buttons (same pattern as `ShopConfigurationPage` from #27). "Lagre rekkefølge" button persists via PUT.
+- Stats card: shelf count + total category count (computed properties `ShelfCount`/`CategoryCount`).
+- Two-step delete: "Slett butikk" → dependency check → confirm/cancel panel (same pattern as #28 in ManageMyShopsPage). Navigates to `/managemyshops` after confirmed deletion via `NavigationManager`.
+- Loading state via `<LoadingComponent />`, error state if API returns null/throws.
+- Link to `/shopconfig/{id}` for full shelf/category configuration.
+- Back navigation arrow to `/managemyshops`.
+- Mobile-responsive with `@@media` at 576px (note: must use `@@media` not `@media` in Blazor `<style>` blocks).
+- Fixed broken nav link in `ManageMyShopsPage.razor`: `GetItemNavLink` was returning `oneShop/{id}` (no matching route); corrected to `managemyshops/{id}`.
+- **Key learning**: Always verify nav link targets against actual `@page` routes — the old stub had a routing mismatch that silently produced dead links.
+
 ### 2026-04-01 — Toast Notification System (#25)
 
 **Implemented D5 (Option A): custom INotificationService + ToastContainer.**
@@ -132,3 +148,28 @@
 - `ShopDependencyResult` model declared as a private inner class in the page — no Shared model needed for this page-local DTO.
 - URL constructed as `Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, id) + "/dependencies"` — no new enum key required.
 - CSS: `shop-delete-panel` with red left-border + fade-in animation added to `app.css`.
+
+### 2026-04-03 — i18n Resource File Architecture (#30) ✅ COMPLETE
+
+**Implemented D19 (i18n Architecture): `Microsoft.Extensions.Localization` infrastructure.**
+
+**Package added:**
+- `Microsoft.Extensions.Localization` 10.0.5 to `Client/Client.csproj`
+
+**Files created:**
+- `Client/Resources/SharedResources.cs` — empty marker class; carries full JSDoc comment with usage pattern and key naming convention
+- `Client/Resources/SharedResources.nb-NO.resx` — 10 Norwegian strings (v1 default; all current hardcoded UI strings for ShoppingListMainPage)
+- `Client/Resources/SharedResources.en.resx` — identical keys with `TODO` values; English translation template
+
+**Files modified:**
+- `Client/Program.cs` — added `using BlazorApp.Client.Resources` and `builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources")`
+- `Client/Pages/Shopping/ShoppingListMainPage.razor` — converted to use `@inject IStringLocalizer<SharedResources> L`. All 3 visible hardcoded strings (`Handlelister`, `Navn på listen?`, `Det finnes ingen handlelister!`) replaced with `@L["key"]`. Added `aria-label` attributes to all 5 action buttons using localized strings (accessibility bonus).
+
+**Squad docs:**
+- `.squad/decisions/inbox/blair-i18n-pattern.md` — full convention doc: key naming, usage pattern, service registration, activation instructions, what NOT to localize
+
+**Key learnings:**
+- `AddLocalization()` in Blazor WASM works at the service level; `.resx` files are embedded resources resolved by `IStringLocalizer<T>` against the marker class namespace. ResourcesPath maps the physical folder.
+- The culture must be set explicitly via `CultureInfo.DefaultThreadCurrentUICulture` for v1 (no browser auto-detect, no UI switcher — config flag only per D19).
+- `using Microsoft.Extensions.Localization` must be in the `@using` block of each page that injects `L`; it is NOT in `_Imports.razor` to avoid polluting all pages until they are migrated.
+- Key naming convention: `{PageOrScope}_{DescriptiveName}` — page prefix avoids collisions; `Common_` for shared strings.

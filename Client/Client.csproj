@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.11" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="10.0.5" />
     <PackageReference Include="Syncfusion.Blazor.Buttons" Version="20.4.0.41" />
     <PackageReference Include="Syncfusion.Blazor.Core" Version="20.4.0.41" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="20.4.0.41" />

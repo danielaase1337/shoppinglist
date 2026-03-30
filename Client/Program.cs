@@ -1,6 +1,7 @@
 using BlazorApp.Client;
 using BlazorApp.Client.Auth;
 using BlazorApp.Client.Common;
+using BlazorApp.Client.Resources;
 using BlazorApp.Client.Services;
 
 using Microsoft.AspNetCore.Components.Authorization;
@@ -51,4 +52,5 @@ builder.Services.AddAuthorizationCore(options =>
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
 builder.Services.AddSyncfusionBlazor();
+builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
 await builder.Build().RunAsync();
