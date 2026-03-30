@@ -122,3 +122,50 @@
   - Program.cs has AddAuthorizationCore(FallbackPolicy=DefaultPolicy), full auth cascade
 
 **Auth chain complete** — All three blocking issues verified and closed. Ready for downstream features (#25, #26, #28).
+
+## 2026-XX-XX — Sprint 2 Planning Complete ✅
+
+**Sprint 2 Scope:** 8 issues (2 P1, 6 P2) focused on UI/UX polish + testing infrastructure + data layer foundation.
+
+**P1 Issues (Blocking):**
+- **#33 (API controller test rewrite)** — Josh owner. Currently 65 tests mock everything, zero controller code executed. Refactor to test actual controller methods. Unblocks Sprint 7 + catches auth regressions.
+- **#25 (Toast/notification system)** — Blair owner. Implements D5 Option A (custom INotificationService). Blocks #28 shop deletion UX. Estimated 1 day.
+
+**P2 Issues (High-Value Feature Work):**
+- **#27 (Mobile drag-and-drop → buttons)** — Blair owner. Implements D6 Option B. Replaces broken iOS drag with up/down button controls (accessible, reliable).
+- **#28 (Shop deletion safeguards)** — Blair+Glenn owners. Implements D16. Multi-step confirm + cascade check for dependency safety. **Depends on #25.**
+- **#29 (Meal planning v1 scoping)** — Peter owner. SCOPING ONLY (no code). Capture v1 requirements (text history parser + weekly suggestions). Aligns with D18. Must finalize scope with Daniel before v1 implementation.
+- **#30 (i18n resource architecture)** — Blair owner. Implements D19. Add `.resx` files + LocalizationService for future English localization. UI stays Norwegian for v1.
+- **#31 (LastModified migration endpoint)** — Ray+Glenn owners. Implements D10 Option A. Extract inline lazy migration from ShoppingListController → one-time admin endpoint. Improves GET performance.
+- **#32 (ManageMyShopsPage completion)** — Blair owner. Implements D17 COMPLETE decision. Shelf/category list + reorder controls. Currently stub with title only. Uses #27 buttons. Moderate scope.
+
+**Out of Sprint 2:**
+- Auth chain (#22-#24) already complete + merged
+- Sprint 0 bugs already complete
+- Meal planning v1 implementation deferred until scope finalized (separate sprint)
+- Sprint 3+ issues deferred
+
+**Critical Dependencies:**
+- #25 (toast) must complete before #28 (shop deletion UX) starts
+- #27 (buttons) must complete before #32 (ManageMyShopsPage) starts
+- #33 (tests) must complete before Sprint 7
+- No cross-sprint blocking
+
+**Team Effort Estimate:** 30-37 team-days (realistic for 2-week sprint, 5 developers, 80 available team-days)
+
+**Technical Concerns Mitigated:**
+- #33: Josh+Glenn establish test pattern on 1 controller first, then scale
+- #25: aria-live accessibility + queue-based notification design required
+- #28: Unit test cascade check before UI integration
+- #32: Reuse #27 patterns for reorder controls
+- #29: Explicitly scoping-only, separate implementation issue created
+
+**Deliverables:**
+- `.squad/agents/peter/sprint2-plan.md` — Detailed sprint roadmap (dependencies, owners, technical concerns)
+- `.squad/decisions/inbox/peter-sprint2-scope.md` — Formal decision document (scope rationale, capacity analysis, approval gates)
+
+**Next Steps:**
+- Daniel reviews sprint plan + decision
+- Daniel confirms scope + approves sprint start
+- Peter creates GitHub Projects sprint board
+- Team begins work in recommended sequence

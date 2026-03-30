@@ -633,6 +633,118 @@ SWA's built-in authentication handles the post-login redirect automatically when
 
 ---
 
+---
+
+### D30 — Staging Auth Fix — 401 Redirect + ClaimsIdentity + Authorizing Template
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
+**Branch:** sprint/2
+
+**Context:** After adding `FallbackPolicy = DefaultPolicy` to `Client/Program.cs`, the staging app became stuck on the index.html loading spinner and never transitioned to the Blazor app.
+
+Three root causes were identified and fixed.
+
+#### 1. ClaimsIdentity must always have a non-null authenticationType
+
+**File:** `Client/Auth/SwaAuthenticationStateProvider.cs`  
+**Change:** `principal.IdentityProvider ?? "aad"` instead of bare `principal.IdentityProvider`  
+**Rationale:** `ClaimsIdentity.IsAuthenticated` returns `false` when `authenticationType` is null or empty — regardless of whether claims are populated. SWA's `/.auth/me` can return a null `IdentityProvider` field. The fallback `"aad"` is always safe for our Microsoft-only auth config (D1).
+
+#### 2. `<Authorizing>` template is required in App.razor
+
+**File:** `Client/App.razor`  
+**Change:** Added `<Authorizing>` spinner template inside `<AuthorizeRouteView>`  
+**Rationale:** While `GetAuthenticationStateAsync()` is in-flight (real network call to `/.auth/me` on SWA), `AuthorizeRouteView` renders nothing without an `<Authorizing>` template. Blazor has replaced the index.html spinner, leaving a blank/white screen that appears as "stuck loading". The spinner gives users correct feedback.
+
+#### 3. 401 redirect must point to `/.auth/login/aad`, not `/welcome`
+
+**File:** `Client/wwwroot/staticwebapp.config.json`  
+**Change:** `responseOverrides["401"].redirect` changed from `/welcome` to `/.auth/login/aad`. Removed dead `/welcome` anonymous route entry.  
+**Rationale:** No `Welcome.razor` page exists. Redirecting to `/welcome` served `index.html` (via navigationFallback), Blazor loaded, found no matching route, and produced confusing behaviour. Using `/.auth/login/aad` directly is cleaner — SWA handles the post-login redirect automatically. This also aligns with the existing learning in D27 that `{request.path}` doesn't work in `responseOverrides`.
+
+**Constraints Respected:**
+- FallbackPolicy (`DefaultPolicy`) is NOT removed — auth enforcement stays.
+- `<NotAuthorized>` template is preserved in `App.razor`.
+- No `Welcome.razor` page was created — the redirect no longer needs it.
+- D1 (Microsoft provider only) respected — `"aad"` fallback aligns with AAD-only config.
+
+---
+
+### D31 — Sprint 2 Scope — UI/UX Foundation + Testing
+**Status:** 🟡 PENDING APPROVAL (awaiting Daniel review)  
+**Owner:** Peter (Lead/Architect)  
+**Date:** 2026-XX-XX
+
+**Problem:** Sprint 0 (P0 bugs) is complete. Auth chain is verified and merged. We need a clear, realistic scope for Sprint 2 that:
+1. Unblocks downstream feature work (meal planning, shop management)
+2. Addresses P1 technical debt (#33 test rewriting is BLOCKING)
+3. Closes high-value P2 issues without overloading the team
+4. Respects existing architectural decisions (D1-D30)
+
+**Decision:** Sprint 2 will tackle 8 issues: 2 P1 (blocking), 6 P2 (high-value).
+
+#### P1 (Blocking — Must Complete)
+1. **#33 — Testing: Rewrite API controller tests** (Josh)
+   - Currently: 65 tests mock everything, zero controller code executed
+   - Action: Refactor to test actual controller methods
+   - Unblocks: Sprint 7 (full test audit) and catches auth regressions early
+   - Effort: Medium
+
+2. **#25 — UI: Toast/notification system** (Blair)
+   - Implements decision D5 (Option A: custom INotificationService)
+   - Blocks: #28 (shop deletion UX) and future meal planning UI
+   - Effort: Low (estimated 1 day per D5 recommendation)
+
+#### P2 (High-Value Feature Work)
+3. **#27 — UI: Mobile drag-and-drop buttons** (Blair)
+   - Replaces broken iOS drag-and-drop with up/down buttons
+   - Used by: #32 (ManageMyShopsPage reorder controls)
+   - Effort: Medium
+
+4. **#28 — Feature: Shop deletion safeguards** (Blair+Glenn)
+   - Multi-step confirm + cascade check
+   - **Dependency:** Requires #25 (toast) code-complete
+   - Effort: Medium
+
+5. **#29 — Scoping: Meal Planning v1** (Peter)
+   - **SCOPING ONLY — NO IMPLEMENTATION**
+   - Capture v1 requirements + architecture decisions
+   - Aligns with D18 (v1 = text history + suggestions, NOT recipe CRUD)
+   - Effort: Low (1-2 days for scope doc + Daniel alignment)
+
+6. **#30 — Feature: i18n resource architecture** (Blair)
+   - Creates `.resx` file structure + LocalizationService
+   - No UI language switch yet (architecture only)
+   - Effort: Low-Medium
+
+7. **#31 — Feature: LastModified migration endpoint** (Ray+Glenn)
+   - Extract inline lazy migration from ShoppingListController
+   - Create one-time `GET /api/admin/migrate-lastmodified` endpoint
+   - Improves GET response time
+   - Effort: Medium
+
+8. **#32 — Feature: Complete ManageMyShopsPage** (Blair)
+   - Shelf/category list + reorder controls (using #27 buttons)
+   - Currently: stub with only title placeholder
+   - Effort: Medium-High
+
+**Team Capacity:** 30–37 team-days estimated; fits 80 team-days available in 2-week sprint
+
+**Critical Path Dependencies:**
+- #25 (Toast) → #28 (Shop deletion) depends on toast
+- #27 (Buttons) → #32 (ManageMyShopsPage) uses buttons
+- #33 (Tests) unblocks Sprint 7 + catches regressions
+
+**Success Criteria:**
+1. All 8 issues closed
+2. All PRs merged to `development`
+3. `development` branch builds + tests pass (90 API + 61 Client + E2E)
+4. Staging deployment successful
+5. No regressions in shopping list functionality
+6. Code review completed by Peter + team leads
+7. Mobile testing completed for #27
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
