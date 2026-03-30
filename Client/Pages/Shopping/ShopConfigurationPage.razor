@@ -98,13 +98,25 @@
                                             else
                                             {
                                                 <div class="btn-group" role="group">
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-secondary"
+                                                            @onclick="@(() => MoveShelfUp(shelf))"
+                                                            disabled="@IsFirstShelf(shelf)"
+                                                            aria-label="Flytt opp">
+                                                        <i class="fas fa-arrow-up"></i>
+                                                    </button>
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-secondary"
+                                                            @onclick="@(() => MoveShelfDown(shelf))"
+                                                            disabled="@IsLastShelf(shelf)"
+                                                            aria-label="Flytt ned">
+                                                        <i class="fas fa-arrow-down"></i>
+                                                    </button>
                                                     <button type="button" class="editButtonStyle btn-sm btn-outline-primary" @onclick="@(() => EnableEdit(shelf))">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
                                                     <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(() => DeleteShelf(shelf))">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
-                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-secondary" title="Dra for å endre rekkefølge">
+                                                    <button type="button" class="editButtonStyle btn-sm btn-outline-secondary drag-handle-desktop" title="Dra for å endre rekkefølge">
                                                         <i class="fas fa-grip-vertical"></i>
                                                     </button>
                                                 </div>
@@ -147,15 +159,20 @@
 
                                         <!-- Available Categories for this shelf -->
                                         <div class="available-categories-per-shelf">
-                                            <small class="text-primary">📋 Tilgjengelige kategorier (dra til hyllen):</small>
+                                            <small class="text-primary">📋 Tilgjengelige kategorier (dra til hyllen eller klikk +):</small>
                                             <div class="local-categories-grid">
                                                 @foreach (var category in GetUnusedCategories())
                                                 {
                                                     <div class="category-item-mini @(category == draggedCategory ? "dragging" : "")" 
                                                          draggable="true" 
                                                          @ondragstart="@(() => HandleCategoryDragStart(category))"
-                                                         title="Dra denne til hyllen ovenfor">
+                                                         title="Dra eller klikk + for å legge til i hyllen">
                                                         <span class="badge badge-outline-primary mini-badge">@category.Name</span>
+                                                        <button type="button" class="btn btn-sm btn-link category-assign-btn p-0 ms-1"
+                                                                @onclick="@(() => AssignCategoryToShelf(category, shelf))"
+                                                                aria-label="Legg @category.Name til i @shelf.Name">
+                                                            <i class="fas fa-plus"></i>
+                                                        </button>
                                                     </div>
                                                 }
                                             </div>
@@ -474,6 +491,59 @@
             Console.WriteLine($"Error saving shop: {ex.Message}");
         }
     }
+
+    private void MoveShelfUp(ShelfModel shelf)
+    {
+        if (CurrentShop?.ShelfsInShop == null) return;
+        var shelfs = CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        var idx = shelfs.IndexOf(shelf);
+        if (idx <= 0) return;
+        shelfs.RemoveAt(idx);
+        shelfs.Insert(idx - 1, shelf);
+        for (int i = 0; i < shelfs.Count; i++) shelfs[i].SortIndex = i + 1;
+        StateHasChanged();
+    }
+
+    private void MoveShelfDown(ShelfModel shelf)
+    {
+        if (CurrentShop?.ShelfsInShop == null) return;
+        var shelfs = CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        var idx = shelfs.IndexOf(shelf);
+        if (idx < 0 || idx >= shelfs.Count - 1) return;
+        shelfs.RemoveAt(idx);
+        shelfs.Insert(idx + 1, shelf);
+        for (int i = 0; i < shelfs.Count; i++) shelfs[i].SortIndex = i + 1;
+        StateHasChanged();
+    }
+
+    private bool IsFirstShelf(ShelfModel shelf)
+    {
+        if (CurrentShop?.ShelfsInShop == null || !CurrentShop.ShelfsInShop.Any()) return false;
+        return CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).First() == shelf;
+    }
+
+    private bool IsLastShelf(ShelfModel shelf)
+    {
+        if (CurrentShop?.ShelfsInShop == null || !CurrentShop.ShelfsInShop.Any()) return false;
+        return CurrentShop.ShelfsInShop.OrderBy(s => s.SortIndex).Last() == shelf;
+    }
+
+    private void AssignCategoryToShelf(ItemCategoryModel category, ShelfModel shelf)
+    {
+        if (shelf.ItemCateogries.Any(c => c.Id == category.Id)) return;
+
+        if (CurrentShop?.ShelfsInShop != null)
+        {
+            foreach (var s in CurrentShop.ShelfsInShop)
+            {
+                var existing = s.ItemCateogries.FirstOrDefault(c => c.Id == category.Id);
+                if (existing != null) s.ItemCateogries.Remove(existing);
+            }
+        }
+
+        shelf.ItemCateogries.Add(category);
+        StateHasChanged();
+    }
 }
 
 <style>
@@ -753,6 +823,32 @@
 
     .editButtonStyle {
         margin-left: 2px;
+    }
+
+    .category-assign-btn {
+        color: #6c757d;
+        font-size: 0.7rem;
+        vertical-align: middle;
+        line-height: 1;
+    }
+
+    .category-assign-btn:hover {
+        color: #28a745;
+    }
+
+    /* Hide drag handle on touch devices; up/down buttons are primary */
+    @@media (pointer: coarse) {
+        .drag-handle-desktop {
+            display: none;
+        }
+
+        .shelf-item {
+            cursor: default;
+        }
+
+        .category-item-mini {
+            cursor: default;
+        }
     }
 
     .parent-horizontal-stack {
