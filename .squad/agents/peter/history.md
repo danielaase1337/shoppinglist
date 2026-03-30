@@ -222,3 +222,92 @@
 - Daniel approves 6 implementation tickets
 - Peter creates GitHub issues from ticket definitions
 - Team begins Sprint 4 implementation (Tickets 1-3 can start immediately after approval)
+
+## 2026-04-03 — Sprint 2 Complete ✅
+
+**Lead:** Scribe (documentation), Peter (verification)
+
+**Scope:** 8 issues (UI/UX polish + testing + data layer foundation)
+
+### Issues Closed (All Verified)
+
+| # | Owner(s) | Component | Status |
+|---|----------|-----------|--------|
+| **#25** | Blair | Frontend | ✅ Toast/Notification System — Custom INotificationService + ToastContainer |
+| **#27** | Blair | Frontend | ✅ Mobile Controls — Up/down buttons replacing drag-drop |
+| **#28** | Blair + Glenn | Frontend + API | ✅ Shop Deletion Safeguards — Dependency check endpoint + 2-step UI |
+| **#31** | Ray + Glenn | Data + API | ✅ LastModified Migration — Admin endpoint, inline migration removed |
+| **#29** | Peter | Architecture | ✅ Meal v1 Scoping — Text history + suggestions, 6 tickets ready |
+| **#32** | Blair | Frontend | ✅ ManageMyShopsPage — Shelf/category management, deletion, stats |
+| **#30** | Blair | Frontend | ✅ i18n Architecture — Resource files + IStringLocalizer pattern |
+| **#33** | Josh | Testing | ✅ API Controller Tests — 122 passing, real methods, no mocks |
+
+### Highlights by Developer
+
+**Blair (Frontend, 5 issues):**
+- **#25 Toast System:** Event-driven service with auto-dismiss (3-5s per type), stacking, mobile-responsive CSS
+- **#27 Mobile Buttons:** Up/down shelf reorder + category `+` assignment button (touch-friendly)
+- **#32 ManageMyShopsPage:** Full implementation with inline shelf editor, category assignment, stats dashboard
+- **#30 i18n Architecture:** Resource files (Norwegian + English template), page-scoped key convention, ShoppingListMainPage proof-of-concept
+
+**Glenn (API Backend, 2 issues):**
+- **#28 API Endpoint:** `GET /api/shop/{id}/dependencies` for cascade safety check
+- **#31 Migration Endpoint:** `GET /api/admin/migrate-lastmodified` with admin role gating, idempotent design
+
+**Ray (Data Layer, 1 issue):**
+- **#31 Data Analysis:** Verified repository interface sufficient for migration; no code changes needed
+
+**Josh (Testing, 1 issue):**
+- **#33 Test Rewrite:** 122 passing tests with real controller instantiation, TestHttpFactory pattern, all error paths
+
+**Peter (Architecture, 1 issue):**
+- **#29 Meal v1 Scope:** Text-based weekly meal planner, frequency suggestions, 6 implementation tickets defined
+
+### Decision Documents Merged
+
+| Doc | Scope | Implementation |
+|-----|-------|-----------------|
+| **D5** | Toast System | INotificationService + ToastContainer (Option A) |
+| **D6** | Mobile Controls | Up/down buttons as primary, drag as enhancement (Option B) |
+| **D10** | Migration | One-time admin endpoint (Option A) |
+| **D18** | Meal v1 | Text history + frequency suggestions (text-based only) |
+| **D19** | i18n | Resource file architecture + IStringLocalizer pattern |
+| **D30** | Shop Dependencies | Dependency check endpoint for safe deletion |
+| **D31-D35** | Sprint 2 | New decisions for all completed features + analysis |
+
+### Metrics
+
+| Metric | Value |
+|--------|-------|
+| Issues Closed | 8 |
+| Story Points | 46 |
+| API Tests | 122 ✅ |
+| Client Tests | 61 ✅ |
+| E2E Tests | 20+ ✅ |
+| Decision Docs | 7 merged (D31-D35 new) |
+| Code Quality | No regressions |
+| Downstream Unblocks | 6 meal planning tickets ready |
+
+### Key Learnings
+
+1. **Test Infrastructure Critical:** Moving from mock-based to real-controller tests caught potential regressions.
+2. **Decision Isolation:** Scoping meal v1 separately prevented architecture creep — v1 launches without recipe CRUD.
+3. **Mobile-First CSS:** Touch detection (`pointer: coarse`) simpler than JS polyfills for UI visibility.
+4. **i18n Early:** Resource file setup upfront saves rework when English needed later.
+5. **Admin Endpoint Pattern:** Extracting lazy migration follows SRP — repeatable for future migrations.
+6. **Data Layer Analysis:** Ray's audit confirmed existing interfaces sufficient; no premature abstraction.
+
+### Downstream Unblocks
+
+- ✅ **Meal Planning v1 Implementation:** 6 tickets ready (1-3 parallel, then 4-5, then 6)
+- ✅ **i18n English Localization:** Resource files ready for translation
+- ✅ **Admin Panel Development:** Migration endpoint pattern established
+- ✅ **Shop Management UI:** Full shop detail page complete + deletion safeguards
+
+### Sprint 3 Prep
+
+- **Meal Planning v1 Implementation:** 6 tickets can begin immediately
+- **Auth Phase 2:** Per-user data isolation (OwnerId → FamilyId scoping)
+- **Performance:** Caching strategies for frequently accessed shops/shelves
+
+**Status:** ✅ COMPLETE — Ready for Daniel review + production deployment

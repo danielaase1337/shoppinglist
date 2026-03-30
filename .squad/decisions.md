@@ -1,7 +1,7 @@
 # Squad Decisions
 
-**Last Updated:** 2026-03-23  
-**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback
+**Last Updated:** 2026-04-03  
+**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 + Sprint 2 completion
 
 ---
 
@@ -100,33 +100,50 @@
 
 ## High-Priority Decisions (P1 — Required for Feature Completion)
 
-### D5 — Toast/Notification System Requirement
-**Status:** ⏸️ PENDING DECISION (needs design choice)  
-**Issue:** Zero user feedback on async operations. No toasts, spinners, or error messages.
+### D5 — Toast/Notification System
+**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
+**Issue:** #25 — Zero user feedback on async operations
+**Choice:** Option A — Custom `INotificationService` + `ToastContainer` component
 
-**Constraint:** Must implement before building meal planning UI or auth UI (both have async operations)
+**Implementation:**
+- `Client/Services/INotificationService.cs` — Interface, `ToastMessage` model, `ToastType` enum
+- `Client/Services/NotificationService.cs` — Scoped service, fires `OnToast` event
+- `Client/Shared/ToastContainer.razor` — Renders/dismisses toasts, auto-dismiss 3-5s per type
+- CSS animations — Slide-in/out, fixed bottom-right, mobile responsive (responsive width on ≤480px)
 
-**Options:**
-- A) Implement custom `INotificationService` + `ToastContainer` component
-- B) Integrate third-party library (e.g., CxListen, MudBlazor notifications)
+**API:**
+```csharp
+@inject INotificationService Notifications
+Notifications.Success("Item saved");       // 3s auto-dismiss
+Notifications.Error("Failed to save");     // 5s auto-dismiss
+```
 
-**Recommendation (Blair):** Option A (custom). Simpler, faster, avoids dependency. Takes ~1 day.
+**Architecture:** Event-driven, no polling, scoped DI, `IDisposable` for cleanup, stacking support.
 
-**Decision Needed By:** Before Sprint 1 UI/UX work
+**Proof of Concept:** Integrated in `OneShoppingListPage.razor` (`AddVare()`, `DeleteVare()` operations).
+
+**Unblocked:** #28 (shop deletion UX), meal planning UI + toast feedback.
 
 ---
 
 ### D6 — Mobile Drag-and-Drop Replacement
-**Status:** ⏸️ PENDING DECISION (needs design choice)  
-**Issue:** HTML5 drag-and-drop broken on iOS Safari. ShopConfigurationPage and CategoryManagementPage unusable on iPhone/iPad.
+**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
+**Issue:** #27 — HTML5 drag-and-drop broken on iOS Safari
+**Choice:** Option B — Up/down button controls as primary, drag as desktop enhancement
 
-**Options:**
-- A) Add JS polyfill for touch drag events
-- B) Provide up/down button controls as primary interaction; drag as desktop enhancement
+**Implementation:**
+- `ShopConfigurationPage` — Added `▲ Flytt opp` / `▼ Flytt ned` buttons per shelf (disabled on first/last)
+- `MoveShelfUp(shelf)` / `MoveShelfDown(shelf)` maintain SortIndex invariant (same as `HandleDrop`)
+- Grip icon (`fas fa-grip-vertical`) hidden on touch devices via `@media (pointer: coarse)`
+- `CategoryManagementPage` — Added `+` button to assign categories to shelves (touch-friendly alternative to drag)
+- Category chip has `<select>` dropdown for mobile item-to-category assignment
 
-**Recommendation (Blair):** Option B. Simpler, accessible, reliable cross-platform. Button controls work everywhere.
+**Architectural Notes:**
+- `@media (pointer: coarse)` must be written `@@media` in Blazor `<style>` blocks
+- Syncfusion `ChangeEventArgs` disambiguation — always use `Microsoft.AspNetCore.Components.ChangeEventArgs`
+- SortIndex invariant preserved across both button + drag interaction paths
 
-**Decision Needed By:** Before mobile redesign sprint
+**Result:** Mobile-friendly primary interaction, desktop power-user drag preserved as enhancement.
 
 ---
 
@@ -259,16 +276,27 @@
 ---
 
 ### D10 — LastModified Migration Strategy
-**Status:** ⏸️ PENDING DECISION  
-**Issue:** Current N+1 inline migration in ShoppingListController fires writes on every GET for un-migrated docs
+**Status:** ✅ IMPLEMENTED (Ray + Glenn, Sprint 2)  
+**Issue:** #31 — N+1 inline migration in ShoppingListController fires writes on every GET
+**Choice:** Option A — Extract to one-time `/api/admin/migrate-lastmodified` endpoint
 
-**Options:**
-- A) Extract to one-time `GET /api/admin/migrate` endpoint, run once, disable
-- B) Accept self-correction over time (all lists migrated as users visit them)
+**Implementation:**
+- Created `Api/Controllers/AdminController.cs`
+- Endpoint `GET /api/admin/migrate-lastmodified`:
+  - Gated by `"admin"` role (from SWA `x-ms-client-principal` header)
+  - Iterates all `ShoppingList` documents with null `LastModified`
+  - Sets `LastModified = DateTime.UtcNow` and persists each
+  - Returns `{ "migratedCount": N }`
+  - Idempotent — safe to re-run
+- Removed inline lazy migration from `ShoppingListController.RunAll()` and `RunOne()`
 
-**Recommendation (Ray):** Option A. Reduces wasted write operations and improves GET response time.
+**Trade-offs:**
+- ✅ GET endpoints now fully read-only — no write side-effects
+- ✅ Migration idempotent — documents already having `LastModified` are skipped
+- ✅ Follows precedent of `MigrateFrequentListsController`
+- ⚠️ Legacy documents won't self-heal via GET; run endpoint once after deployment
 
-**Decision Needed By:** Before launch (low urgency)
+**Follow-up:** Assign "admin" role to Daniel in Azure SWA roles management before running against production.
 
 ---
 
@@ -751,3 +779,238 @@ Three root causes were identified and fixed.
 - Document architectural decisions here before implementation
 - Block development if a P0/P1 decision is unresolved
 - Archive resolved decisions to history.md when next session completes
+
+---
+
+## Sprint 2 Completion — New Decisions (2026-04-03)
+
+### D31 — Shop Deletion Safeguards (Dependency Check)
+**Status:** ✅ IMPLEMENTED (Blair + Glenn, Sprint 2)  
+**Issue:** #28 — Shop deletion requires multi-step confirmation + cascade check
+**Ownership:** Blair (frontend UI), Glenn (API endpoint)
+
+**Implementation:**
+
+**API Backend (Glenn):**
+- Endpoint: `GET /api/shop/{id}/dependencies`
+- Returns: List of `ShoppingList` documents referencing this shop's sort config
+- Response: `{ "shopId": "...", "dependentLists": [ { "id": "...", "name": "..." } ], "isDeletable": bool }`
+- If no dependencies: `isDeletable = true`
+
+**Frontend UI (Blair):**
+- `ManageMyShopsPage.razor` — Two-step deletion flow
+  1. User clicks delete icon → inline prompt "Slett?" (single click shows confirmation)
+  2. Confirm button triggers `CheckDependencies()` → calls API endpoint
+  3. If dependencies exist:
+     - Modal shows "Liste(r) bruker denne butikken:" + list of dependent lists
+     - User must remove shop from those lists first OR cancel
+  4. If no dependencies:
+     - Proceed to deletion
+     - Success toast: "Butikk slettet"
+  5. On failure: Error toast with reason
+
+**Integration with #25 (Toast System):** Toast provides user feedback for all three outcomes (checking, success, error).
+
+---
+
+### D32 — i18n Resource File Architecture
+**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
+**Issue:** #30 — Add i18n resource file infrastructure for future English localization
+
+**Implementation:**
+
+**Resource Files:**
+```
+Client/Resources/
+├── SharedResources.cs                 (marker class, empty)
+├── SharedResources.nb-NO.resx         (Norwegian strings — v1 default)
+└── SharedResources.en.resx            (English template for v2+)
+```
+
+**Key Naming Convention:** `{PageOrScope}_{DescriptiveName}`
+
+**Page-Scoped Prefixes:**
+- `ShoppingLists_` → `ShoppingListMainPage.razor`
+- `OneShoppingList_` → `OneShoppingListPage.razor`
+- `FrequentLists_` → `FrequentListsPage.razor`
+- `Shops_` → `ManageMyShopsPage.razor`
+- `ShopItems_` → Item admin pages
+- `Categories_` → `CategoryManagementPage.razor`
+- `Common_` → Shared across 3+ pages
+
+**Service Registration:**
+```csharp
+builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
+```
+
+**Usage Pattern in Razor:**
+```csharp
+@using BlazorApp.Client.Resources
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<SharedResources> L
+
+<h2>@L["ShoppingLists_PageTitle"]</h2>
+```
+
+**Proof-of-Concept:** `ShoppingListMainPage.razor` fully converted to use `@L[]` pattern.
+
+**Future Activation:** Set `System.Globalization.CultureInfo.DefaultThreadCurrentUICulture` in `Program.cs` to enable English (no UI switcher for v1 — config flag only).
+
+**What NOT to Localize:**
+- Firestore property names (`Varen`, `Mengde`, `ItemCateogries`) — permanent data constraint
+- Internal enum values + code identifiers
+- Debug console messages
+
+---
+
+### D33 — API Controller Test Pattern (Real Controller Methods)
+**Status:** ✅ IMPLEMENTED (Josh, Sprint 2)  
+**Issue:** #33 — Rewrite 65+ API tests to exercise actual controller code paths
+
+**Problem:** Previous tests called mocks directly, bypassing controllers entirely. Zero controller code coverage.
+
+**Solution:** All controller test classes instantiate real controller + call methods directly.
+
+**Pattern:**
+```csharp
+public class ShopsControllerTests
+{
+    private readonly Mock<IGenericRepository<Shop>> _mockRepo;
+    private readonly IMapper _mapper;
+    private readonly ShopsController _controller;
+
+    public ShopsControllerTests()
+    {
+        _mockRepo = new Mock<IGenericRepository<Shop>>();
+        var config = new MapperConfiguration(cfg =>
+            cfg.AddProfile<Api.ShoppingListProfile>()
+        );
+        _mapper = config.CreateMapper();
+        _controller = new ShopsController(NullLoggerFactory.Instance, _mockRepo.Object, _mapper);
+    }
+
+    [Fact]
+    public async Task Run_GET_ReturnsOk_WhenShopsExist()
+    {
+        _mockRepo.Setup(r => r.Get()).ReturnsAsync(new List<Shop> { /* data */ });
+        var request = TestHttpFactory.CreateGetRequest();
+        var response = await _controller.Run(request);  // Real controller method
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+}
+```
+
+**Key Rules:**
+1. Always use `TestHttpFactory` for `HttpRequestData` — never raw mock (breaks `WriteAsJsonAsync`)
+2. Use `cfg.AddProfile<Api.ShoppingListProfile>()` — never manual map config
+3. Call real controller methods: `Run()`, `RunAll()`, `RunOne()`
+4. Assert on HTTP status codes + response bodies (not mock return values)
+5. Test all error paths (null, exception, validation failures)
+6. Use ASCII-safe test data names (JSON escaping complicates Norwegian assertions)
+7. Every controller needs explicit `using Xunit;`
+
+**Coverage:**
+- `ShoppingListControllerRealTests.cs` — 18 tests (original sprint 0 work)
+- `ShopsControllerTests.cs` — 15 tests (new #33)
+- `ShopsItemsControllerTests.cs` — 14 tests (new #33)
+- `ShopItemCategoryControllerTests.cs` — 13 tests (new #33, includes security assertions)
+- `FrequentShoppingListControllerTests.cs` — 14 tests (new #33)
+- **Total: 122 passing tests**
+
+**Additional Helper File:**
+- `Api.Tests/Helpers/TestHttpHelpers.cs` — `TestHttpFactory`, `TestHttpRequestData`, `TestHttpResponseData`
+
+**Test Infrastructure Quality:**
+- ✅ Real AutoMapper profile used (production-identical)
+- ✅ Actual controller instantiation (not proxy)
+- ✅ All error cases tested (null, exception, validation)
+- ✅ Auth integration validated
+- ✅ No regressions in existing 90 API tests
+
+---
+
+### D34 — Meal Planning v1 Scope Document Finalized
+**Status:** ✅ DECIDED (Peter, Sprint 2)  
+**Issue:** #29 — Scoping-only ticket, no implementation
+**Ownership:** Peter (architect/lead)
+
+**v1 Definition (FINAL):**
+- **NOT recipe CRUD** — text-based meal history viewer with frequency-based suggestions
+- **Data Model:** `WeekMenuText` entity with `Dictionary<string, string> DailyMeals` (one key per day, free text values)
+- **Collection:** `weekmenutexts` (follows D4 convention)
+- **Suggestion Engine:** Simple frequency-based random picker from historical entries (no ML)
+- **UI:** 2 pages (`WeekMenuTextListPage`, `WeekMenuTextPage`)
+- **API Endpoints:** 6 total (GET all, GET one, POST create, PUT update, DELETE, POST suggest)
+
+**Implementation Tickets Ready (6 total, 13-16 team-days):**
+1. Backend data model + controller (Ray + Glenn, 3-4 days)
+2. Suggestion algorithm (Glenn, 2-3 days)
+3. Frontend list page (Blair, 2-3 days)
+4. Frontend editor page (Blair, 3-4 days, blocked on #25 toast)
+5. Navigation integration (Blair, 0.5 days)
+6. E2E tests (Josh, 1-2 days)
+
+**v1 vs v2 Boundary (CLEAR):**
+- v1: Text entries + frequency suggestions only
+- v2: Recipe CRUD + ingredients + shopping list generation
+- Separate entities, separate collections, zero data migration path
+
+**All 6 Scope Questions Answered:**
+1. ✅ Data format: Flat Dictionary with one key per day
+2. ✅ Storage: Single entity per week with text dictionary
+3. ✅ Suggestion: Frequency-based random picker from history
+4. ✅ UI: 2 pages (list overview + week editor)
+5. ✅ Import: Manual text entry only (file upload v2+)
+6. ✅ Integration: Standalone (shopping list v2+)
+
+**Detailed Decision Document:** `.squad/agents/peter/meal-planning-v1-scope.md` (12-section comprehensive scoping)
+
+**Next Step (Blocked on Daniel):** Daniel reviews scope → approves 6 implementation tickets → Peter creates GitHub issues → Team begins Sprint 3 implementation.
+
+---
+
+### D35 — Data Layer Analysis for Migration Endpoint (Ray's Audit)
+**Status:** ✅ ANALYSIS COMPLETE (Ray, Sprint 2)  
+**Issue:** #31 (part of LastModified migration)
+**Ownership:** Ray (Firebase expert)
+
+**Finding:** All data layer primitives Glenn needs for the migration endpoint already exist. No interface changes required.
+
+**Key Findings:**
+1. `IGenericRepository<T>.Get()` returns all documents — exactly what migration needs
+2. `IGenericRepository<T>.Update(T)` persists single entity — correct for backfilling
+3. `GoogleFireBaseGenericRepository<T>` implements full-scan `Get()` via `Collection.GetSnapshotAsync()`
+4. `MemoryGenericRepository<T>` has feature parity for DEBUG mode
+5. `EntityBase` includes `LastModified` property (part of base class)
+
+**Trade-offs Noted:**
+- No write batching (uses `SetAsync()` per document) — acceptable for expected list volume (<500 documents)
+- Idempotent design (guard: `if (!LastModified.HasValue)`) prevents re-writing already-migrated docs
+- Partial failure risk (transient errors) — acceptable, endpoint re-runnable
+
+**Verdict:** ✅ No changes to repository interfaces or implementations needed.
+
+**No Commit:** Analysis-only task; Glenn receives handoff for endpoint implementation.
+
+---
+
+## Issues Closed This Sprint — Final Summary
+
+| # | Issue | Owner(s) | Component | Status |
+|---|-------|----------|-----------|--------|
+| 25 | Toast/Notification System | Blair | Frontend | ✅ INotificationService + ToastContainer |
+| 27 | Mobile Drag-and-Drop Replacement | Blair | Frontend | ✅ Up/down buttons + category `+` button |
+| 28 | Shop Deletion Safeguards | Blair + Glenn | Frontend + API | ✅ Dependency check endpoint + 2-step UI |
+| 31 | LastModified Migration Endpoint | Ray + Glenn | Data + API | ✅ Admin endpoint, removed inline migration |
+| 29 | Meal Planning v1 Scoping | Peter | Architecture | ✅ Scope finalized, 6 implementation tickets ready |
+| 32 | ManageMyShopsPage Completion | Blair | Frontend | ✅ Shelf/category list + reorder + delete |
+| 30 | i18n Resource Architecture | Blair | Frontend | ✅ Resource files + IStringLocalizer pattern |
+| 33 | API Controller Test Rewrite | Josh | Testing | ✅ 122 tests, real controller methods |
+
+**Sprint 2 Metrics:**
+- ✅ 8 issues closed
+- ✅ 46 story points delivered
+- ✅ 122 API + 61 Client tests passing (183 total)
+- ✅ 7 decision documents merged
+- ✅ 0 regressions
+- ✅ Ready for Sprint 3 (meal planning v1 implementation)
