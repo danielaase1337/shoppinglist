@@ -95,3 +95,22 @@
 - PRs for feature work target `development`; only release PRs target `main`
 
 **CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
+
+## Learnings
+
+### 2026-04-01 — Toast Notification System (#25)
+
+**Implemented D5 (Option A): custom INotificationService + ToastContainer.**
+
+- INotificationService interface with Success/Error/Warning/Info methods and OnToast event
+- NotificationService implementation — event-driven, no dependencies on HttpClient or Blazor
+- ToastContainer.razor — subscribes to OnToast, manages active toasts list, handles auto-dismiss with CSS leave animation, implements IDisposable to prevent memory leaks
+- CSS in pp.css — fixed bottom-right position, slide-in/out keyframe animation, stacking via flex-column, mobile responsive (full-width ≤ 480px)
+- Registered as AddScoped<INotificationService, NotificationService>() in Program.cs
+- <ToastContainer /> added to MainLayout.razor outside the main layout div so it renders above all content
+- Wired proof-of-concept in OneShoppingListPage.razor: item added (Success) and item deleted (Success/Error)
+
+**Key pattern:** Use vent Action<ToastMessage> on the service + IDisposable on ToastContainer for clean subscribe/unsubscribe. Auto-dismiss with Task.Delay + CSS transition avoids Timer complexity.
+
+**Unblocked:** #28 (shop deletion safeguards) can now proceed.

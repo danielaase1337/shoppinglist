@@ -41,6 +41,7 @@ builder.Services.AddScoped(sp =>
 });
 
 builder.Services.AddSingleton<ISettings, Settings>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IDataCacheService, DataCacheService>();
 builder.Services.AddScoped<IBackgroundPreloadService, BackgroundPreloadService>();
 builder.Services.AddAuthorizationCore(options =>

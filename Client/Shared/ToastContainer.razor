@@ -1,0 +1,99 @@
+@using BlazorApp.Client.Services
+@implements IDisposable
+@inject INotificationService Notifications
+
+@if (_toasts.Count > 0)
+{
+    <div class="toast-container" aria-live="polite" aria-atomic="false">
+        @foreach (var toast in _toasts)
+        {
+            <div class="toast-item toast-@toast.Type.ToString().ToLower() @(toast.IsLeaving ? "toast-leaving" : "")"
+                 role="alert"
+                 @key="toast.Id">
+                <div class="toast-icon">
+                    @switch (toast.Type)
+                    {
+                        case ToastType.Success:
+                            <span>✓</span>
+                            break;
+                        case ToastType.Error:
+                            <span>✕</span>
+                            break;
+                        case ToastType.Warning:
+                            <span>⚠</span>
+                            break;
+                        case ToastType.Info:
+                            <span>ℹ</span>
+                            break;
+                    }
+                </div>
+                <div class="toast-message">@toast.Message</div>
+                <button class="toast-close" @onclick="() => DismissToast(toast.Id)" aria-label="Lukk">×</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private readonly List<ActiveToast> _toasts = new();
+
+    protected override void OnInitialized()
+    {
+        Notifications.OnToast += HandleToast;
+    }
+
+    private void HandleToast(ToastMessage message)
+    {
+        var active = new ActiveToast(message);
+        _toasts.Add(active);
+        InvokeAsync(StateHasChanged);
+
+        // Schedule auto-dismiss
+        _ = AutoDismiss(active);
+    }
+
+    private async Task AutoDismiss(ActiveToast toast)
+    {
+        await Task.Delay(toast.TimeoutMs);
+
+        // Start leave animation
+        toast.IsLeaving = true;
+        await InvokeAsync(StateHasChanged);
+
+        // Wait for CSS transition to complete before removing
+        await Task.Delay(300);
+        DismissToast(toast.Id);
+    }
+
+    private void DismissToast(Guid id)
+    {
+        var toast = _toasts.FirstOrDefault(t => t.Id == id);
+        if (toast != null)
+        {
+            _toasts.Remove(toast);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        Notifications.OnToast -= HandleToast;
+    }
+
+    private class ActiveToast
+    {
+        public Guid Id { get; }
+        public string Message { get; }
+        public ToastType Type { get; }
+        public int TimeoutMs { get; }
+        public bool IsLeaving { get; set; }
+
+        public ActiveToast(ToastMessage msg)
+        {
+            Id = msg.Id;
+            Message = msg.Message;
+            Type = msg.Type;
+            TimeoutMs = msg.TimeoutMs;
+        }
+    }
+}
