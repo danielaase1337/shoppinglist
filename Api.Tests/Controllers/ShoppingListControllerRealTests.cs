@@ -85,18 +85,17 @@ namespace Api.Tests.Controllers
         }
 
         [Fact]
-        public async Task RunAll_GET_MigratesLegacyLists_WhenLastModifiedIsNull()
+        public async Task RunAll_GET_ReturnsOk_WhenListHasNullLastModified()
         {
+            // Migration logic removed (#31) — GET no longer calls Update to backfill LastModified
             var legacyList = new ShoppingList { Id = "old-1", Name = "Legacy List", LastModified = null, ShoppingItems = new List<ShoppingListItem>() };
             _mockRepo.Setup(r => r.Get()).ReturnsAsync(new List<ShoppingList> { legacyList });
-            _mockRepo.Setup(r => r.Update(It.IsAny<ShoppingList>())).ReturnsAsync((ShoppingList sl) => sl);
 
             var request = TestHttpFactory.CreateGetRequest();
             var response = await _controller.RunAll(request);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            // Migration should have called Update for the list without LastModified
-            _mockRepo.Verify(r => r.Update(It.Is<ShoppingList>(sl => sl.Id == "old-1" && sl.LastModified.HasValue)), Times.Once);
+            _mockRepo.Verify(r => r.Update(It.IsAny<ShoppingList>()), Times.Never);
         }
 
         [Fact]
@@ -232,18 +231,17 @@ namespace Api.Tests.Controllers
         }
 
         [Fact]
-        public async Task RunOne_GET_MigratesLastModified_WhenListIsLegacy()
+        public async Task RunOne_GET_DoesNotMigrateLastModified_WhenListIsLegacy()
         {
+            // Migration logic removed (#31) — GET no longer calls Update to backfill LastModified
             var legacy = new ShoppingList { Id = "leg-1", Name = "Old", LastModified = null, ShoppingItems = new List<ShoppingListItem>() };
-            var migrated = new ShoppingList { Id = "leg-1", Name = "Old", LastModified = DateTime.UtcNow, ShoppingItems = new List<ShoppingListItem>() };
             _mockRepo.Setup(r => r.Get("leg-1")).ReturnsAsync(legacy);
-            _mockRepo.Setup(r => r.Update(It.IsAny<ShoppingList>())).ReturnsAsync(migrated);
 
             var request = TestHttpFactory.CreateGetRequest("http://localhost/api/shoppinglist/leg-1");
             var response = await _controller.RunOne(request, "leg-1");
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            _mockRepo.Verify(r => r.Update(It.Is<ShoppingList>(sl => sl.Id == "leg-1" && sl.LastModified.HasValue)), Times.Once);
+            _mockRepo.Verify(r => r.Update(It.IsAny<ShoppingList>()), Times.Never);
         }
 
         // ─── RunOne DELETE ───────────────────────────────────────────────────────────

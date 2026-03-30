@@ -1,240 +1,235 @@
-using Api.Controllers;
+﻿using Api.Controllers;
+using Api.Tests.Helpers;
 using AutoMapper;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
+using System.Net;
+using System.Text.Json;
 using Xunit;
 
 namespace Api.Tests.Controllers
 {
+    /// <summary>
+    /// Real controller tests — instantiate actual ShopsController with mocked dependencies
+    /// and call controller methods directly. Established as Issue #33 fix.
+    /// </summary>
     public class ShopsControllerTests
     {
-        private readonly Mock<IGenericRepository<Shop>> _mockRepository;
-        private readonly ILoggerFactory _loggerFactory;
+        private readonly Mock<IGenericRepository<Shop>> _mockRepo;
+        private readonly Mock<IGenericRepository<ShoppingList>> _mockShoppingListRepo;
         private readonly IMapper _mapper;
         private readonly ShopsController _controller;
 
         public ShopsControllerTests()
         {
-            _mockRepository = new Mock<IGenericRepository<Shop>>();
-            _loggerFactory = NullLoggerFactory.Instance;
+            _mockRepo = new Mock<IGenericRepository<Shop>>();
+            _mockShoppingListRepo = new Mock<IGenericRepository<ShoppingList>>();
 
-            // Setup AutoMapper with the same profile as the API
             var config = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<Shop, ShopModel>().ReverseMap();
-                cfg.CreateMap<Shelf, ShelfModel>().ReverseMap();
-                cfg.CreateMap<ItemCategory, ItemCategoryModel>().ReverseMap();
+                cfg.AddProfile<Api.ShoppingListProfile>();
             });
             _mapper = config.CreateMapper();
-
-            _controller = new ShopsController(_loggerFactory, _mockRepository.Object, _mapper);
+            _controller = new ShopsController(NullLoggerFactory.Instance, _mockRepo.Object, _mockShoppingListRepo.Object, _mapper);
         }
 
+        // --- Run GET ----------------------------------------------------------------
+
         [Fact]
-        public async Task Repository_Get_ReturnsAllShops_WhenShopsExist()
+        public async Task Run_GET_ReturnsOk_WhenShopsExist()
         {
-            // Arrange
             var shops = new List<Shop>
             {
                 new Shop { Id = "1", Name = "Rema 1000", ShelfsInShop = new List<Shelf>() },
                 new Shop { Id = "2", Name = "ICA Maxi", ShelfsInShop = new List<Shelf>() }
             };
+            _mockRepo.Setup(r => r.Get()).ReturnsAsync(shops);
 
-            _mockRepository.Setup(r => r.Get()).ReturnsAsync(shops);
+            var request = TestHttpFactory.CreateGetRequest();
+            var response = await _controller.Run(request);
 
-            // Act
-            var result = await _mockRepository.Object.Get();
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(2, result.Count);
-            Assert.Contains(result, s => s.Name == "Rema 1000");
-            Assert.Contains(result, s => s.Name == "ICA Maxi");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Rema 1000", body);
+            Assert.Contains("ICA Maxi", body);
         }
 
         [Fact]
-        public async Task Repository_Get_ReturnsEmptyList_WhenNoShopsExist()
+        public async Task Run_GET_ReturnsOkWithEmptyArray_WhenNoShopsExist()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Get()).ReturnsAsync(new List<Shop>());
+            _mockRepo.Setup(r => r.Get()).ReturnsAsync(new List<Shop>());
 
-            // Act
-            var result = await _mockRepository.Object.Get();
+            var request = TestHttpFactory.CreateGetRequest();
+            var response = await _controller.Run(request);
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Equal("[]", body.Trim());
         }
 
         [Fact]
-        public async Task Repository_Insert_CreatesNewShop_WhenValidShopProvided()
+        public async Task Run_GET_Returns500_WhenRepositoryReturnsNull()
         {
-            // Arrange
-            var newShop = new Shop 
-            { 
-                Id = "3", 
-                Name = "Kiwi", 
-                ShelfsInShop = new List<Shelf>() 
-            };
+            _mockRepo.Setup(r => r.Get()).ReturnsAsync((List<Shop>?)null!);
 
-            _mockRepository.Setup(r => r.Insert(It.IsAny<Shop>())).ReturnsAsync(newShop);
+            var request = TestHttpFactory.CreateGetRequest();
+            var response = await _controller.Run(request);
 
-            // Act
-            var result = await _mockRepository.Object.Insert(newShop);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Kiwi", result.Name);
-            Assert.Equal("3", result.Id);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
 
         [Fact]
-        public async Task Repository_Update_UpdatesExistingShop_WhenValidShopProvided()
+        public async Task Run_GET_Returns500_WhenRepositoryThrows()
         {
-            // Arrange
-            var updatedShop = new Shop 
-            { 
-                Id = "1", 
-                Name = "Rema 1000 - Updated", 
-                ShelfsInShop = new List<Shelf>() 
-            };
+            _mockRepo.Setup(r => r.Get()).ThrowsAsync(new Exception("Firestore unavailable"));
 
-            _mockRepository.Setup(r => r.Update(It.IsAny<Shop>())).ReturnsAsync(updatedShop);
+            var request = TestHttpFactory.CreateGetRequest();
+            var response = await _controller.Run(request);
 
-            // Act
-            var result = await _mockRepository.Object.Update(updatedShop);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Rema 1000 - Updated", result.Name);
+        // --- Run POST ---------------------------------------------------------------
+
+        [Fact]
+        public async Task Run_POST_ReturnsOk_WhenValidShopProvided()
+        {
+            var shopModel = new ShopModel { Id = "3", Name = "Kiwi", ShelfsInShop = new List<ShelfModel>() };
+            var inserted = new Shop { Id = "3", Name = "Kiwi", ShelfsInShop = new List<Shelf>() };
+            _mockRepo.Setup(r => r.Insert(It.IsAny<Shop>())).ReturnsAsync(inserted);
+
+            var request = TestHttpFactory.CreatePostRequest(JsonSerializer.Serialize(shopModel));
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Kiwi", body);
         }
 
         [Fact]
-        public async Task Repository_GetById_ReturnsShop_WhenShopExists()
+        public async Task Run_POST_Returns500_WhenNullBody()
         {
-            // Arrange
+            var request = TestHttpFactory.CreatePostRequest("null");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Run_POST_Returns500_WhenInsertFails()
+        {
+            var shopModel = new ShopModel { Id = "fail", Name = "Fail Shop", ShelfsInShop = new List<ShelfModel>() };
+            _mockRepo.Setup(r => r.Insert(It.IsAny<Shop>())).ReturnsAsync((Shop?)null!);
+
+            var request = TestHttpFactory.CreatePostRequest(JsonSerializer.Serialize(shopModel));
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // --- Run PUT ----------------------------------------------------------------
+
+        [Fact]
+        public async Task Run_PUT_ReturnsOk_WhenValidShopProvided()
+        {
+            var shopModel = new ShopModel { Id = "1", Name = "Rema 1000 Updated", ShelfsInShop = new List<ShelfModel>() };
+            var updated = new Shop { Id = "1", Name = "Rema 1000 Updated", ShelfsInShop = new List<Shelf>() };
+            _mockRepo.Setup(r => r.Update(It.IsAny<Shop>())).ReturnsAsync(updated);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(shopModel));
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Rema 1000 Updated", body);
+        }
+
+        [Fact]
+        public async Task Run_PUT_Returns500_WhenNullBody()
+        {
+            var request = TestHttpFactory.CreatePutRequest("null");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Run_PUT_Returns500_WhenUpdateFails()
+        {
+            var shopModel = new ShopModel { Id = "1", Name = "Updated", ShelfsInShop = new List<ShelfModel>() };
+            _mockRepo.Setup(r => r.Update(It.IsAny<Shop>())).ReturnsAsync((Shop?)null!);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(shopModel));
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // --- RunOne GET -------------------------------------------------------------
+
+        [Fact]
+        public async Task RunOne_GET_ReturnsOk_WhenShopExists()
+        {
             var shop = new Shop { Id = "1", Name = "Rema 1000", ShelfsInShop = new List<Shelf>() };
-            _mockRepository.Setup(r => r.Get(1)).ReturnsAsync(shop);
+            _mockRepo.Setup(r => r.Get("1")).ReturnsAsync(shop);
 
-            // Act
-            var result = await _mockRepository.Object.Get(1);
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/shop/1");
+            var response = await _controller.RunOne(request, "1");
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Rema 1000", result.Name);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Rema 1000", body);
         }
 
         [Fact]
-        public async Task Repository_GetById_ReturnsNull_WhenShopNotFound()
+        public async Task RunOne_GET_Returns500_WhenShopNotFound()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Get(999)).ReturnsAsync((Shop?)null);
+            _mockRepo.Setup(r => r.Get("999")).ReturnsAsync((Shop?)null!);
 
-            // Act
-            var result = await _mockRepository.Object.Get(999);
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/shop/999");
+            var response = await _controller.RunOne(request, "999");
 
-            // Assert
-            Assert.Null(result);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // --- RunOne DELETE ----------------------------------------------------------
+
+        [Fact]
+        public async Task RunOne_DELETE_ReturnsNoContent_WhenDeleteSucceeds()
+        {
+            _mockRepo.Setup(r => r.Delete("1")).ReturnsAsync(true);
+
+            var request = TestHttpFactory.CreateDeleteRequest("http://localhost/api/shop/1");
+            var response = await _controller.RunOne(request, "1");
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
 
         [Fact]
-        public async Task Repository_Delete_ReturnsTrue_WhenShopDeletedSuccessfully()
+        public async Task RunOne_DELETE_Returns500_WhenDeleteFails()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Delete(1)).ReturnsAsync(true);
+            _mockRepo.Setup(r => r.Delete("999")).ReturnsAsync(false);
 
-            // Act
-            var result = await _mockRepository.Object.Delete(1);
+            var request = TestHttpFactory.CreateDeleteRequest("http://localhost/api/shop/999");
+            var response = await _controller.RunOne(request, "999");
 
-            // Assert
-            Assert.True(result);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
 
-        [Fact]
-        public async Task Repository_Delete_ReturnsFalse_WhenShopDeletionFails()
-        {
-            // Arrange
-            _mockRepository.Setup(r => r.Delete(1)).ReturnsAsync(false);
-
-            // Act
-            var result = await _mockRepository.Object.Delete(1);
-
-            // Assert
-            Assert.False(result);
-        }
+        // --- Exception handling -----------------------------------------------------
 
         [Fact]
-        public void AutoMapper_MapsShopToShopModel_Correctly()
+        public async Task RunOne_GET_Returns500_WhenRepositoryThrows()
         {
-            // Arrange
-            var shop = new Shop 
-            { 
-                Id = "1", 
-                Name = "Test Shop", 
-                ShelfsInShop = new List<Shelf>
-                {
-                    new Shelf 
-                    { 
-                        Id = "shelf-1", 
-                        Name = "Test Shelf", 
-                        SortIndex = 1,
-                        ItemCateogries = new List<ItemCategory>
-                        {
-                            new ItemCategory { Id = "cat-1", Name = "Test Category" }
-                        }
-                    }
-                }
-            };
+            _mockRepo.Setup(r => r.Get(It.IsAny<object>())).ThrowsAsync(new Exception("Timeout"));
 
-            // Act
-            var shopModel = _mapper.Map<ShopModel>(shop);
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/shop/1");
+            var response = await _controller.RunOne(request, "1");
 
-            // Assert
-            Assert.NotNull(shopModel);
-            Assert.Equal("Test Shop", shopModel.Name);
-            Assert.Equal("1", shopModel.Id);
-            Assert.NotNull(shopModel.ShelfsInShop);
-            Assert.Single(shopModel.ShelfsInShop);
-            Assert.Equal("Test Shelf", shopModel.ShelfsInShop.First().Name);
-        }
-
-        [Fact]
-        public void AutoMapper_MapsShopModelToShop_Correctly()
-        {
-            // Arrange
-            var shopModel = new ShopModel 
-            { 
-                Id = "1", 
-                Name = "Test Shop", 
-                ShelfsInShop = new List<ShelfModel>
-                {
-                    new ShelfModel 
-                    { 
-                        Id = "shelf-1", 
-                        Name = "Test Shelf", 
-                        SortIndex = 1,
-                        ItemCateogries = new List<ItemCategoryModel>
-                        {
-                            new ItemCategoryModel { Id = "cat-1", Name = "Test Category" }
-                        }
-                    }
-                }
-            };
-
-            // Act
-            var shop = _mapper.Map<Shop>(shopModel);
-
-            // Assert
-            Assert.NotNull(shop);
-            Assert.Equal("Test Shop", shop.Name);
-            Assert.Equal("1", shop.Id);
-            Assert.NotNull(shop.ShelfsInShop);
-            Assert.Single(shop.ShelfsInShop);
-            Assert.Equal("Test Shelf", shop.ShelfsInShop.First().Name);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
     }
 }
