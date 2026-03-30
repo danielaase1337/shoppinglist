@@ -351,7 +351,10 @@
 | D22: Auth UI Pattern | ✅ Implemented | Blair | 2026-03-28 ✅ |
 | D23: API Auth Parsing | ✅ Implemented | Glenn | 2026-03-28 ✅ |
 | D24: Auth Testing | ✅ Implemented | Josh | 2026-03-28 ✅ |
-| D25: SWA `{request.path}` scope | ✅ Implemented | Blair | 2026-03-28 ✅ |
+| D26: Auth FallbackPolicy | ✅ Implemented | Blair | Sprint 4 (Auth) ✅ (2026-03-30) |
+| D27: SWA Post-Login Redirect | ✅ Implemented | Blair | Sprint 4 (Auth) ✅ (2026-03-28) |
+| D28: Landing Page | ✅ Implemented | Peter | Sprint 4 (Auth) ✅ (2026-03-29) |
+| D29: Branching Strategy Directive | ✅ Implemented | Daniel | N/A ✅ (2026-03-29) |
 
 ---
 
@@ -446,6 +449,69 @@
 **Implementation:**
 - `Client/wwwroot/staticwebapp.config.json` — 401 `responseOverrides` entry corrected
 - Unblocks auth flow — users now land on `/` after AAD login, then navigate to destination
+
+### D26 — Auth FallbackPolicy — All Blazor Routes Require Auth by Default (NEW)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-30)  
+**Component:** Blazor DI auth framework
+
+**Decision:**
+`AddAuthorizationCore` in `Client/Program.cs` now sets:
+```csharp
+options.FallbackPolicy = options.DefaultPolicy;
+```
+
+**Consequence:**
+- **All Blazor routes require authentication by default.** No `@attribute [Authorize]` needed on individual pages.
+- **Public pages must explicitly opt out** with `@attribute [AllowAnonymous]` (e.g., `/welcome` landing page).
+- No `/welcome` Blazor page currently exists — if one is added, it must carry `[AllowAnonymous]` to remain accessible pre-login.
+
+**Rationale:**
+Without a fallback policy, unauthenticated users could reach protected pages in local dev (where `/.auth/me` is unavailable) because no page had `@attribute [Authorize]` and there was no framework-level gate. This change enforces auth at the DI/framework level — consistent, zero-drift, no per-page annotation required.
+
+**Files Changed:**
+- `Client/Program.cs` — Added `FallbackPolicy = DefaultPolicy`
+
+**Test Status:** ✅ Auth flow properly gates unauthenticated users in local dev
+
+---
+
+### D27 — SWA Post-Login Redirect Handling (NEW)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
+**Issue:** The `{request.path}` template variable only works in `routes` entries, not `responseOverrides`.
+
+**Decision:** Use plain `/.auth/login/aad` for the 401 `responseOverrides` redirect. Do NOT append `?post_login_redirect_uri={request.path}`.
+
+**Reason:** The `{request.path}` template variable is only substituted by Azure Static Web Apps inside `routes` entries. In `responseOverrides`, it is passed through literally, causing post-login redirects to a path Blazor cannot route — resulting in a NotFound (404) page after AAD login.
+
+SWA's built-in authentication handles the post-login redirect automatically when no `post_login_redirect_uri` is specified, landing the user on `/`.
+
+**Applies to:** `Client/wwwroot/staticwebapp.config.json`
+
+---
+
+### D28 — Landing Page for Signed-Out Users (CONTEXT)
+**Status:** ✅ IMPLEMENTED (Peter, 2026-03-29)  
+**Component:** `/welcome` Blazor page + SWA config
+
+**Context:** When a user signs out of the Handleliste app, they need somewhere to land that isn't just a raw AAD login prompt.
+
+**Implementation:**
+- `Client/Pages/Landing.razor` — `/welcome` route with `[AllowAnonymous]` attribute
+- `Client/Shared/LandingLayout.razor` — Minimal layout (no nav, no BackgroundPreloadService)
+- `Client/wwwroot/css/app.css` — Added `.landing-*` CSS styling
+- `Client/wwwroot/staticwebapp.config.json` — Added `/welcome` → `anonymous` route, changed 401 redirect to `/welcome`
+- `Client/Shared/LoginDisplay.razor` — Changed `post_logout_redirect_uri` to `/welcome`
+- `Client/_Imports.razor` — Added `@using Microsoft.AspNetCore.Authorization` for `[AllowAnonymous]` attribute
+
+**Consequence:** Works seamlessly with D26 (auth fallback policy).
+
+---
+
+### D29 — User Directive: Branching Strategy (CONTEXT)
+**Status:** ✅ IMPLEMENTED (Daniel Aase, 2026-03-29)  
+**Directive:** All feature work must be done on a feature branch cut from `development`. Never commit feature work directly to `main` or `development`. Always branch from `development`, not `main`.
+
+**Reason:** User request — branching strategy enforcement for team memory
 
 ---
 

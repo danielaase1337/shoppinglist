@@ -43,7 +43,10 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddSingleton<ISettings, Settings>();
 builder.Services.AddScoped<IDataCacheService, DataCacheService>();
 builder.Services.AddScoped<IBackgroundPreloadService, BackgroundPreloadService>();
-builder.Services.AddAuthorizationCore();
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
 builder.Services.AddSyncfusionBlazor();
