@@ -51,24 +51,6 @@ namespace Api.Controllers
                         return response;
                     }
                     
-                    // Migration: Set LastModified for existing lists without timestamp
-                    bool hasUpdates = false;
-                    foreach (var list in result)
-                    {
-                        if (!list.LastModified.HasValue)
-                        {
-                            list.LastModified = DateTime.UtcNow;
-                            await repo.Update(list);
-                            hasUpdates = true;
-                            _logger.LogInformation($"Migrated LastModified for list: {list.Name}");
-                        }
-                    }
-                    
-                    if (hasUpdates)
-                    {
-                        _logger.LogInformation("✅ Migration completed: Added LastModified to existing lists");
-                    }
-                    
                     var shoppingListModel = mapper.Map<ShoppingListModel[]>(result);
                     await response.WriteAsJsonAsync(shoppingListModel);
                     return response;
@@ -133,14 +115,6 @@ namespace Api.Controllers
                     _logger.LogInformation($"Could not find the list with id {id}");
                     var res = req.CreateResponse(HttpStatusCode.InternalServerError);
                     return res;
-                }
-                
-                // Migration: Set LastModified for existing list without timestamp
-                if (!result.LastModified.HasValue)
-                {
-                    result.LastModified = DateTime.UtcNow;
-                    await repo.Update(result);
-                    _logger.LogInformation($"Migrated LastModified for list: {result.Name}");
                 }
                 
                 var shoppingListModel = mapper.Map<ShoppingListModel>(result);

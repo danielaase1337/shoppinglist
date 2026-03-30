@@ -57,3 +57,11 @@
 - **Key architectural decision**: v1 = family app (D2). Auth is parsed everywhere but NOT enforced as a gate on reads. Write enforcement deferred to future sprint. Principal available for logging and v2 FamilyId path.
 - **Auth type**: Microsoft provider only (D14). SWA injects header automatically — zero JWT library dependencies.
 - **99 API tests passing** post-change.
+
+### Issue #31 — LastModified Migration Endpoint — sprint/2
+
+- **D10 resolved**: Extracted inline lazy migration from `ShoppingListController` (both `RunAll` GET and `RunOne` GET) into a new one-time `GET /api/admin/migrate-lastmodified` endpoint in `Api/Controllers/AdminController.cs`.
+- **Auth gate**: Endpoint checks `"admin"` role in SWA-injected `x-ms-client-principal` via `GetCurrentUser(req)`. Returns `403 Forbidden` if role is absent. Uses `AuthorizationLevel.Function` as an additional layer.
+- **Response shape**: `{ "migratedCount": N }` — consistent with `MigrateFrequentListsController` pattern.
+- **GET endpoints are now read-only**: `ShoppingListController.RunAll` and `RunOne` no longer perform any writes on GET. Eliminates N+1 write pattern.
+- **No new DI registrations needed**: `IGenericRepository<ShoppingList>` was already registered in both debug and production blocks in `Program.cs`.

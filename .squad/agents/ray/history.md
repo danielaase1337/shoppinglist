@@ -8,6 +8,14 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-03-28 — Issue #31: LastModified Migration Data Layer Analysis ✅ COMPLETE
+- `IGenericRepository<T>.Get()` (no args) performs a full Firestore collection scan via `GetSnapshotAsync()` — no pagination. This is sufficient for the migration endpoint; no new interface method is needed.
+- `GoogleFireBaseGenericRepository.Update()` uses `SetAsync(entity)` — full document overwrite, one write per call, no batching. Acceptable for this project's scale (personal/family lists). True Firestore `WriteBatch` would require bypassing `IGenericRepository` entirely.
+- `MemoryGenericRepository` is in full parity: `Get()` returns all items, `Update()` replaces by ID. Migration works identically in DEBUG mode.
+- Inline migration in `ShoppingListController` lives in **two places**: `RunAll` (GET /api/shoppinglists, lines ~54–70) and `RunOne` (GET /api/shoppinglist/{id}, lines ~138–144). Glenn removes both blocks after migration endpoint is deployed.
+- Migration endpoint must be **idempotent** (`if (!LastModified.HasValue)` guard) and **partial-failure tolerant** (re-runnable; returns migrated/skipped counts).
+- No code changes made to repositories — analysis only. No commit from Ray on this issue.
 - Dual-model pattern is mandatory: `Shared/FireStoreDataModels/` (with `[FirestoreData]`/`[FirestoreProperty]`) and `Shared/HandlelisteModels/` (DTOs).
 - Norwegian property names (`Varen`, `Mengde`, `ItemCateogries`) preserved for Firestore backward compatibility — do not rename.
 - Every entity inherits `EntityBase` which includes `LastModified` (DateTime?) with `[FirestoreProperty]`.
