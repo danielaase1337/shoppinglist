@@ -379,6 +379,124 @@
 
 ---
 
+## Sprint Closure — Auth Chain Verification (2026-03-30)
+
+**Lead:** Peter (General-Purpose Agent)  
+**Request:** Daniel Aase — Close GitHub issues completed by auth work  
+**Result:** ✅ All three auth chain issues (#22, #23, #24) verified as shipped and closed
+
+### Closed Issues
+
+#### ✅ #22 — Auth: Configure staticwebapp.config.json for Microsoft provider only
+**Status:** CLOSED  
+**Completed:** 2026-03-28  
+**Commit:** b2e32fe  
+
+**What was shipped:**
+- `Client/wwwroot/staticwebapp.config.json` — Microsoft (AAD) provider configured
+  - All routes protected by `"authenticated"` role (except static assets, `/api/*`, auth endpoints)
+  - 401 responses redirect to `/welcome` (landing page for signed-out users)
+  - Static resources (/_framework/*, /css/*, /js/*, /img/*, etc.) remain public
+  - SPA fallback routing preserved for Blazor navigation
+- `/api/*` intentionally left anonymous — per D2 v1 scope, no per-user enforcement yet
+- `Api/local.settings.example.json` — Added `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` placeholders
+
+---
+
+#### ✅ #23 — Auth: Parse x-ms-client-principal header in ControllerBase
+**Status:** CLOSED  
+**Completed:** 2026-03-28  
+**Commit:** 0c91d2e  
+
+**What was shipped:**
+- `Api/Auth/ClientPrincipal.cs` — Parses `x-ms-client-principal` header (base64-encoded JSON)
+  - Safe: handles null/malformed headers, never throws
+  - Exposes `IdentityProvider`, `UserId`, `UserDetails`, `UserRoles` properties
+  - `IsAuthenticated` property checks for `"authenticated"` role membership
+  
+- `Api/Auth/AuthExtensions.cs` — HttpRequest extension helpers
+  - `GetClientPrincipal()` — parses and returns principal
+  - `IsAuthenticated()` — shorthand auth status check
+  - `GetUserId()`, `GetUserName()` — user detail accessors
+  
+- `Api/Controllers/ControllerBase.cs` — Protected helper methods
+  - `GetCurrentUser(req)` — returns `ClientPrincipal` or null
+  - `GetCurrentUserId(req)`, `GetCurrentUserName(req)` — shorthand accessors
+  
+- `Api.Tests/Helpers/AuthTestHelpers.cs` — Test fixtures
+  - `CreateAuthenticatedRequest()` — builds mock request with x-ms-client-principal
+  - `CreateUnauthenticatedRequest()` — request without header
+  - `CreateRequestWithRoles()` — request with custom role list
+
+**Per D2 (v1 scope):** API reads principal for logging; future v2 will enforce per-user data access via FamilyId.
+
+---
+
+#### ✅ #24 — Auth: LoginPage.razor + AuthorizeRouteView in App.razor
+**Status:** CLOSED  
+**Completed:** 2026-03-28 (UI committed), 2026-03-30 (auth policy refined)  
+**Commits:** 40ecc0f, 5984891  
+
+**What was shipped:**
+- `App.razor` — AuthorizeRouteView with fallback
+  - Wraps all routes with `<AuthorizeRouteView>`
+  - `<NotAuthorized>` block: Login prompt card with "Logg inn med Microsoft" link
+  - Authenticated users see `MainLayout`; unauthenticated see NotAuthorized UI
+  
+- `Client/Auth/SwaAuthenticationStateProvider.cs` — Implements `AuthenticationStateProvider`
+  - Reads `/.auth/me` endpoint (SWA built-in auth metadata)
+  - Constructs `ClaimsPrincipal` with Name, NameIdentifier, Role claims
+  - Gracefully returns unauthenticated principal on error (no exception leaks)
+  
+- `Client/Shared/LoginDisplay.razor` — Authenticated user display in nav
+  - Shows user name (from `UserDetails`)
+  - Logout link redirects to `/welcome` before calling SWA logout
+  - Integrated into nav-auth slot in `NewNavComponent.razor`
+  
+- `Client/Program.cs` — Auth registration
+  - `AddAuthorizationCore(options => options.FallbackPolicy = options.DefaultPolicy)` — **all routes require auth by default**
+  - `AddCascadingAuthenticationState()` — auth state cascade to child components
+  - `SwaAuthenticationStateProvider` scoped registration
+  
+- `_Imports.razor` — Added `@using Microsoft.AspNetCore.Authorization` directive
+
+**Auth fallback policy refinement (2026-03-30, commit 5984891):**
+- Set `FallbackPolicy = DefaultPolicy` so all routes require authentication by default
+- Public pages must use `[AllowAnonymous]` attribute explicitly
+- Enables `/welcome` landing page for signed-out users (exempted in SWA config)
+
+---
+
+### Open Backlog (Deferred to Sprint 3+)
+
+**#25–#33:** Feature issues remain open (not auth work, require separate implementation sprints)
+- #25 (toast system) — Not verified as shipped
+- #26 (nav accessibility) — Marked complete in history (D7), but not verified in this session
+- #27 (mobile drag) — Not verified
+- #28 (shop deletion) — Depends on #25 (toast), not verified
+- #29 (meal scoping) — Scoping issue, no implementation shipped
+- #30 (i18n architecture) — Not verified
+- #31 (LastModified migration) — Not verified
+- #32 (ManageMyShopsPage) — Not verified
+- #33 (controller test rewrite) — Not verified
+
+---
+
+### Unblocking Status
+
+**Auth chain complete ✅**
+- #22 → #23 → #24 all verified done
+- Downstream features now unblocked:
+  - **#25** (toast system) — can now integrate with auth-required pages
+  - **#26** (nav accessibility) — can now add meal planning nav entries
+  - **#28** (shop deletion) — depends on #25, can proceed once toast ready
+
+**Blocking dependencies remain:**
+- #29 (meal scoping) — must be completed before meal implementation (#30+)
+- #18 + #19 (CI tests) — should be completed before #33 (test rewrite)
+
+---
+
 ### D22 — Auth UI Implementation Pattern
 **Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
 **Component:** Blazor auth state provider + login UI
