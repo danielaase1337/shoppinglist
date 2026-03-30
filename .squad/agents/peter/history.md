@@ -4,50 +4,42 @@
 - **Project:** Shoppinglist — Blazor WebAssembly shopping list app with shop-specific item sorting
 - **Stack:** Blazor WebAssembly (.NET 9), Azure Functions v4, Google Cloud Firestore, Syncfusion UI, Playwright E2E tests
 - **Created:** 2026-03-22
+- **Status:** Sprint 2 complete (8 issues, 122 tests passing)
 
-## Learnings
+## Core Context — Learnings & Decisions (Archived)
 
-<!-- Append new learnings below. Each entry is something lasting about the project. -->
-- App uses a dual-model pattern: `FireStoreDataModels` (with Firestore attributes) and `HandlelisteModels` (DTOs). AutoMapper with `.ReverseMap()` bridges them.
-- Core shop-specific sorting runs client-side in `OneShoppingListPage.razor` via `SortShoppingList()`.
-- Norwegian property names (`Varen`, `Mengde`, `ItemCateogries`) must be preserved — backward compatibility with Firestore data.
-- Current goals: add authentication/security and improve performance.
-- Auth provider changed to Microsoft-only — GitHub dropped per Daniel (2026-03-23)
-- Family sharing model clarified: v2 uses FamilyId group ownership, NOT individual OwnerId scoping
-- Meal planning v1 is text-history based suggestion engine, NOT recipe CRUD — separate scoping issue required
-- i18n: Norwegian UI is intentional for v1; add resource file architecture for future English localization
-- Norwegian Firestore property names (Varen, Mengde, ItemCateogries) are permanent data constraints
-- Shop deletion requires safeguard UX (multi-step confirm + dependency check)
-- ManageMyShopsPage (D11): decision is to COMPLETE the page, not remove it
-- Sprint 0 (P0 bugs) successfully completed: 6 merged PRs (#34-#38) closed issues #16-#21 (2026-03-23)
-- **REGRESSION FOUND (2026-03-23):** Frequent lists invisible due to collection key fix NOT merged to main. PR #35 has fix, but `main` branch still uses hardcoded switch defaulting FrequentShoppingList to `misc` collection. Fix committed in bb35ee2 but not cherry-picked to production branch.
+**See `.squad/decisions.md` for full decision history (D1–D35).** This section summarizes core learnings through Sprint 2.
 
-### 2026-03-27 — Regression Fixes Complete ✅
-- **D7 (Admin Nav Accessibility):** ✅ IMPLEMENTED by Blair. Converted CSS `:hover`-only dropdown to Blazor `@onclick` toggle with `_adminOpen` state. Added ARIA attributes. Updated app.css to support both hover and click-toggle. Frequent lists now accessible on mobile.
-- **D4 (Collection Key Convention):** ✅ IMPLEMENTED by Ray. Replaced hardcoded switch in `GoogleDbContext.GetCollectionKey()` with convention: `typeof(T).Name.ToLower() + "s"`. Two backward-compat overrides: `Shop → shopcollection` (legacy), `ItemCategory → itemcategories` (irregular plural). Created `POST /api/admin/migrate-frequent-lists` endpoint for one-time data recovery from "misc" collection. Migration must run before D4 merge to main.
-- **D9 (MealIngredient DI):** ✅ RE-APPLIED by Ray. Removed orphaned `IGenericRepository<MealIngredient>` DI registration (was marked complete 2026-03-23 but not actually applied). Now correctly implements D3 (embedding strategy).
-- **Verification:** All tests passing (90 API + 61 Client). No regressions introduced.
+### Fundamental Architecture
+- Dual-model pattern: `FireStoreDataModels` (Firestore-attributed) + `HandlelisteModels` (DTOs), bridged by AutoMapper + `.ReverseMap()`
+- Shop-specific sorting: client-side in `OneShoppingListPage.razor` via `SortShoppingList()`
+- Product catalogue globally shared; user-generated content (lists, shops) will be per-family in v2
 
-## PRD Synthesis — 2026-03-22
+### Data Constraints (Permanent)
+- Norwegian Firestore property names (`Varen`, `Mengde`, `ItemCateogries`) must NOT be renamed — data already persisted
+- Existing collection keys (`shoppinglists`, `shopitems`, `itemcategories`, `shopcollection`) are immutable
+- `IGenericRepository<T>` interface changes are breaking — coordinate across all 7+ implementations
 
-### Key Architectural Decisions
-- **AD-1:** Auth via Azure SWA built-in authentication (GitHub + Microsoft providers). No Firebase Auth — avoids mixing cloud ecosystems.
-- **AD-2:** Hybrid data isolation — shared product catalogue (ShopItem, ItemCategory), per-user lists/shops/menus via `OwnerId` field.
-- **AD-3:** MealIngredient stored embedded in MealRecipe, not as separate collection. Remove standalone MealIngredient repository.
-- **AD-4:** WeekMenu uses recipe ID references, not full MealRecipe embedding. Prevents document bloat.
-- **AD-5:** Convention-based collection key fallback to prevent future `"misc"` collection bugs.
-- **AD-6:** Error message scrubbing in production — generic messages to callers, full details to ILogger.
+### Completed Infrastructure
+- **Sprint 0 (P0 bugs):** 6 PRs (#34–#38), issues #16–#21 closed. Collection key convention (D4), DI registration (D9), admin nav accessibility (D7).
+- **Auth Chain (Sprint 1):** Issues #22–#24 complete. SWA config (D21), auth parsing (D23), auth UI (D22).
+- **Sprint 2 (UI/Testing):** Issues #25–#33 complete. Toast system (D5), mobile controls (D6), migration endpoint (D10), i18n architecture (D32), shop deletion safeguards (D30), 122 controller tests (D33).
 
-### Critical Bugs Found
-1. `GetCollectionKey()` maps 5 entity types (FrequentShoppingList, MealRecipe, MealIngredient, WeekMenu, DailyMeal) to `"misc"` — active data corruption risk.
-2. WeekMenu/DailyMeal have no DI registration — entire feature is unwired.
-3. All 65 API tests call mocks directly, not controller methods — zero controller code tested.
-4. No tests run in CI — GitHub Actions builds but never runs `dotnet test`.
-5. `ShopItemCategoryController.RunOne` has no try/catch — unhandled exceptions leak to callers.
-6. `ShopsController` uses `.Result` instead of `await` — potential deadlocks.
+### Key Decisions
+- **v1 Scope (D18):** Text-based meal history + frequency suggestions only — NO recipe CRUD. v2 will have full meal planning.
+- **Auth (D1):** Azure SWA with Microsoft provider only. No per-user enforcement in v1 (D2).
+- **i18n (D19):** UI stays Norwegian v1; resource file infrastructure ready for English v2.
+- **Mobile (D6):** Up/down buttons as primary reorder control; HTML5 drag-drop as desktop enhancement.
 
-### GitHub Issue Filed
-- **Issue #15**: PRD: Shoppinglist App — Next Evolution (Auth, Meal Planning, UI, Performance)
+### Blockers & Risks Mitigated
+- Collection key bug (FrequentShoppingList in "misc" collection) — Fixed by Ray (D4), migration endpoint created
+- No controller code tested (65 tests called mocks) — Fixed by Josh (D33), 122 real-method tests passing
+- Meal v1 scope unclear — Fixed by Peter (D29–D34), 6 implementation tickets ready
+- i18n missing infrastructure — Fixed by Blair (D32), resource files + pattern established
+
+---
+
+## Recent Sprint History
 - URL: https://github.com/danielaase1337/shoppinglist/issues/15
 
 ## PRD Decomposition — 2026-03-23
