@@ -114,3 +114,18 @@
 **Key pattern:** Use vent Action<ToastMessage> on the service + IDisposable on ToastContainer for clean subscribe/unsubscribe. Auto-dismiss with Task.Delay + CSS transition avoids Timer complexity.
 
 **Unblocked:** #28 (shop deletion safeguards) can now proceed.
+
+### 2026-04-02 — Shop Deletion Safeguards (#28) ✅ COMPLETE
+
+**Implemented two-step delete flow in `ManageMyShopsPage.razor`:**
+
+- Red `btn-danger` trash button appears next to each shop in non-edit mode — visually distinct from edit/config actions.
+- First click → `InitiateDelete()`: calls `GET api/shop/{id}/dependencies`, sets `_deletingShopId`, shows inline `shop-delete-panel`.
+- Panel shows a spinner while checking; then either "⚠️ Denne butikken brukes av X handleliste(r) for sortering." or the simpler "Er du sikker?" variant.
+- Second click on red "Ja, slett butikken" → `ConfirmDelete()`: calls DELETE, removes from list, fires `INotificationService.Success("Butikk slettet")`.
+- On any HTTP error or exception: `INotificationService.Error("Kunne ikke slette butikken")`.
+- "Avbryt" button resets `_deletingShopId = null` → panel disappears.
+- Dependencies endpoint is gracefully handled: if not yet deployed (404/error), `catch` sets `DependencyCount = 0` and the flow continues with the simple confirmation.
+- `ShopDependencyResult` model declared as a private inner class in the page — no Shared model needed for this page-local DTO.
+- URL constructed as `Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, id) + "/dependencies"` — no new enum key required.
+- CSS: `shop-delete-panel` with red left-border + fade-in animation added to `app.css`.
