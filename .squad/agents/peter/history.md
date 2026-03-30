@@ -101,3 +101,24 @@
 - **SWA config updated:** /welcome made anonymous; 401 redirect changed from /.auth/login/aad to /welcome.
 - **Sign-out flow fixed:** LoginDisplay.razor now redirects to /welcome instead of straight back to AAD login.
 - **Key learnings:** MainLayout cannot be used for unauthenticated pages (calls authenticated API in preload). Always use a minimal layout. SWA anonymous route must appear before /* catch-all rule.
+
+## 2026-06-XX — Sprint Closure: Auth Chain Verification ✅
+
+**Issues Closed:**
+- **#22 (Auth: Configure staticwebapp.config.json)** — CLOSED ✅
+  - Work was pre-existing (committed 2026-03-28 in b2e32fe)
+  - Microsoft (AAD) provider configured, routes guarded, 401→/welcome redirect, /api/* anonymous per D2 v1 scope
+  
+- **#23 (Auth: Parse x-ms-client-principal header)** — CLOSED ✅
+  - Work was pre-existing (committed 2026-03-28 in 0c91d2e)
+  - ClientPrincipal.cs + AuthExtensions.cs + ControllerBase helpers fully implemented
+  - Safe parsing: handles null/malformed headers, never throws
+  
+- **#24 (Auth: LoginPage + AuthorizeRouteView)** — CLOSED ✅
+  - Work was pre-existing (committed 2026-03-28 in 40ecc0f, refined 2026-03-30 in 5984891)
+  - App.razor has AuthorizeRouteView with NotAuthorized block
+  - LoginDisplay.razor integrated in nav, shows user + logout
+  - SwaAuthenticationStateProvider reads /.auth/me endpoint
+  - Program.cs has AddAuthorizationCore(FallbackPolicy=DefaultPolicy), full auth cascade
+
+**Auth chain complete** — All three blocking issues verified and closed. Ready for downstream features (#25, #26, #28).
