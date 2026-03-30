@@ -19,6 +19,9 @@
 - Admin functions sit behind a CSS-only dropdown in `NewNavComponent.razor`.
 - Current goals: auth UI flows and client-side performance improvements.
 
+- **`@media` in Blazor `<style>` blocks must be written `@@media`** — single `@` is parsed as a Blazor directive and causes `CS0103: The name 'media' does not exist` at compile time. This affects both `@media` and any other CSS at-rules using `@`.
+- **`ChangeEventArgs` ambiguity with Syncfusion** — `Syncfusion.Blazor.Navigations` exports its own `ChangeEventArgs`. Any page that `@using` Syncfusion and uses `@onchange` on a native `<select>` must fully qualify: `Microsoft.AspNetCore.Components.ChangeEventArgs`. Otherwise CS0104 ambiguous reference error.
+
 ### 2026-03-27 — D7 Navigation Accessibility Fix ✅ COMPLETE
 - **D7 (Admin Nav Accessibility):** ✅ IMPLEMENTED. Converted CSS `:hover`-only dropdown to Blazor `@onclick` toggle. Root cause: commit 30e7e83 moved "Hyppige Lister" into admin dropdown but no click handler was added. Desktop browsers could hover, but mobile/touch couldn't. Fix applied: Added `_adminOpen` bool state in `NewNavComponent.razor`. `@onclick="ToggleAdminMenu"` on trigger span. `@onclick:stopPropagation="true"` prevents nav collapse. Added `role="button"`, `aria-haspopup="true"`, `aria-expanded` attributes. `ToggleNavMenu` resets `_adminOpen` when navbar collapses. Extended `app.css` `.admin-dropdown:hover` selectors to also match `.admin-dropdown.open` class. Result: Both hover (desktop) and click-toggle (mobile/all) work. Fully accessible. **Frequent lists now visible on all devices.**
 - **Secondary issue (Ray's domain):** `GoogleDbContext.GetCollectionKey()` silently maps `FrequentShoppingList` to `"misc"` collection. All existing production data lives in `"misc"`. D4 implementation includes migration strategy but must run migration endpoint before D4 merge to main, otherwise data becomes invisible.
