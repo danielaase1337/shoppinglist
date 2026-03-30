@@ -169,3 +169,56 @@
 - Daniel confirms scope + approves sprint start
 - Peter creates GitHub Projects sprint board
 - Team begins work in recommended sequence
+
+## 2026-03-29 — Meal Planning v1 Scoping Complete ✅
+
+**Issued by:** Daniel Aase (issue #29 — scoping-only ticket)
+
+**Scope Document:** `.squad/agents/peter/meal-planning-v1-scope.md` — Comprehensive 12-section decision document
+
+**v1 Definition (FINAL):**
+- **NOT recipe CRUD** — text-based meal history viewer only
+- Data model: `WeekMenuText` entity with `Dictionary<string, string> DailyMeals` (one key per day, free text)
+- Firestore collection: `weekmenutexts` (follows D4 convention)
+- UI: 2 pages (`WeekMenuTextListPage`, `WeekMenuTextPage`)
+- Suggestion engine: Simple frequency-based picker from historical entries (no AI)
+- No shopping list integration (v1 standalone)
+
+**Implementation Tickets Ready (6 total):**
+1. Backend data model + API controller (Ray + Glenn, 3-4 days)
+2. Suggestion algorithm (Glenn, 2-3 days)
+3. Frontend list page (Blair, 2-3 days)
+4. Frontend editor page (Blair, 3-4 days, depends #25 toast)
+5. Navigation integration (Blair, 0.5 days)
+6. E2E tests (Josh, 1-2 days)
+
+**Total Effort:** 13-16 team-days (2 weeks), can run Tickets 1-3 in parallel
+
+**v1 vs v2 Boundary (CLEAR):**
+- v1: Text entries + suggestions only
+- v2 (future): Recipe CRUD + ingredients + shopping list generation
+- Completely separate entities (`WeekMenuText` vs `WeekMenu`/`DailyMeal`/`MealRecipe`)
+- No data migration path between v1 and v2
+
+**Constraints Respected:**
+- ✅ D3 (MealIngredient embedding) — N/A for v1
+- ✅ D4 (Collection convention) — `weekmenutexts` automatic
+- ✅ D18 (Meal v1 scope) — Confirmed text history + suggestions
+- ✅ D19 (i18n) — UI Norwegian, code English
+
+**Blocking Dependency:**
+- #25 (Toast system) — Required for week editor user feedback
+
+**All 6 Scope Questions Answered:**
+1. Data format: Flat Dictionary with one key per day
+2. Storage: Single entity per week with text dictionary
+3. Suggestion: Frequency-based random picker from history
+4. UI: 2 pages (list overview + week editor)
+5. Import: Manual text entry only (file upload v2+)
+6. Integration: Standalone (shopping list v2+)
+
+**Next Steps (Blocked on Daniel):**
+- Daniel reviews scope document
+- Daniel approves 6 implementation tickets
+- Peter creates GitHub issues from ticket definitions
+- Team begins Sprint 4 implementation (Tickets 1-3 can start immediately after approval)
