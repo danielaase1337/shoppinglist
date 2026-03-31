@@ -174,6 +174,18 @@
 - `using Microsoft.Extensions.Localization` must be in the `@using` block of each page that injects `L`; it is NOT in `_Imports.razor` to avoid polluting all pages until they are migrated.
 - Key naming convention: `{PageOrScope}_{DescriptiveName}` — page prefix avoids collisions; `Common_` for shared strings.
 
+### 2026-04-04 — Fix: Remove Category from Shelf (Issue #44) ✅ COMPLETE
+
+**Root cause:** Firestore does NOT store document IDs inside embedded array maps by default. When a `Shop` document is loaded, the `ItemCategory` objects nested inside `Shelf.ItemCateogries` have `Id = null`. `GetUnusedCategories()` compares by `Id`, so the null IDs never match anything in `AvailableCategories` — resulting in categories that disappear after removal instead of appearing in the available list.
+
+**Fix:** Added `NormalizeEmbeddedCategoryIds()` called right after `OnParametersSetAsync` loads both `CurrentShop` and `AvailableCategories`. It walks all embedded categories in every shelf; if `Id` is null/empty, it finds the matching entry in `AvailableCategories` by `Name` (case-insensitive) and backfills the ID. All downstream logic (`GetUnusedCategories()`, `AssignCategoryToShelf` duplicate-guard) stays unchanged because they already use ID comparison correctly — they just needed valid IDs.
+
+**Key learnings:**
+- **Firestore embedded array items never get a document ID** — only top-level documents get `DocumentSnapshot.Id`. For objects stored inside arrays, only `[FirestoreProperty]`-tagged fields are round-tripped. If data was saved before `Id` was reliably set, embedded items arrive with `Id = null`.
+- **Normalize on load, not on use** — fixing IDs once in `OnParametersSetAsync` keeps all other methods clean. Matching by `Name` is safe here because category names are unique within the catalogue.
+- **The bug also caused a silent duplicate** — `AssignCategoryToShelf` checked `c.Id == category.Id`; with null IDs the guard always passed, so assigning an already-embedded category would add a duplicate to the shelf. Normalization fixes this too.
+- **File changed:** `Client/Pages/Shopping/ShopConfigurationPage.razor` — added 18-line `NormalizeEmbeddedCategoryIds()` method + one call-site in `OnParametersSetAsync`.
+
 ### 2026-04-04 — Active Filter Double-Check Bug Fix (#45) ✅ COMPLETE
 
 **Root cause:** Two cooperating issues caused the "next item also gets checked" bug:
