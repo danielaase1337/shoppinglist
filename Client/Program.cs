@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlazorApp.Client;
 using BlazorApp.Client.Auth;
 using BlazorApp.Client.Common;
@@ -53,4 +54,10 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
 builder.Services.AddSyncfusionBlazor();
 builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
+
+// Fix: Pin UI culture to nb-NO so IStringLocalizer resolves SharedResources.nb-NO.resx
+var culture = new CultureInfo("nb-NO");
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
+
 await builder.Build().RunAsync();

@@ -303,3 +303,10 @@
 - **Performance:** Caching strategies for frequently accessed shops/shelves
 
 **Status:** ✅ COMPLETE — Ready for Daniel review + production deployment
+
+## Learnings — PR #43 Review (2026-04-03)
+
+- **i18n in Blazor WASM:** `AddLocalization` alone is not enough. Must set `CultureInfo.DefaultThreadCurrentUICulture` explicitly — otherwise defaults to browser/OS culture and `IStringLocalizer` returns raw key names. Always pin culture in `Program.cs` for single-language apps.
+- **SWA anonymous routes are order-sensitive:** Every route that must be accessible unauthenticated — including the landing/welcome page — must be listed BEFORE the `/*` catch-all rule. The 401 `responseOverride` redirect must point to the landing page (`/welcome`), not directly to `/.auth/login/aad`.
+- **Firestore embedded objects may lose document IDs:** When categories are embedded as arrays inside shop/shelf documents in Firestore, the Firestore document ID is NOT automatically stored as a property. Any UI logic comparing embedded `Id` to top-level collection `Id` must verify the Id is correctly serialized into the embedded object's `Id` field (e.g., via `[FirestoreDocumentId]` or explicit Id assignment before saving).
+- **Pre-existing build environment issue:** `Shared.csproj` fails to build locally with `MSB3492 / CoreCompile` error. This is an environment-level issue (locked cache file) and pre-dates PR #43. Does not affect CI/CD pipeline builds.
