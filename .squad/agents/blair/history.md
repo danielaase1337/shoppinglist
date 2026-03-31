@@ -173,3 +173,18 @@
 - The culture must be set explicitly via `CultureInfo.DefaultThreadCurrentUICulture` for v1 (no browser auto-detect, no UI switcher — config flag only per D19).
 - `using Microsoft.Extensions.Localization` must be in the `@using` block of each page that injects `L`; it is NOT in `_Imports.razor` to avoid polluting all pages until they are migrated.
 - Key naming convention: `{PageOrScope}_{DescriptiveName}` — page prefix avoids collisions; `Common_` for shared strings.
+
+### 2026-04-04 — Active Filter Double-Check Bug Fix (#45) ✅ COMPLETE
+
+**Root cause:** Two cooperating issues caused the "next item also gets checked" bug:
+1. **No `@key` on `<li>` in the `@foreach` loop** — without a key, Blazor diffs by position. After `FilterList` removes the just-checked item from `ThisShoppingListItems`, the `<li>` at the original DOM index now holds a different item. The browser's already-captured change event fires on the recycled DOM node, marking the wrong item.
+2. **`FilterList` called synchronously inside `VareCheckChanged`** — the list was rebuilt mid-render, before Blazor had a chance to process the current event cycle cleanly.
+
+**Fix applied (`OneShoppingListPage.razor`):**
+- Added `@key="vare.Id"` on the `<li>` element — Blazor now tracks items by identity, not position, so nodes are never recycled for different items.
+- Added `await Task.Yield()` before `FilterList(activeListFiler)` — defers list rebuild to after the current render cycle, eliminating the race between DOM event rebinding and list reconstruction.
+- Removed stale `Console.WriteLine("bvalue")` debug statement.
+
+**Key rules for all future list renders:**
+- **Always `@key` repeated elements** — `@foreach` without `@key` is a Blazor anti-pattern whenever the list can change order or size during events. Use the item's stable unique identifier (`Id` from `EntityBase`).
+- **Never rebuild a rendered list synchronously inside an event handler that triggered from that list** — use `await Task.Yield()` to yield to the render cycle first.
