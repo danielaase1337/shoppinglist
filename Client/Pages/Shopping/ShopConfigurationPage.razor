@@ -265,12 +265,35 @@
                     CurrentShop.ShelfsInShop = new List<ShelfModel>();
                 }
 
+                // Normalize embedded category IDs (Firestore doesn't preserve document IDs
+                // for embedded array items — match by Name to AvailableCategories to restore them)
+                NormalizeEmbeddedCategoryIds();
+
                 // Ensure sort indexes are set
                 EnsureSortIndexes();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading shop: {ex.Message}");
+            }
+        }
+    }
+
+    private void NormalizeEmbeddedCategoryIds()
+    {
+        if (CurrentShop?.ShelfsInShop == null || AvailableCategories == null) return;
+
+        foreach (var shelf in CurrentShop.ShelfsInShop)
+        {
+            foreach (var cat in shelf.ItemCateogries)
+            {
+                if (string.IsNullOrEmpty(cat.Id))
+                {
+                    var match = AvailableCategories.FirstOrDefault(a =>
+                        string.Equals(a.Name, cat.Name, StringComparison.OrdinalIgnoreCase));
+                    if (match != null)
+                        cat.Id = match.Id;
+                }
             }
         }
     }
