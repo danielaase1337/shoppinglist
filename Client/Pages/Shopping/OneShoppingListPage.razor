@@ -152,7 +152,7 @@
                     <ul class="todo-list">
                         @foreach (var vare in ThisShoppingListItems)
                         {
-                            <li class="@vare.CssComleteEditClassName">
+                            <li @key="vare.Id" class="@vare.CssComleteEditClassName">
                                 <div class="parent-horizontal-stack">
                                     <div class="col-1">
                                         <input type="checkbox" checked="@vare.IsDone" @onchange="@(f=> VareCheckChanged(f, vare))" />
@@ -489,13 +489,15 @@ else
     {
         if (f.Value is bool bValue)
         {
-            Console.WriteLine("bvalue");
             vare.IsDone = bValue;
+            // Yield before rebuilding the filtered list so Blazor can complete the current
+            // render cycle first. Without this, FilterList rebuilds ThisShoppingListItems
+            // synchronously mid-render, and without @key Blazor would recycle DOM nodes
+            // by position — causing the next item to receive the change event.
+            await Task.Yield();
             FilterList(activeListFiler);
             await UpdateShoppinglist(ThisShoppingList);
         }
-
-
     }
     private async Task UpdateShoppinglist (ShoppingListModel liste)
     {
