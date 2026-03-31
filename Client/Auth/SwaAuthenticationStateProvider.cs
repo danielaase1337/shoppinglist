@@ -17,7 +17,8 @@ public class SwaAuthenticationStateProvider : AuthenticationStateProvider
     {
         try
         {
-            var authData = await _httpClient.GetFromJsonAsync<SwaAuthData>("/.auth/me");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var authData = await _httpClient.GetFromJsonAsync<SwaAuthData>("/.auth/me", cts.Token);
 
             if (authData?.ClientPrincipal == null ||
                 authData.ClientPrincipal.UserDetails == null)

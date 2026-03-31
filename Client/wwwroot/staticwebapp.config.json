@@ -25,10 +25,6 @@
       "allowedRoles": ["anonymous"]
     },
     {
-      "route": "/welcome",
-      "allowedRoles": ["anonymous"]
-    },
-    {
       "route": "/_framework/*",
       "allowedRoles": ["anonymous"]
     },
@@ -67,17 +63,9 @@
     {
       "route": "/*.svg",
       "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/*",
-      "allowedRoles": ["authenticated"]
     }
   ],
   "responseOverrides": {
-    "401": {
-      "redirect": "/welcome",
-      "statusCode": 302
-    },
     "404": {
       "rewrite": "/index.html",
       "statusCode": 200

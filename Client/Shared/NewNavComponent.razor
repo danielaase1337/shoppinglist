@@ -43,10 +43,20 @@
                 </div>
             </li>
 
+            <AuthorizeView>
+                <Authorized>
+                    <li class="nav-item">
+                        <span class="nav-link nav-user">👤 @context.User.Identity?.Name</span>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/.auth/logout?post_logout_redirect_uri=/" class="nav-link">
+                            🚪 Logg ut
+                        </a>
+                    </li>
+                </Authorized>
+            </AuthorizeView>
+
         </ul>
-        <div class="navbar-nav ml-auto nav-auth">
-            <LoginDisplay />
-        </div>
     </div>
     
     

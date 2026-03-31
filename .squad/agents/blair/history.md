@@ -7,6 +7,13 @@
 
 ## Learnings
 
+### 2026-03-29 — Strip SWA-level auth, Blazor owns everything ✅ COMPLETE
+- **Root cause of infinite spinner**: `/.auth/me` had no timeout — if SWA gateway was slow/unreachable, `GetAuthenticationStateAsync` hung forever and `<Authorizing>` never resolved. Fix: `CancellationTokenSource(TimeSpan.FromSeconds(5))` passed to `GetFromJsonAsync`.
+- **SWA `/*` → `authenticated` + `responseOverrides.401 → /welcome` was a redirect loop**: SWA blocked the Blazor app's own assets, then redirected to `/welcome`, which triggered Blazor auth again. Removed both. SWA now serves everything anonymously; Blazor `FallbackPolicy = DefaultPolicy` is the single auth gate.
+- **Logout redirect**: Changed `post_logout_redirect_uri` from `/welcome` (removed route) to `/`. With SWA open and Blazor FallbackPolicy active, landing on `/` unauthenticated correctly shows the `<NotAuthorized>` login page in `App.razor`.
+- **Nav logout**: Replaced `<LoginDisplay />` component reference in `NewNavComponent.razor` with an inline `<AuthorizeView>` block showing username + logout link at the bottom of the nav `<ul>`. Cleaner and co-located with the nav structure.
+- **Key insight**: Two auth systems (SWA gateway + Blazor middleware) fighting is a common Blazor-on-SWA pitfall. SWA auth is only useful for server-side route protection of APIs; for Blazor WASM the correct pattern is SWA fully anonymous + Blazor FallbackPolicy.
+
 - `[AllowAnonymous]` in Blazor WASM requires `@using Microsoft.AspNetCore.Authorization` — **not** `Microsoft.AspNetCore.Components.Authorization` (which covers auth components). Both namespaces must be in `_Imports.razor` when using the attribute on a page. Mixing them up causes CS0246 build errors and a completely broken app.
 
 - For SWA logout links, always use `post_logout_redirect_uri=/.auth/login/aad` (not `/`) — redirecting to `/` on a protected route causes a 401 that lands on the Blazor loading spinner. Pointing directly to the AAD login page bypasses Blazor entirely and gives a clean logout → login UX.
