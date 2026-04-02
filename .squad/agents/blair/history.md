@@ -7,6 +7,21 @@
 
 ## Learnings
 
+### 2026-04-03 — Welcome page login flow: AllowAnonymous + RedirectToWelcome ✅ COMPLETE
+
+**Pattern: Welcome page as auth entry point**
+- `Landing.razor` at `/welcome` uses `@attribute [AllowAnonymous]` and `@layout LandingLayout`. This is the entry point for unauthenticated users.
+- `RedirectToWelcome.razor` in `Client/Shared/` is a tiny utility component (no `@page`, no layout) that calls `Navigation.NavigateTo("/welcome")` in `OnInitialized`. Placed in `<NotAuthorized>` inside `App.razor`.
+- `App.razor` `<NotAuthorized>` renders `<RedirectToWelcome />` — unauthenticated access to any route redirects to the welcome page.
+
+**Infinite redirect guard pattern**
+- The `[AllowAnonymous]` attribute on `Landing.razor` is the critical guard. Without it, `AuthorizeRouteView` would deny the welcome page itself → `<NotAuthorized>` → redirect to `/welcome` → loop.
+- Both `Microsoft.AspNetCore.Components.Authorization` AND `Microsoft.AspNetCore.Authorization` must be in `_Imports.razor` — the first for auth components (`<AuthorizeView>`), the second for the `[AllowAnonymous]` attribute. Missing the second causes CS0246 build errors.
+- Flow: `unauthenticated hit /anything` → `NotAuthorized` → `RedirectToWelcome` → `/welcome` (AllowAnonymous, renders) → user clicks login → AAD → redirect to `/` → `AuthorizeRouteView` → authenticated → shopping list. ✓
+
+**staticwebapp.config.json**
+- Add an explicit `{ "route": "/welcome", "allowedRoles": ["anonymous"] }` entry before the `/*` catch-all for clarity, even though `/*` already covers it. SWA evaluates routes top-to-bottom.
+
 ### 2026-04-02 — Login spinner still spinning after 5-second timeout fix ✅ COMPLETE
 
 **Context:** The `/.auth/me` CancellationToken fix was in the code, but the app was still displaying the "Laster app..." spinner indefinitely in production.

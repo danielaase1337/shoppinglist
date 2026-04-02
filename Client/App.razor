@@ -12,13 +12,7 @@
                     </div>
                 </Authorizing>
                 <NotAuthorized>
-                    <div class="container">
-                        <div class="card card-maincontainer">
-                            <h2>🔒 Ikke logget inn</h2>
-                            <p>Du må logge inn for å bruke denne siden.</p>
-                            <a href="/.auth/login/aad?post_login_redirect_uri=/" class="btn btn-primary">Logg inn med Microsoft</a>
-                        </div>
-                    </div>
+                    <RedirectToWelcome />
                 </NotAuthorized>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />

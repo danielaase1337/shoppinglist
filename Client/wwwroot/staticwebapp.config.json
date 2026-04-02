@@ -65,6 +65,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/welcome",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/*",
       "allowedRoles": ["anonymous"]
     }
