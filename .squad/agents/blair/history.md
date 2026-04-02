@@ -7,6 +7,32 @@
 
 ## Learnings
 
+### 2026-04-02 — Login spinner still spinning after 5-second timeout fix ✅ COMPLETE
+
+**Context:** The `/.auth/me` CancellationToken fix was in the code, but the app was still displaying the "Laster app..." spinner indefinitely in production.
+
+**Suspects confirmed and fixed:**
+
+- **CONFIRMED — Suspect 1 (root cause): Duplicate Syncfusion JS in `index.html`**
+  - `<head>` loaded `_content/Syncfusion.Blazor.Core/scripts/syncfusion-blazor.min.js` (correct NuGet version)
+  - `<body>` line 44 *also* loaded `https://cdn.syncfusion.com/blazor/20.4.38/syncfusion-blazor.min.js` (CDN, old version 20.4.38)
+  - The CDN script overwrote the NuGet version with an older, incompatible one. This caused silent JS errors that prevented `blazor.webassembly.js` (loaded after) from booting correctly — the `#app` spinner never got replaced.
+  - **Fix:** Removed the CDN `<script>` tag entirely. The commented-out duplicate of the NuGet version on the adjacent line was also removed. Only `_content/Syncfusion.Blazor.Core` remains.
+
+- **CONFIRMED — Suspect 2: Missing `/*` anonymous catch-all in `staticwebapp.config.json`**
+  - Routes array had explicit entries for known paths but no catch-all. In some SWA configurations, `/` itself (and deep-linked routes) could receive a 401, preventing Blazor from loading.
+  - **Fix:** Added `{"route": "/*", "allowedRoles": ["anonymous"]}` as the final entry in the routes array (SWA evaluates routes top-to-bottom; last = lowest-priority catch-all).
+
+- **CONFIRMED — Suspect 3: `MainLayout.OnInitializedAsync` blocking layout render**
+  - `OnInitializedAsync` was `await`-ing `StartFastCorePreloadAsync()` (which itself awaits `PreloadCoreDataAsync()`) before returning. While Blazor renders before async completes, this meant the layout held its async path open for the full duration of all preload API calls — visually delaying `@Body` updates and making the page feel stuck.
+  - **Fix:** Converted to synchronous fire-and-forget: `_ = Task.Run(async () => { ... })` + `return Task.CompletedTask`. Both preloads now run entirely in the background, never blocking layout render.
+
+- **Logout redirect corrected:**
+  - `NewNavComponent.razor` had `post_logout_redirect_uri=/` on the logout link. Per the 2026-03-29 learning, redirecting to `/` after logout lands on a protected Blazor route → auth check → spinner.
+  - **Fix:** Changed to `post_logout_redirect_uri=/.auth/login/aad`. Logout now flows directly to the AAD login page, bypassing Blazor entirely.
+
+**Key lesson:** The 5-second CancellationToken in `SwaAuthenticationStateProvider` was correct and not the issue. The spinner was caused by the CDN Syncfusion script conflicting with the NuGet version, silently preventing Blazor from initialising at all. The other three fixes are defence-in-depth.
+
 ### 2026-03-29 — Strip SWA-level auth, Blazor owns everything ✅ COMPLETE
 - **Root cause of infinite spinner**: `/.auth/me` had no timeout — if SWA gateway was slow/unreachable, `GetAuthenticationStateAsync` hung forever and `<Authorizing>` never resolved. Fix: `CancellationTokenSource(TimeSpan.FromSeconds(5))` passed to `GetFromJsonAsync`.
 - **SWA `/*` → `authenticated` + `responseOverrides.401 → /welcome` was a redirect loop**: SWA blocked the Blazor app's own assets, then redirected to `/welcome`, which triggered Blazor auth again. Removed both. SWA now serves everything anonymously; Blazor `FallbackPolicy = DefaultPolicy` is the single auth gate.

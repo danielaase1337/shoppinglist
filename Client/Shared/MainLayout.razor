@@ -12,16 +12,18 @@
 <ToastContainer />
 
 @code {
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        Console.WriteLine("🏠 MainLayout: Starting fast core data preload...");
-        
-        // Start fast parallel preload of core data immediately  
-        await BackgroundPreload.StartFastCorePreloadAsync();
-        
-        Console.WriteLine("🏠 MainLayout: Starting background preload...");
-        
-        // Start background preloading of active shopping lists
-        await BackgroundPreload.StartPreloadingAsync();
+        // Fire-and-forget: never block layout rendering — both preloads run in background
+        _ = Task.Run(async () =>
+        {
+            Console.WriteLine("🏠 MainLayout: Starting fast core data preload...");
+            await BackgroundPreload.StartFastCorePreloadAsync();
+
+            Console.WriteLine("🏠 MainLayout: Starting background preload...");
+            await BackgroundPreload.StartPreloadingAsync();
+        });
+
+        return Task.CompletedTask;
     }
 }
