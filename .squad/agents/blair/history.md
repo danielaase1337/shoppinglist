@@ -78,6 +78,22 @@
 - **Root cause**: Commit `30e7e83` moved "Hyppige Lister" into the admin dropdown but the dropdown was CSS `:hover`-only — inaccessible on mobile/touch. D7 was not shipped alongside the nav refactor.
 - **Fix applied**: `NewNavComponent.razor` converted to Blazor `@onclick` toggle (`_adminOpen` bool + `ToggleAdminMenu()`). `@onclick:stopPropagation="true"` prevents the nav collapse handler from firing on the trigger. `ToggleNavMenu` resets `_adminOpen` when navbar collapses. Added `aria-haspopup`/`aria-expanded`. `app.css` extended to `.admin-dropdown.open` so both hover and click-toggle work. **D7 is now ✅ done.**
 - **Secondary bug (Ray's domain)**: `GoogleDbContext.GetCollectionKey()` returns `"misc"` for `FrequentShoppingList` — no dedicated Firestore collection. All production data for frequent lists lives in `"misc"`. D4 implementation must include a data migration before the correct collection key is set, otherwise existing data goes dark.
+
+### 2026-04-04 — Auth-aware nav and Index.razor branching ✅ COMPLETE
+
+**Auth-aware nav pattern (`NewNavComponent.razor`)**
+- Wrapped all nav links (Handlelister + Admin dropdown) and the existing logout block inside a single `<AuthorizeView><Authorized>` block.
+- The pre-existing inner `<AuthorizeView>` around username/logout was removed and its content merged into the outer `<Authorized>` block — avoids double-wrapping.
+- Added `<NotAuthorized>` block with a `🔒 Logg inn` link pointing to `/.auth/login/aad?post_login_redirect_uri=/`.
+- Brand logo and hamburger toggler remain outside `<AuthorizeView>` — always visible.
+- No CSS classes changed; all existing `@onclick` handlers preserved.
+
+**Index.razor auth branching pattern**
+- Wrapped `<ShoppingListMainPage>` in `<AuthorizeView><Authorized>`. Unauthenticated users get `<RedirectToWelcome />` in `<NotAuthorized>`.
+- `RedirectToWelcome` is at `Client/Shared/RedirectToWelcome.razor` — tiny component that calls `Navigation.NavigateTo("/welcome")` in `OnInitialized`.
+- `@code` block was empty — no data loading affected.
+- No `[AllowAnonymous]` was present on Index.razor — nothing to remove.
+- `Microsoft.AspNetCore.Components.Authorization` already in `_Imports.razor` — no import changes needed.
 - **Key files**: `Client/Shared/NewNavComponent.razor`, `Client/wwwroot/css/app.css`, `Shared/Shared/Repository/GoogleDbContext.cs`
 
 ### 2026-03-22 — Full UI Audit (ui-findings.md)
