@@ -405,3 +405,50 @@
 
 ### Key Learning
 - **Semi-automatic = the right default for household apps:** "Suggested but overridable" threads the needle between convenience and flexibility. Guest dinners, special occasions, or just "we're extra hungry tonight" all require override capability. Automatic-only would frustrate; manual-only would be ignored. The IsSuggested/override pattern generalises well across this app.
+
+## 2026-04-XX — Meal Planning GitHub Issues Created ✅
+
+**Triggered by:** Daniel Aase request to create concrete implementation tickets from finalized scope.
+
+### Labels Created
+- `meal-planning`, `phase-1`, `phase-2`, `phase-3`, `phase-4`, `phase-5`, `backend`, `frontend`, `shared`
+
+### Milestones Created
+- Meal Planning Phase 1 (milestone #1)
+- Meal Planning Phase 2 (milestone #2)
+- Meal Planning Phase 3 (milestone #3)
+- Meal Planning Phase 4 (milestone #4)
+- Meal Planning Phase 5 (milestone #5)
+
+### Phase 1 Issues Created (13 total — ready to start immediately)
+
+| Issue | Title |
+|-------|-------|
+| #46 | [Shared] Add MealUnit enum to Shared project |
+| #47 | [Shared] Add MealRecipe and MealIngredient Firestore data models |
+| #48 | [Shared] Add MealRecipeModel and MealIngredientModel DTO models |
+| #49 | [Shared] Extend AutoMapper profile for MealRecipe ↔ MealRecipeModel mapping |
+| #50 | [Api] Register MealRecipe repository in Program.cs |
+| #51 | [Api] Create MealRecipeController with CRUD endpoints |
+| #52 | [Client] Add MealRecipe enum keys to ShoppingListKeysEnum |
+| #53 | [Client] Add MealRecipe URL mappings to ISettings |
+| #54 | [Client] Create MealManagementPage — recipe list and management |
+| #55 | [Client] Create OneMealRecipePage — recipe detail and ingredient editor |
+| #56 | [Client] Add Meals link to Admin navigation dropdown |
+| #57 | [Api.Tests] Add MealRecipeController unit tests |
+| #58 | [Client.Tests] Add MealManagementPage component tests |
+
+### Phase 2–5 Issues Created (8 total — queued for future sprints)
+
+| Issue | Title |
+|-------|-------|
+| #59 | [Phase 2] WeekMenu + DailyMeal models and CRUD API |
+| #60 | [Phase 2] WeekMenu UI + shopping list generation from meals |
+| #61 | [Phase 3] InventoryItem model and pantry CRUD API |
+| #62 | [Phase 3] Inventory deduction on shopping list completion + Pantry UI |
+| #63 | [Phase 4] Ingredient matching suggestions and perishable scheduling warnings |
+| #64 | [Phase 4] Meal variety suggestion engine with category balancing |
+| #65 | [Phase 5] Google Keep meal history import tool |
+| #66 | [Phase 5] Family profile support — OwnerId isolation for meal planning |
+
+**Summary comment posted on #29.** Manifest filed at `.squad/decisions/inbox/peter-phase1-issues-created.md`.
