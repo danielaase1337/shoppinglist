@@ -683,6 +683,40 @@ input[type="checkbox"] {
     z-index: 9999;
 }
 
+/* Nav auth (login/logout display) */
+.nav-auth {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.nav-user {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.nav-login,
+.nav-logout {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.nav-login:hover,
+.nav-logout:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    text-decoration: none;
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
 /* Admin dropdown styling */
 .admin-dropdown {
     position: relative;
@@ -982,6 +1016,121 @@ label[for='toggle-all'] {
     display: none;
 }
 
+/* ─── Landing Page ─────────────────────────────────────────────────────── */
+
+.landing-layout {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+
+.landing-page {
+    width: 100%;
+    max-width: 480px;
+}
+
+.landing-card {
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 20px;
+    padding: 48px 40px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    text-align: center;
+}
+
+.landing-logo {
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 16px;
+}
+
+.landing-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e1b4b;
+    margin: 0 0 4px;
+}
+
+.landing-subtitle {
+    font-size: 1rem;
+    color: #6b7280;
+    margin: 0 0 28px;
+    font-style: italic;
+}
+
+.landing-description {
+    text-align: left;
+    margin-bottom: 32px;
+}
+
+.landing-description p {
+    color: #374151;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.landing-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.landing-features li {
+    color: #374151;
+    font-size: 0.9rem;
+    padding: 6px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.landing-features li:last-child {
+    border-bottom: none;
+}
+
+.landing-signin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff !important;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    text-decoration: none !important;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    margin-bottom: 16px;
+}
+
+.landing-signin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+    color: #fff !important;
+}
+
+.landing-hint {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+@media (max-width: 480px) {
+    .landing-card {
+        padding: 36px 24px 32px;
+    }
+    .landing-logo {
+        font-size: 48px;
+    }
+    .landing-title {
+        font-size: 1.6rem;
+    }
+}
+
 .todo-list li.editing:last-child {
     margin-bottom: -1px;
 }
@@ -1154,4 +1303,129 @@ html .clear-completed:active {
 
 .btn-toggle i {
     transition: transform 0.3s ease;
+}
+
+/* ===== Toast Notifications ===== */
+.toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 340px;
+    width: calc(100vw - 3rem);
+    pointer-events: none;
+}
+
+.toast-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+    pointer-events: all;
+    animation: toast-in 0.25s ease forwards;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-item.toast-leaving {
+    opacity: 0;
+    transform: translateX(110%);
+}
+
+.toast-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.toast-error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.toast-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.toast-info    { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+
+.toast-icon {
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.toast-message {
+    flex: 1;
+    word-break: break-word;
+}
+
+.toast-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: color 0.15s ease;
+}
+
+.toast-close:hover {
+    color: #fff;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(110%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 480px) {
+    .toast-container {
+        bottom: 1rem;
+        right: 0.75rem;
+        left: 0.75rem;
+        width: auto;
+    }
+}
+
+/* ===== Shop Delete Safeguard ===== */
+.shop-delete-btn {
+    margin-left: 4px;
+}
+
+.shop-delete-panel {
+    margin: 8px 0 4px 0;
+    padding: 10px 14px;
+    border-left: 4px solid #ef4444;
+    background: #fff5f5;
+    border-radius: 0 6px 6px 0;
+    animation: panel-in 0.18s ease forwards;
+}
+
+@keyframes panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.shop-delete-warning-text {
+    margin: 0 0 10px 0;
+    font-size: 0.9rem;
+    color: #7f1d1d;
+}
+
+.shop-delete-checking {
+    margin: 0 0 4px 0;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.shop-delete-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }

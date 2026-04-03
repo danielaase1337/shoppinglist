@@ -1,48 +1,490 @@
 ﻿@page "/managemyshops/{Id}"
-@using global::Shared.FireStoreDataModels;
-@using Common;
+@using BlazorApp.Client.Common
+@using BlazorApp.Client.Services
 @inject HttpClient Http
+@inject ISettings Settings
+@inject INotificationService Notifications
+@inject BlazorApp.Client.Services.IDataCacheService DataCache
+@inject NavigationManager Navigation
 
-@*@using Shared.HandlelisteModels*@
-@using Microsoft.Extensions.Configuration
-<h3>OneShopManagmentPage</h3>
-<p>@shopId</p>
-<button onclick="@AddItem">Items</button>
+<div class="card-maincontainer container-sm">
+
+    @if (_loading)
+    {
+        <LoadingComponent />
+    }
+    else if (_notFound)
+    {
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Butikken ble ikke funnet.
+                    </div>
+                    <a href="/managemyshops" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Tilbake til butikklisten
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_shop != null)
+    {
+        <!-- Header -->
+        <div class="card">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <a href="/managemyshops" class="btn btn-sm btn-outline-secondary" title="Tilbake">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                </div>
+                <div class="col">
+                    @if (_editingName)
+                    {
+                        <div class="d-flex align-items-center gap-2">
+                            <input class="form-control editing"
+                                   @bind-value="_editName"
+                                   @onkeyup="HandleNameKeyUp"
+                                   autofocus />
+                            <button class="btn btn-sm btn-outline-success" @onclick="SaveName" title="Lagre">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" @onclick="CancelEditName" title="Avbryt">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h2 class="mb-0">@_shop.Name</h2>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="StartEditName" title="Rediger navn">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    }
+                </div>
+                <div class="col-auto">
+                    <a href="shopconfig/@_shop.Id" class="btn btn-sm btn-outline-info" title="Konfigurer hyller og kategorier">
+                        <i class="fas fa-cog"></i> Konfigurer
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="card">
+            <div class="row text-center">
+                <div class="col">
+                    <div class="shop-stat">
+                        <span class="shop-stat-number">@ShelfCount</span>
+                        <span class="shop-stat-label">Hylle@(ShelfCount == 1 ? "" : "r")</span>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="shop-stat">
+                        <span class="shop-stat-number">@CategoryCount</span>
+                        <span class="shop-stat-label">Kategori@(CategoryCount == 1 ? "" : "er")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shelf list -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5><i class="fas fa-layer-group"></i> Hyller</h5>
+                    @if (_shop.ShelfsInShop != null && _shop.ShelfsInShop.Any())
+                    {
+                        <ul class="todo-list">
+                            @foreach (var shelf in _shop.ShelfsInShop.OrderBy(s => s.SortIndex))
+                            {
+                                <li>
+                                    <div class="parent-horizontal-stack align-items-center">
+                                        <div class="col-1">
+                                            <span class="sort-indicator text-muted">@shelf.SortIndex</span>
+                                        </div>
+                                        <div class="col">
+                                            <strong>@shelf.Name</strong>
+                                            @if (shelf.ItemCateogries != null && shelf.ItemCateogries.Any())
+                                            {
+                                                <div class="shelf-category-tags mt-1">
+                                                    @foreach (var cat in shelf.ItemCateogries)
+                                                    {
+                                                        <span class="badge badge-secondary category-tag">@cat.Name</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted d-block">Ingen kategorier tildelt</small>
+                                            }
+                                        </div>
+                                        <div class="col-auto">
+                                            <div class="btn-group" role="group">
+                                                <button type="button"
+                                                        class="editButtonStyle btn-sm btn-outline-secondary"
+                                                        @onclick="@(() => MoveShelfUp(shelf))"
+                                                        disabled="@IsFirstShelf(shelf)"
+                                                        aria-label="Flytt opp">
+                                                    <i class="fas fa-arrow-up"></i>
+                                                </button>
+                                                <button type="button"
+                                                        class="editButtonStyle btn-sm btn-outline-secondary"
+                                                        @onclick="@(() => MoveShelfDown(shelf))"
+                                                        disabled="@IsLastShelf(shelf)"
+                                                        aria-label="Flytt ned">
+                                                    <i class="fas fa-arrow-down"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-success" @onclick="SaveShelfOrder" disabled="@_savingOrder">
+                                @if (_savingOrder)
+                                {
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-save"></i>
+                                }
+                                Lagre rekkefølge
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <p>Ingen hyller konfigurert ennå.</p>
+                            <a href="shopconfig/@_shop.Id" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-plus"></i> Legg til hyller
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete shop -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <h5 class="text-danger"><i class="fas fa-trash"></i> Slett butikk</h5>
+                    @if (_deletePanelOpen)
+                    {
+                        <div class="shop-delete-panel">
+                            @if (_isCheckingDependencies)
+                            {
+                                <p class="shop-delete-checking"><i class="fas fa-spinner fa-spin"></i> Sjekker avhengigheter...</p>
+                            }
+                            else if (_dependency != null && _dependency.DependencyCount > 0)
+                            {
+                                <p class="shop-delete-warning-text">
+                                    ⚠️ Denne butikken brukes av <strong>@_dependency.DependencyCount</strong> handleliste@(_dependency.DependencyCount == 1 ? "" : "r") for sortering. Er du sikker?
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="shop-delete-warning-text">Er du sikker på at du vil slette denne butikken?</p>
+                            }
+                            @if (!_isCheckingDependencies)
+                            {
+                                <div class="shop-delete-actions">
+                                    <button class="btn btn-sm btn-danger" @onclick="ConfirmDelete">
+                                        <i class="fas fa-trash"></i> Ja, slett butikken
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDelete">
+                                        Avbryt
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-danger" @onclick="InitiateDelete">
+                            <i class="fas fa-trash"></i> Slett butikk
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .shop-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.5rem 0;
+    }
+
+    .shop-stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .shop-stat-label {
+        font-size: 0.85rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .shelf-category-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .category-tag {
+        font-size: 0.75rem;
+        padding: 2px 6px;
+    }
+
+    .sort-indicator {
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+
+    @@media (max-width: 576px) {
+        .shop-stat-number {
+            font-size: 1.5rem;
+        }
+
+        .d-flex.align-items-center.gap-2.flex-wrap h2 {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
 @code {
     [Parameter]
-    public string Id { get; set; }
-    string shopId;
+    public string Id { get; set; } = "";
 
-    
+    private ShopModel? _shop;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _editingName;
+    private string _editName = "";
+    private bool _savingOrder;
+    private bool _deletePanelOpen;
+    private bool _isCheckingDependencies;
+    private ShopDependencyResult? _dependency;
 
-    [Inject]
-    public ISettings Settings{ get;set; }
+    private class ShopDependencyResult
+    {
+        public int DependencyCount { get; set; }
+        public List<string> DependentLists { get; set; } = new();
+    }
+
+    private int ShelfCount => _shop?.ShelfsInShop?.Count ?? 0;
+    private int CategoryCount => _shop?.ShelfsInShop?.Sum(s => s.ItemCateogries?.Count ?? 0) ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
-        var shop = await Http.GetFromJsonAsync<Shop>(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id));
+        try
+        {
+            _shop = await Http.GetFromJsonAsync<ShopModel>(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id));
+            if (_shop == null)
+            {
+                _notFound = true;
+            }
+            else
+            {
+                EnsureSortIndexes();
+            }
+        }
+        catch
+        {
+            _notFound = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
-    public async void AddItem()
+
+    private void EnsureSortIndexes()
     {
-        
-        //var shopItems = await Http.GetAsync("api/shopitems/2");
-        //var item = new ShopItemModel()
-        //    {
-        //        Id = "ask3234",
-        //        ItemCategory = new ItemCategoryModel()
-        //        {
-        //            Id = "DAFSDF",
-        //            Name = "meieri",
+        if (_shop?.ShelfsInShop == null) return;
+        var shelves = _shop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        for (int i = 0; i < shelves.Count; i++)
+            shelves[i].SortIndex = i + 1;
+    }
 
-        //        },
-        //        Name = "Melk",
-        //        Unit = "stk"
-        //    };
-        //var model = Mapper.Map<ShopItem>(item);
+    // --- Name editing ---
 
-        //var newItem = await Http.PostAsJsonAsync($"api/shopitems/2", model);
+    private void StartEditName()
+    {
+        _editName = _shop?.Name ?? "";
+        _editingName = true;
+    }
 
-        //var updateItem = await Http.PutAsJsonAsync("api/shopitems/2", model);
-        
+    private void CancelEditName()
+    {
+        _editingName = false;
+    }
+
+    private async Task HandleNameKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Code == "Enter") await SaveName();
+        else if (args.Code == "Escape") CancelEditName();
+    }
+
+    private async Task SaveName()
+    {
+        if (_shop == null || string.IsNullOrWhiteSpace(_editName)) return;
+        _shop.Name = _editName.Trim();
+        _editingName = false;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), _shop);
+            if (response.IsSuccessStatusCode)
+            {
+                DataCache.InvalidateShopsCache();
+                Notifications.Success("Navn lagret");
+            }
+            else
+            {
+                Notifications.Error("Kunne ikke lagre navn");
+            }
+        }
+        catch
+        {
+            Notifications.Error("Kunne ikke lagre navn");
+        }
+    }
+
+    // --- Shelf reordering ---
+
+    private void MoveShelfUp(ShelfModel shelf)
+    {
+        if (_shop?.ShelfsInShop == null) return;
+        var shelves = _shop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        var idx = shelves.IndexOf(shelf);
+        if (idx <= 0) return;
+        shelves.RemoveAt(idx);
+        shelves.Insert(idx - 1, shelf);
+        for (int i = 0; i < shelves.Count; i++) shelves[i].SortIndex = i + 1;
+        StateHasChanged();
+    }
+
+    private void MoveShelfDown(ShelfModel shelf)
+    {
+        if (_shop?.ShelfsInShop == null) return;
+        var shelves = _shop.ShelfsInShop.OrderBy(s => s.SortIndex).ToList();
+        var idx = shelves.IndexOf(shelf);
+        if (idx < 0 || idx >= shelves.Count - 1) return;
+        shelves.RemoveAt(idx);
+        shelves.Insert(idx + 1, shelf);
+        for (int i = 0; i < shelves.Count; i++) shelves[i].SortIndex = i + 1;
+        StateHasChanged();
+    }
+
+    private bool IsFirstShelf(ShelfModel shelf)
+    {
+        if (_shop?.ShelfsInShop == null || !_shop.ShelfsInShop.Any()) return false;
+        return _shop.ShelfsInShop.OrderBy(s => s.SortIndex).First() == shelf;
+    }
+
+    private bool IsLastShelf(ShelfModel shelf)
+    {
+        if (_shop?.ShelfsInShop == null || !_shop.ShelfsInShop.Any()) return false;
+        return _shop.ShelfsInShop.OrderBy(s => s.SortIndex).Last() == shelf;
+    }
+
+    private async Task SaveShelfOrder()
+    {
+        if (_shop == null) return;
+        _savingOrder = true;
+        try
+        {
+            EnsureSortIndexes();
+            var response = await Http.PutAsJsonAsync(Settings.GetApiUrl(ShoppingListKeysEnum.Shops), _shop);
+            if (response.IsSuccessStatusCode)
+            {
+                DataCache.InvalidateShopsCache();
+                Notifications.Success("Rekkefølge lagret");
+            }
+            else
+            {
+                Notifications.Error("Kunne ikke lagre rekkefølge");
+            }
+        }
+        catch
+        {
+            Notifications.Error("Kunne ikke lagre rekkefølge");
+        }
+        finally
+        {
+            _savingOrder = false;
+        }
+    }
+
+    // --- Delete ---
+
+    private async Task InitiateDelete()
+    {
+        _deletePanelOpen = true;
+        _dependency = null;
+        _isCheckingDependencies = true;
+
+        try
+        {
+            var depUrl = Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id) + "/dependencies";
+            var result = await Http.GetFromJsonAsync<ShopDependencyResult>(depUrl);
+            _dependency = result ?? new ShopDependencyResult();
+        }
+        catch
+        {
+            _dependency = new ShopDependencyResult();
+        }
+        finally
+        {
+            _isCheckingDependencies = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        _deletePanelOpen = false;
+        _dependency = null;
+
+        try
+        {
+            var response = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.Shop, Id));
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                DataCache.InvalidateShopsCache();
+                Notifications.Success("Butikk slettet");
+                // Navigate back to list
+                await Task.Delay(500);
+                // Use NavigationManager if available — navigate back
+                Navigation.NavigateTo("/managemyshops");
+            }
+            else
+            {
+                Notifications.Error("Kunne ikke slette butikken");
+            }
+        }
+        catch
+        {
+            Notifications.Error("Kunne ikke slette butikken");
+        }
+    }
+
+    private void CancelDelete()
+    {
+        _deletePanelOpen = false;
+        _dependency = null;
     }
 }

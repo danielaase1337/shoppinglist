@@ -17,6 +17,10 @@ namespace Api.Controllers
         [Function("DebugFunction")]
         public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
+#if !DEBUG
+            // Security: DebugFunction must not be reachable in production (decisions.md constraint)
+            return req.CreateResponse(HttpStatusCode.NotFound);
+#else
             _logger.LogInformation("C# HTTP trigger function processed a request.");
 
             var response = req.CreateResponse(HttpStatusCode.OK);
@@ -25,6 +29,7 @@ namespace Api.Controllers
             response.WriteStringAsync("Welcome to Azure Functions! Its up and running");
 
             return response;
+#endif
         }
     }
 }

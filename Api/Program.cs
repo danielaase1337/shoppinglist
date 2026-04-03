@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Shared.Repository;
 using System.Reflection;
 using Shared.FireStoreDataModels;
@@ -53,7 +54,10 @@ namespace ApiIsolated
                     }
                 })
                 .Build();
-            
+
+            var logger = host.Services.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Auth: x-ms-client-principal parsing enabled (SWA Microsoft provider)");
+
             host.Run();
         }
     }

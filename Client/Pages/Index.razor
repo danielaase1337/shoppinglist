@@ -2,9 +2,16 @@
 @using BlazorApp.Client.Pages.Shopping
 @inject HttpClient http
 
-<div class="container-sm" >
-    <ShoppingListMainPage></ShoppingListMainPage>
-</div>
+<AuthorizeView>
+    <Authorized>
+        <div class="container-sm">
+            <ShoppingListMainPage></ShoppingListMainPage>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToWelcome />
+    </NotAuthorized>
+</AuthorizeView>
 
 @code
 {

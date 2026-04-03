@@ -1,313 +1,219 @@
-using Api.Controllers;
+﻿using Api.Controllers;
+using Api.Tests.Helpers;
 using AutoMapper;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
-using System.IO;
 using System.Net;
-using System.Text;
+using System.Text.Json;
 using Xunit;
 
 namespace Api.Tests.Controllers
 {
+    /// <summary>
+    /// Real controller tests — instantiate actual ShopItemCategoryController with mocked dependencies
+    /// and call controller methods directly. Established as Issue #33 fix.
+    /// </summary>
     public class ShopItemCategoryControllerTests
     {
-        private readonly Mock<IGenericRepository<ItemCategory>> _mockRepository;
-        private readonly ILoggerFactory _loggerFactory;
+        private readonly Mock<IGenericRepository<ItemCategory>> _mockRepo;
         private readonly IMapper _mapper;
         private readonly ShopItemCategoryController _controller;
 
         public ShopItemCategoryControllerTests()
         {
-            _mockRepository = new Mock<IGenericRepository<ItemCategory>>();
-            _loggerFactory = NullLoggerFactory.Instance;
+            _mockRepo = new Mock<IGenericRepository<ItemCategory>>();
 
-            // Setup AutoMapper with the same profile as the API
             var config = new MapperConfiguration(cfg =>
             {
-                cfg.CreateMap<ItemCategory, ItemCategoryModel>().ReverseMap();
+                cfg.AddProfile<Api.ShoppingListProfile>();
             });
             _mapper = config.CreateMapper();
 
-            _controller = new ShopItemCategoryController(_loggerFactory, _mockRepository.Object, _mapper);
+            _controller = new ShopItemCategoryController(NullLoggerFactory.Instance, _mockRepo.Object, _mapper);
         }
 
+        // ─── Run GET ────────────────────────────────────────────────────────────────
+
         [Fact]
-        public async Task Repository_Get_ReturnsAllItemCategories_WhenCategoriesExist()
+        public async Task Run_GET_ReturnsOk_WhenCategoriesExist()
         {
-            // Arrange
             var categories = new List<ItemCategory>
             {
                 new ItemCategory { Id = "1", Name = "Meieri" },
-                new ItemCategory { Id = "2", Name = "Bakeri" },
-                new ItemCategory { Id = "3", Name = "Frukt" }
+                new ItemCategory { Id = "2", Name = "Bakeri" }
             };
+            _mockRepo.Setup(r => r.Get()).ReturnsAsync(categories);
 
-            _mockRepository.Setup(r => r.Get()).ReturnsAsync(categories);
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
 
-            // Act
-            var result = await _mockRepository.Object.Get();
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(3, result.Count);
-            Assert.Contains(result, c => c.Name == "Meieri");
-            Assert.Contains(result, c => c.Name == "Bakeri");
-            Assert.Contains(result, c => c.Name == "Frukt");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Meieri", body);
+            Assert.Contains("Bakeri", body);
         }
 
         [Fact]
-        public async Task Repository_Get_ReturnsEmptyList_WhenNoCategoriesExist()
+        public async Task Run_GET_Returns500_WhenRepositoryReturnsNull()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Get()).ReturnsAsync(new List<ItemCategory>());
+            _mockRepo.Setup(r => r.Get()).ReturnsAsync((List<ItemCategory>?)null!);
 
-            // Act
-            var result = await _mockRepository.Object.Get();
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // ─── Run POST ───────────────────────────────────────────────────────────────
+
+        [Fact]
+        public async Task Run_POST_ReturnsOk_WhenValidCategoryProvided()
+        {
+            var model = new ItemCategoryModel { Id = "3", Name = "Kjott" };
+            var inserted = new ItemCategory { Id = "3", Name = "Kjott" };
+            _mockRepo.Setup(r => r.Insert(It.IsAny<ItemCategory>())).ReturnsAsync(inserted);
+
+            var request = TestHttpFactory.CreatePostRequest(JsonSerializer.Serialize(model), "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Kjott", body);
         }
 
         [Fact]
-        public async Task Repository_Insert_CreatesNewItemCategory_WhenValidCategoryProvided()
+        public async Task Run_POST_Returns500_WhenNullBody()
         {
-            // Arrange
-            var newCategory = new ItemCategory 
-            { 
-                Id = "4", 
-                Name = "Kjøtt" 
-            };
+            var request = TestHttpFactory.CreatePostRequest("null", "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
 
-            _mockRepository.Setup(r => r.Insert(It.IsAny<ItemCategory>())).ReturnsAsync(newCategory);
-
-            // Act
-            var result = await _mockRepository.Object.Insert(newCategory);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Kjøtt", result.Name);
-            Assert.Equal("4", result.Id);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
 
         [Fact]
-        public async Task Repository_Update_UpdatesExistingItemCategory_WhenValidCategoryProvided()
+        public async Task Run_POST_Returns500_WhenInsertFails()
         {
-            // Arrange
-            var updatedCategory = new ItemCategory 
-            { 
-                Id = "1", 
-                Name = "Meieri - Oppdatert" 
-            };
+            var model = new ItemCategoryModel { Id = "fail", Name = "FailCat" };
+            _mockRepo.Setup(r => r.Insert(It.IsAny<ItemCategory>())).ReturnsAsync((ItemCategory?)null!);
 
-            _mockRepository.Setup(r => r.Update(It.IsAny<ItemCategory>())).ReturnsAsync(updatedCategory);
+            var request = TestHttpFactory.CreatePostRequest(JsonSerializer.Serialize(model), "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
 
-            // Act
-            var result = await _mockRepository.Object.Update(updatedCategory);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Meieri - Oppdatert", result.Name);
+        // ─── Run PUT ────────────────────────────────────────────────────────────────
+
+        [Fact]
+        public async Task Run_PUT_ReturnsOk_WhenValidCategoryProvided()
+        {
+            var model = new ItemCategoryModel { Id = "1", Name = "Meieri Updated" };
+            var updated = new ItemCategory { Id = "1", Name = "Meieri Updated" };
+            _mockRepo.Setup(r => r.Update(It.IsAny<ItemCategory>())).ReturnsAsync(updated);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(model), "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Meieri Updated", body);
         }
 
         [Fact]
-        public async Task Repository_GetById_ReturnsItemCategory_WhenCategoryExists()
+        public async Task Run_PUT_Returns500_WhenNullBody()
         {
-            // Arrange
+            var request = TestHttpFactory.CreatePutRequest("null", "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Run_PUT_Returns500_WhenUpdateFails()
+        {
+            var model = new ItemCategoryModel { Id = "1", Name = "Updated" };
+            _mockRepo.Setup(r => r.Update(It.IsAny<ItemCategory>())).ReturnsAsync((ItemCategory?)null!);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(model), "http://localhost/api/itemcategorys");
+            var response = await _controller.Run(request);
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // ─── RunOne GET ─────────────────────────────────────────────────────────────
+
+        [Fact]
+        public async Task RunOne_GET_ReturnsOk_WhenCategoryExists()
+        {
             var category = new ItemCategory { Id = "1", Name = "Meieri" };
-            _mockRepository.Setup(r => r.Get("1")).ReturnsAsync(category);
+            _mockRepo.Setup(r => r.Get("1")).ReturnsAsync(category);
 
-            // Act
-            var result = await _mockRepository.Object.Get("1");
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/itemcategory/1");
+            var response = await _controller.RunOne(request, "1");
 
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal("Meieri", result.Name);
-            Assert.Equal("1", result.Id);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("Meieri", body);
         }
 
         [Fact]
-        public async Task Repository_GetById_ReturnsNull_WhenCategoryNotFound()
+        public async Task RunOne_GET_Returns500_WhenCategoryNotFound()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Get("999")).ReturnsAsync((ItemCategory?)null);
+            _mockRepo.Setup(r => r.Get("999")).ReturnsAsync((ItemCategory?)null!);
 
-            // Act
-            var result = await _mockRepository.Object.Get("999");
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/itemcategory/999");
+            var response = await _controller.RunOne(request, "999");
 
-            // Assert
-            Assert.Null(result);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // ─── RunOne DELETE ───────────────────────────────────────────────────────────
+
+        [Fact]
+        public async Task RunOne_DELETE_ReturnsNoContent_WhenDeleteSucceeds()
+        {
+            _mockRepo.Setup(r => r.Delete("1")).ReturnsAsync(true);
+
+            var request = TestHttpFactory.CreateDeleteRequest("http://localhost/api/itemcategory/1");
+            var response = await _controller.RunOne(request, "1");
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         }
 
         [Fact]
-        public async Task Repository_Delete_ReturnsTrue_WhenCategoryDeletedSuccessfully()
+        public async Task RunOne_DELETE_Returns500_WhenDeleteFails()
         {
-            // Arrange
-            _mockRepository.Setup(r => r.Delete("1")).ReturnsAsync(true);
+            _mockRepo.Setup(r => r.Delete("999")).ReturnsAsync(false);
 
-            // Act
-            var result = await _mockRepository.Object.Delete("1");
+            var request = TestHttpFactory.CreateDeleteRequest("http://localhost/api/itemcategory/999");
+            var response = await _controller.RunOne(request, "999");
 
-            // Assert
-            Assert.True(result);
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
 
-        [Fact]
-        public async Task Repository_Delete_ReturnsFalse_WhenCategoryDeletionFails()
-        {
-            // Arrange
-            _mockRepository.Setup(r => r.Delete("1")).ReturnsAsync(false);
-
-            // Act
-            var result = await _mockRepository.Object.Delete("1");
-
-            // Assert
-            Assert.False(result);
-        }
+        // ─── Exception handling (security: no internal details leaked) ───────────────
 
         [Fact]
-        public void AutoMapper_MapsItemCategoryToItemCategoryModel_Correctly()
+        public async Task RunOne_GET_Returns500WithGenericMessage_WhenRepositoryThrows()
         {
-            // Arrange
-            var category = new ItemCategory 
-            { 
-                Id = "1", 
-                Name = "Test Category"
-            };
-
-            // Act
-            var categoryModel = _mapper.Map<ItemCategoryModel>(category);
-
-            // Assert
-            Assert.NotNull(categoryModel);
-            Assert.Equal("Test Category", categoryModel.Name);
-            Assert.Equal("1", categoryModel.Id);
-        }
-
-        [Fact]
-        public void AutoMapper_MapsItemCategoryModelToItemCategory_Correctly()
-        {
-            // Arrange
-            var categoryModel = new ItemCategoryModel 
-            { 
-                Id = "1", 
-                Name = "Test Category"
-            };
-
-            // Act
-            var category = _mapper.Map<ItemCategory>(categoryModel);
-
-            // Assert
-            Assert.NotNull(category);
-            Assert.Equal("Test Category", category.Name);
-            Assert.Equal("1", category.Id);
-        }
-
-        [Fact]
-        public void ItemCategory_ValidateBusinessLogic_CategoryHasRequiredProperties()
-        {
-            // Arrange & Act
-            var category = new ItemCategory 
-            { 
-                Id = "1", 
-                Name = "Meieri"
-            };
-
-            // Assert
-            Assert.NotNull(category.Id);
-            Assert.NotEmpty(category.Name);
-        }
-
-        [Fact]
-        public void ItemCategoryModel_ValidateBusinessLogic_ModelHasRequiredProperties()
-        {
-            // Arrange & Act
-            var categoryModel = new ItemCategoryModel 
-            { 
-                Id = "1", 
-                Name = "Meieri"
-            };
-
-            // Assert
-            Assert.NotNull(categoryModel.Id);
-            Assert.NotEmpty(categoryModel.Name);
-        }
-
-        [Fact]
-        public async Task RunOne_Get_Returns500WithGenericMessage_WhenRepositoryThrows()
-        {
-            // Arrange — repository throws to simulate an unexpected failure
-            var mockLogger = new Mock<ILogger>();
-            var mockLoggerFactory = new Mock<ILoggerFactory>();
-            mockLoggerFactory.Setup(f => f.CreateLogger(It.IsAny<string>())).Returns(mockLogger.Object);
-
             var throwingRepo = new Mock<IGenericRepository<ItemCategory>>();
             throwingRepo.Setup(r => r.Get(It.IsAny<object>()))
                 .ThrowsAsync(new InvalidOperationException("Firestore connection string exposed in error"));
 
-            var controller = new ShopItemCategoryController(mockLoggerFactory.Object, throwingRepo.Object, _mapper);
+            var controller = new ShopItemCategoryController(NullLoggerFactory.Instance, throwingRepo.Object, _mapper);
 
-            var mockContext = new Mock<FunctionContext>();
-            mockContext.Setup(c => c.InstanceServices).Returns(new Mock<IServiceProvider>().Object);
+            var request = TestHttpFactory.CreateGetRequest("http://localhost/api/itemcategory/test-id");
+            var response = await controller.RunOne(request, "test-id");
 
-            var responseBody = new MemoryStream();
-            var mockResponse = new Mock<HttpResponseData>(mockContext.Object);
-            mockResponse.SetupProperty(r => r.StatusCode);
-            mockResponse.Setup(r => r.Body).Returns(responseBody);
-            mockResponse.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
 
-            var mockRequest = new Mock<HttpRequestData>(mockContext.Object);
-            mockRequest.Setup(r => r.Method).Returns("GET");
-            mockRequest.Setup(r => r.CreateResponse()).Returns(mockResponse.Object);
-
-            // Act
-            var result = await controller.RunOne(mockRequest.Object, "test-id");
-
-            // Assert — status 500
-            Assert.Equal(HttpStatusCode.InternalServerError, result.StatusCode);
-
-            // Assert — response body does NOT leak internal exception details (security constraint S4)
-            responseBody.Seek(0, SeekOrigin.Begin);
-            var body = await new StreamReader(responseBody, Encoding.UTF8).ReadToEndAsync();
+            var body = await TestHttpFactory.ReadResponseBodyAsync(response);
+            Assert.Contains("An unexpected error occurred", body);
             Assert.DoesNotContain("Firestore connection string exposed", body);
-
-            // Assert — exception was logged via ILogger
-            mockLogger.Verify(
-                l => l.Log(
-                    LogLevel.Error,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
-                    It.IsAny<InvalidOperationException>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Once);
-        }
-
-        [Theory]
-        [InlineData("dairy", "Meieri")]
-        [InlineData("bakery", "Bakeri")]
-        [InlineData("fruit", "Frukt")]
-        [InlineData("meat", "Kjøtt")]
-        [InlineData("fish", "Fisk")]
-        public void ItemCategory_ValidateCommonCategories_CreatesValidCategories(string id, string name)
-        {
-            // Arrange & Act
-            var category = new ItemCategory 
-            { 
-                Id = id, 
-                Name = name
-            };
-
-            // Assert
-            Assert.Equal(id, category.Id);
-            Assert.Equal(name, category.Name);
-            Assert.NotEmpty(category.Id);
-            Assert.NotEmpty(category.Name);
         }
     }
 }

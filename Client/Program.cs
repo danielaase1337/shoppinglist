@@ -1,7 +1,11 @@
+using System.Globalization;
 using BlazorApp.Client;
+using BlazorApp.Client.Auth;
 using BlazorApp.Client.Common;
+using BlazorApp.Client.Resources;
 using BlazorApp.Client.Services;
 
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Syncfusion.Blazor;
@@ -39,7 +43,26 @@ builder.Services.AddScoped(sp =>
 });
 
 builder.Services.AddSingleton<ISettings, Settings>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IDataCacheService, DataCacheService>();
 builder.Services.AddScoped<IBackgroundPreloadService, BackgroundPreloadService>();
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
+builder.Services.AddCascadingAuthenticationState();
+#if DEBUG
+builder.Services.AddScoped<AuthenticationStateProvider, DebugAuthenticationStateProvider>();
+#else
+builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
+#endif
 builder.Services.AddSyncfusionBlazor();
+builder.Services.AddLocalization();
+
+// Fix: Pin UI culture to nb-NO so IStringLocalizer resolves SharedResources.nb-NO.resx
+var culture = new CultureInfo("nb-NO");
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
+
+
 await builder.Build().RunAsync();

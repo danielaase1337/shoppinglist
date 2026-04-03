@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject ISettings Settings
 @inject IDataCacheService DataCache 
+@inject INotificationService Notifications
 
 @if (newVareModel != null)
 {
@@ -151,7 +152,7 @@
                     <ul class="todo-list">
                         @foreach (var vare in ThisShoppingListItems)
                         {
-                            <li class="@vare.CssComleteEditClassName">
+                            <li @key="vare.Id" class="@vare.CssComleteEditClassName">
                                 <div class="parent-horizontal-stack">
                                     <div class="col-1">
                                         <input type="checkbox" checked="@vare.IsDone" @onchange="@(f=> VareCheckChanged(f, vare))" />
@@ -356,11 +357,19 @@ else
 
     public async Task DeleteVare(ShoppingListItemModel m)
     {
+        var name = m.Varen?.Name ?? "Vare";
         ThisShoppingList.ShoppingItems.Remove(m);
 
         var updated = await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
         if (updated != null && updated.IsSuccessStatusCode)
+        {
             ThisShoppingList = await updated.Content.ReadFromJsonAsync<ShoppingListModel>();
+            Notifications.Success($"{name} fjernet fra listen");
+        }
+        else
+        {
+            Notifications.Error("Kunne ikke fjerne vare. Prøv igjen.");
+        }
         FilterList(activeListFiler);
     }
 
@@ -374,6 +383,7 @@ else
         ThisShoppingList.ShoppingItems = itemsList;
 
         await UpdateShoppinglist(ThisShoppingList);
+        Notifications.Success($"{shopItem.Name} lagt til");
 
         FilterList(activeListFiler);
     }
@@ -479,13 +489,15 @@ else
     {
         if (f.Value is bool bValue)
         {
-            Console.WriteLine("bvalue");
             vare.IsDone = bValue;
+            // Yield before rebuilding the filtered list so Blazor can complete the current
+            // render cycle first. Without this, FilterList rebuilds ThisShoppingListItems
+            // synchronously mid-render, and without @key Blazor would recycle DOM nodes
+            // by position — causing the next item to receive the change event.
+            await Task.Yield();
             FilterList(activeListFiler);
             await UpdateShoppinglist(ThisShoppingList);
         }
-
-
     }
     private async Task UpdateShoppinglist (ShoppingListModel liste)
     {

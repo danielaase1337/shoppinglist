@@ -44,3 +44,27 @@
 - PRs for feature work target `development`; only release PRs target `main`
 
 **CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
+## Auth Test Fixtures Sprint — squad/auth-workflow
+
+- **Date**: 2026-03-28
+- **Context**: Glenn built `Api/Auth/ClientPrincipal.cs` and `Api/Auth/AuthExtensions.cs` using `HttpRequestData` (Azure Functions v4 pattern) before this sprint. Adapted test helpers to match Glenn's actual implementation rather than the ASP.NET Core `HttpRequest` variant in the original task spec.
+- **Files created**:
+  - `Api.Tests/Helpers/AuthTestHelpers.cs` — builds `TestHttpRequestData` with base64-encoded `x-ms-client-principal` headers. Uses `TestHttpFactory` (existing helper) to keep mocking consistent.
+  - `Api.Tests/Auth/ClientPrincipalTests.cs` — 7 unit tests: header parse, null header, `IsAuthenticated` true/false, malformed header, `IsAuthenticated()` extension, `GetUserId()` extension. All 7 pass.
+  - `Client.Tests.Playwright/Tests/AuthenticationTests.cs` — 4 E2E tests using `page.RouteAsync` to mock `/.auth/me`. Tests: `LoginLink_IsVisible`, `LoginLink_PointsToCorrectSwaEndpoint`, `LogoutLink_IsVisible_WhenAuthenticated`, `ProtectedRoute_RedirectsToLogin` (last one marked `[Trait("Category", "RequiresSWA")]`).
+- **Key pattern**: Playwright `page.RouteAsync("**/.auth/me", ...)` intercepts and mocks the SWA auth endpoint without needing a live SWA deployment.
+- **Key decision**: E2E auth tests intentionally fail until Blair's `SwaAuthenticationStateProvider` + `LoginDisplay` components are in place — that's the intent (TDD, these tests prove the feature).
+- **`[Trait("Category", "RequiresSWA")]`**: Tests that rely on SWA gateway-level 302 redirects are tagged so CI can exclude them locally with `--filter "Category!=RequiresSWA"`.
+- **xUnit note**: `Api.Tests` has no `GlobalUsings.cs` — every test file needs explicit `using Xunit;`.
+
+## Issue #33 — Rewrite API Controller Tests (sprint/2)
+
+- **Date**: 2026-03-30
+- **Finding**: All Api.Tests controller tests for ShopsController, ShopsItemsController, ShopItemCategoryController, and FrequentShoppingListController called mock repository methods directly — no test exercised actual controller code.
+- **Action**: Rewrote all 4 test classes. Created FrequentShoppingListControllerTests.cs from scratch (no test file existed). All tests now instantiate real controllers and call Run(), RunAll(), or RunOne() methods.
+- **Pattern**: Use cfg.AddProfile<Api.ShoppingListProfile>() for real AutoMapper (not manually wired maps). Use TestHttpFactory helpers for HttpRequestData/HttpResponseData.
+- **ShopsController constructor change**: The controller already had an uncommitted change adding IGenericRepository<ShoppingList> as a second dependency — tests must pass it as a second mock.
+- **Migration tests**: ShoppingListControllerRealTests had 2 tests verifying GET-based lazy migration. Migration was removed in #31. Updated those tests to verify Update is NOT called during GET (removed behavior).
+- **Norwegian characters in assertions**: Avoid Norwegian chars (ø, æ, å) in Assert.Contains() body checks — WriteAsJsonAsync escapes them as \uXXXX Unicode escapes. Use ASCII-safe names in test data.
+- **Result**: 122 tests pass in Api.Tests (up from 91). Commit: 7bdf205 on sprint/2.

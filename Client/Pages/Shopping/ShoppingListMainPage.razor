@@ -1,19 +1,26 @@
-﻿@page "/shoppinglist"
+﻿@* i18n pattern: inject IStringLocalizer<SharedResources> as "L", then use @L["Key"] for all UI strings.
+   Resource files live in Client/Resources/. nb-NO is the v1 default; en is an empty template.
+   To activate English: builder.Services.AddLocalization sets ResourcesPath; switch culture via
+   CultureInfo.DefaultThreadCurrentUICulture in Program.cs when a language flag is needed. *@
+@page "/shoppinglist"
 @using BlazorApp.Client.Common
+@using BlazorApp.Client.Resources
+@using Microsoft.Extensions.Localization
 @inject HttpClient Http;
 @inject BlazorApp.Client.Services.IDataCacheService DataCache
 @inject BlazorApp.Client.Services.IBackgroundPreloadService BackgroundPreload
+@inject IStringLocalizer<SharedResources> L
 
 <div class="card-maincontainer container-sm">
 
     <div class="row card">
-        <h2>Handlelister</h2>
+        <h2>@L["ShoppingLists_PageTitle"]</h2>
         <div class="row">
             <div class="col">
-                <input class="new-todo" placeholder="Navn på listen?" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler">
+                <input class="new-todo" placeholder="@L["ShoppingLists_NewListPlaceholder"]" aria-label="@L["Common_NewNameInputAria"]" name="newVare" @bind="@_newListName" @onkeyup="OnKeyUpNewListItemHandler">
             </div>
             <div class="col-2">
-                <button type="button" class="btn-sm btn-outline-link"><i class="fas fa-check" @onclick="@(f => AddList())"></i></button>
+                <button type="button" class="btn-sm btn-outline-link" aria-label="@L["ShoppingLists_AddListAria"]"><i class="fas fa-check" @onclick="@(f => AddList())"></i></button>
             </div>
         </div>
     </div>
@@ -23,7 +30,7 @@
         {
             <div class="row card">
                 <h6>
-                    Det finnes ingen handlelister!
+                    @L["ShoppingLists_EmptyState"]
                 </h6>
             </div>
 
@@ -55,15 +62,15 @@
                                 @if (l.EditClicked)
                                 {
                                     <div class="btn-group" role="group" aria-label="Basic example">
-                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" @onclick="@(e => StoreChange(l))"><i class="fas fa-check"></i></button>
-                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" @onclick="@(e => { l.EditClicked= false;  })"><i class="fas fa-times"> </i></button>
-                                        <button type="button" class="editButtonStyle btn-sm btn-outline-danger" @onclick="@(e => DeleteList(l))"><i class="fas fa-ban"> </i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-success" aria-label="@L["ShoppingLists_SaveEditAria"]" @onclick="@(e => StoreChange(l))"><i class="fas fa-check"></i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-warning" aria-label="@L["ShoppingLists_CancelEditAria"]" @onclick="@(e => { l.EditClicked= false;  })"><i class="fas fa-times"> </i></button>
+                                        <button type="button" class="editButtonStyle btn-sm btn-outline-danger" aria-label="@L["ShoppingLists_DeleteListAria"]" @onclick="@(e => DeleteList(l))"><i class="fas fa-ban"> </i></button>
                                     </div>
                                 }
                                 else
                                 {
                                     <div class="col-2">
-                                        <button @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></button>
+                                        <button aria-label="@L["ShoppingLists_EditListAria"]" @onclick="@(e => { l.EditClicked = true;  })"><i class="fas fa-edit"></i></button>
                                     </div>
 
                                 }

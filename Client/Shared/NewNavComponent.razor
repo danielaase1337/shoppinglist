@@ -13,35 +13,55 @@
 
     <div class="@NavMenuCssClass" id="toggler" @onclick="ToggleNavMenu">
         <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
-            <NavLink class="nav-link" href="shoppinglist">
-                <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
-            </NavLink>
+            <AuthorizeView>
+                <Authorized>
+                    <NavLink class="nav-link" href="shoppinglist">
+                        <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
+                    </NavLink>
 
-            @* Admin functions — click-toggled dropdown (D7: accessible on mobile/touch/keyboard) *@
-            <li class="nav-item admin-dropdown @(_adminOpen ? "open" : "")">
-                <span class="nav-link dropdown-trigger"
-                      role="button"
-                      aria-haspopup="true"
-                      aria-expanded="@_adminOpen"
-                      @onclick="ToggleAdminMenu"
-                      @onclick:stopPropagation="true">
-                    <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Admin <span class="dropdown-arrow">▼</span>
-                </span>
-                <div class="admin-dropdown-menu">
-                    <NavLink class="dropdown-item" href="/frequent-lists">
-                        <span class="oi oi-list-rich" aria-hidden="true" style="margin:2px"></span> Hyppige Lister
-                    </NavLink>
-                    <NavLink class="dropdown-item" href="/managemyshops">
-                        <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
-                    </NavLink>
-                    <NavLink class="dropdown-item" href="/items">
-                        <span class="oi oi-list" aria-hidden="true" style="margin:2px"></span> Administrer varer
-                    </NavLink>
-                    <NavLink class="dropdown-item" href="/categories">
-                        <span class="oi oi-tags" aria-hidden="true" style="margin:2px"></span> Administrer kategorier
-                    </NavLink>
-                </div>
-            </li>
+                    @* Admin functions — click-toggled dropdown (D7: accessible on mobile/touch/keyboard) *@
+                    <li class="nav-item admin-dropdown @(_adminOpen ? "open" : "")">
+                        <span class="nav-link dropdown-trigger"
+                              role="button"
+                              aria-haspopup="true"
+                              aria-expanded="@_adminOpen"
+                              @onclick="ToggleAdminMenu"
+                              @onclick:stopPropagation="true">
+                            <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Admin <span class="dropdown-arrow">▼</span>
+                        </span>
+                        <div class="admin-dropdown-menu">
+                            <NavLink class="dropdown-item" href="/frequent-lists">
+                                <span class="oi oi-list-rich" aria-hidden="true" style="margin:2px"></span> Hyppige Lister
+                            </NavLink>
+                            <NavLink class="dropdown-item" href="/managemyshops">
+                                <span class="oi oi-arrow-circle-top" aria-hidden="true" style="margin:2px"></span> Håndter butikker
+                            </NavLink>
+                            <NavLink class="dropdown-item" href="/items">
+                                <span class="oi oi-list" aria-hidden="true" style="margin:2px"></span> Administrer varer
+                            </NavLink>
+                            <NavLink class="dropdown-item" href="/categories">
+                                <span class="oi oi-tags" aria-hidden="true" style="margin:2px"></span> Administrer kategorier
+                            </NavLink>
+                        </div>
+                    </li>
+
+                    <li class="nav-item">
+                        <span class="nav-link nav-user">👤 @context.User.Identity?.Name</span>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/.auth/logout?post_logout_redirect_uri=/" class="nav-link">
+                            🚪 Logg ut
+                        </a>
+                    </li>
+                </Authorized>
+                <NotAuthorized>
+                    <li class="nav-item">
+                        <a href="/.auth/login/aad?post_login_redirect_uri=/" class="nav-link">
+                            🔒 Logg inn
+                        </a>
+                    </li>
+                </NotAuthorized>
+            </AuthorizeView>
 
         </ul>
     </div>

@@ -1,11 +1,75 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/img/*.{png,jpg,gif,svg}", "/css/*", "/_framework/*", "/api/*"]
+  "_readme": "AAD_CLIENT_ID and AAD_CLIENT_SECRET must be set as Application Settings in the Azure Static Web Apps resource in the Azure portal.",
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        }
+      }
+    }
   },
   "routes": [
     {
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/logout",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/_framework/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/_content/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/css/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/js/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/img/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.js",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.css",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.ico",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.png",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.svg",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/welcome",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*",
       "allowedRoles": ["anonymous"]
     }
   ],
@@ -14,5 +78,9 @@
       "rewrite": "/index.html",
       "statusCode": 200
     }
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/_framework/*", "/css/*", "/js/*", "/img/*", "/*.ico", "/*.png", "/*.svg"]
   }
 }

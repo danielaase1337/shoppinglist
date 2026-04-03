@@ -3,7 +3,18 @@
 
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <div class="container">
+                        <div class="card card-maincontainer">
+                            <p>🔄 Sjekker innlogging...</p>
+                        </div>
+                    </div>
+                </Authorizing>
+                <NotAuthorized>
+                    <RedirectToWelcome />
+                </NotAuthorized>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>
