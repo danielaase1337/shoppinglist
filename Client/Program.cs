@@ -57,7 +57,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, DebugAuthenticationState
 builder.Services.AddScoped<AuthenticationStateProvider, SwaAuthenticationStateProvider>();
 #endif
 builder.Services.AddSyncfusionBlazor();
-builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
+builder.Services.AddLocalization();
 
 // Fix: Pin UI culture to nb-NO so IStringLocalizer resolves SharedResources.nb-NO.resx
 var culture = new CultureInfo("nb-NO");
