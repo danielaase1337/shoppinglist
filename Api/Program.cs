@@ -23,8 +23,12 @@ namespace ApiIsolated
 
                     // Use environment variable to determine which repository to use
                     var environment = context.HostingEnvironment.EnvironmentName;
+                    // Use memory repos if: local Development, OR GOOGLE_CLOUD_PROJECT not set, OR GOOGLE_APPLICATION_CREDENTIALS not set.
+                    // The third check catches staging environments that have GOOGLE_CLOUD_PROJECT but no Firestore credentials file —
+                    // without it, GoogleFireBaseGenericRepository throws at startup and the Functions host returns HTML for all requests.
                     var useMemoryDb = environment == "Development" || 
-                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT"));
+                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT")) ||
+                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS"));
 
                     if (useMemoryDb)
                     {
