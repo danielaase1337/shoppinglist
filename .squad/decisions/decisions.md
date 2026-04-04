@@ -140,16 +140,114 @@ using DtoMealCategory = Shared.HandlelisteModels.MealCategory;
 
 ---
 
+## Phase 2 Meal Planning — WeekMenuController API (Glenn)
+**Date:** 2026-04-04  
+**Author:** Glenn (Backend Dev)  
+**Status:** ✅ IMPLEMENTED
+
+### D1 — Four Function handlers (not three)
+WeekMenu needs extra lookup route (`weekmenu/week/{weekNumber}/year/{year}`) beyond standard collection/single split. Distinct Azure Function (`weekmenubyweek`) avoids route conflicts with `{id}`.
+
+### D2 — `weekmenubyweek` does full Get() scan
+`IGenericRepository<T>.Get()` has no predicate overload. Loads all records and filters in-memory. Acceptable for current dataset sizes; Firestore query index needed if hot path.
+
+### D3 — Generate shopping list is preview-only
+`weekmenugenerateshoppinglist` returns `ShoppingListModel` without persisting. Caller decides whether to save as ShoppingList or FrequentList. Keeps API composable, avoids side-effects.
+
+### D4 — Single `_mealRepository.Get()` with in-memory dict
+Fetches all active recipes once into `Dictionary<string, MealRecipe>` (O(1) lookup). Only active recipes included. Avoids N+1 fetches per DailyMeal.
+
+### D5 — CustomIngredients take precedence
+If DailyMeal has `CustomIngredients.Any()`, uses those exclusively. Recipe defaults only when no overrides. DailyMeals with missing MealRecipeId/ingredients silently skipped.
+
+### D6 — Quantity aggregation uses Math.Ceiling to int
+`Mengde` is `int`. Aggregated `double` quantities ceiled to avoid under-ordering (e.g., 1.5 + 0.5 = 2).
+
+### D7 — No new DI registrations
+`IGenericRepository<WeekMenu>` already registered (Phase 1). No changes needed.
+
+### D8 — Auto-generated Name on POST
+Client sends empty/null Name → controller sets `"Uke {WeekNumber} {Year}"`. Ensures meaningful display name.
+
+---
+
+## Phase 2 Meal Planning — WeekMenuPages Frontend (Blair)
+**Date:** 2026-04-07  
+**Author:** Blair (Frontend Dev)  
+**Status:** ✅ IMPLEMENTED
+
+### D1 — `DailyMealModel.MealRecipeName` added
+Was missing from Shared model. Added as plain `string` property for denormalized display in planner. Avoids recipe lookups on every render.
+
+### D2 — `select` (not SfAutoComplete) for recipe picker
+7-row planner uses `<select>` with `@onchange`, not SfAutoComplete. Syncfusion instances are too heavy; standard select is performant and gives side-effects cleanly.
+
+### D3 — Thursday-first week order
+`WeekOrder` static `DayOfWeek[]` starts Thursday (Norwegian meal-planning convention). No localization library needed.
+
+### D4 — Friday auto-suggestion: KidsLike OR pizza
+On page load, if Friday unset, top-scoring active recipe with `Category == KidsLike` OR name contains "pizza" (case-insensitive) pre-selected with `IsSuggested = true`. Override clears flag.
+
+### D5 — "Generer handleliste" hidden for unsaved menus
+Button renders only when `!IsNew` (has Id). Prevents API calls with non-existent ids.
+
+### D6 — Generate shopping list: inline card, not modal
+Rendered below save buttons, not in JS modal. Consistent with app's no-modal infrastructure; simpler implementation.
+
+### D7 — Nav placement: "Ukemeny" under Admin, after "Middager"
+Planning/admin concern grouped logically with meal features.
+
+### D8 — `@using Shared` per-page
+Follows Phase 1 pattern. Avoids namespace collision in _Imports.razor.
+
+---
+
+## Phase 2 Meal Planning — Unit Tests (Josh)
+**Date:** 2026-04-04  
+**Author:** Josh (QA Engineer)  
+**Status:** ✅ IMPLEMENTED
+
+### D1 — Real Controller Tests (WeekMenuControllerTests)
+All 16 tests call actual controller methods (`_controller.RunAll(req)` / `_controller.RunOne(req, id)`). No mock-only testing.
+
+### D2 — Moq ICollection<T> Type Inference Bug
+`_mockRepo.Setup(r => r.Get()).ReturnsAsync(new List<T>())` silently returns null for parameterless `Get()` returning `Task<ICollection<T>>`. **Fix**: use `Returns(Task.FromResult<ICollection<T>>(list))` with explicit type parameter. Applies to any mocked `Get()` returning interface collection.
+
+### D3 — Soft-delete pattern verified
+Mock setup ensures `_repository.Delete()` never called (verified with `Times.Never`). Tests document correct soft-delete: Get → IsActive=false → Update.
+
+---
+
+## Phase 2 UI — ShopItem Autocomplete (Blair)
+**Date:** 2026-04-04  
+**Author:** Blair (Frontend Dev)  
+**Status:** ✅ IMPLEMENTED
+
+### Decision: Replace plain text input with SfAutoComplete for ingredients
+Reuses ShopItems catalogue, links ingredients to known item IDs (enables future shop sorting). Free-form entry preserved: null `ItemData` → slug-ID from text.
+
+### Implementation: Parallel ShopItems loading
+`_shopItems` loaded in `OnInitializedAsync` parallel to recipe fetch. `_shopItemsLoaded` flag shows spinner until ready. `_newIngShopItemId` tracks real catalogue ID separately from display text.
+
+### Pattern: Exact match to OneShoppingListPage lines 115-128
+SfAutoComplete configuration mirrors existing autocomplete usage. Event handler type: `Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel>`.
+
+---
+
 ## Deferred Decisions
 
-### Phase 2+: InventoryItem API
+### Phase 3+: InventoryItem API
 **Status:** Awaiting finalization of recipe → stock feature scope.  
 **Blocker:** DI registration deferred (no endpoints defined yet).
 
-### Phase 2+: Frontend IsActive Filtering
+### Phase 3+: Frontend IsActive Filtering
 **Status:** Awaiting frontend pagination/filter work.  
-**Approach:** Client-side filter for now. Consider backend query optimization in Phase 3.
+**Approach:** Client-side filter for now. Consider backend query optimization.
 
 ### Future: Enum Consolidation
 **Ray recommendation:** Consolidate MealCategory/MealType/MealEffort to single namespace.  
 **Impact:** Would simplify file-level aliases. Lower priority than Phase 2 features.
+
+### Phase 3+: Meal Suggestion Algorithm (AI Foreslå Meny)
+**Status:** Deferred pending API spec refinement.  
+**Scope:** Suggestion endpoint, category weighting, recent-meal exclusion.

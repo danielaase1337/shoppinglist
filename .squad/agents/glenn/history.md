@@ -79,3 +79,17 @@
 - AutoMapper: all 4 Phase 1 mappings already configured
 - AuthorizationLevel.Anonymous on all (consistent with SWA pattern)
 - ✅ Build clean, 0 errors, 44 pre-existing warnings (no new issues)
+
+### WeekMenuController — Phase 2 API (2026-04-07)
+- Controller path: `Api/Controllers/WeekMenuController.cs` — created fresh
+- Four Functions: `[Function("weekmenus")]` GET all/POST/PUT, `[Function("weekmenu")]` GET/{id}/soft-DELETE, `[Function("weekmenubyweek")]` GET by week+year, `[Function("weekmenugenerateshoppinglist")]` POST generate preview shopping list
+- GET all: ordered by Year DESC, WeekNumber DESC (most recent first)
+- POST: auto-generates Name as `"Uke {WeekNumber} {Year}"` when Name not provided; initializes DailyMeals to empty list if null
+- Soft delete: same pattern as MealRecipeController — GET → set IsActive=false + LastModified → Update()
+- `weekmenubyweek` route: `weekmenu/week/{weekNumber}/year/{year}` — scans all records, filters by weekNumber + year + IsActive
+- `weekmenugenerateshoppinglist`: preview-only — loads WeekMenu, builds recipe dict in one `_mealRepository.Get()` call, aggregates ingredients (sum Quantity by ShopItemId), returns `ShoppingListModel` — does NOT persist to Firestore
+- Constructor takes TWO repositories: `IGenericRepository<WeekMenu>` and `IGenericRepository<MealRecipe>`
+- DI registrations for WeekMenu already existed in Program.cs — no changes needed
+- AutoMapper mappings for WeekMenu/DailyMeal already in ShoppingListProfile.cs — no changes needed
+- ✅ Build clean, 0 errors, 53 pre-existing warnings (no new issues)
+- ✅ Integrated with 16 passing unit tests (josh-weekmenu-tests)

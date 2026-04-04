@@ -145,9 +145,26 @@
                 <div class="row g-2 align-items-end">
                     <div class="col-3">
                         <label class="form-label">Varenavn</label>
-                        <input class="form-control form-control-sm"
-                               placeholder="f.eks. Brokkoli"
-                               @bind="_newIngName" />
+                        @if (!_shopItemsLoaded)
+                        {
+                            <div class="form-control form-control-sm d-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <small class="text-muted">Laster varer...</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <SfAutoComplete TValue="string" TItem="ShopItemModel"
+                                            Placeholder="Søk etter vare..."
+                                            @bind-Value="@_newIngName"
+                                            DataSource="@_shopItems"
+                                            FilterType="FilterType.Contains"
+                                            Highlight>
+                                <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                                <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                                    ValueChange="@OnIngredientShopItemChanged" />
+                            </SfAutoComplete>
+                        }
                     </div>
                     <div class="col-2">
                         <label class="form-label">Mengde</label>
@@ -237,16 +254,25 @@
     private string _mealTypeStr = nameof(MealType.FreshCook);
     private string _effortStr   = nameof(MealEffort.Normal);
 
+    // ShopItems catalogue for ingredient autocomplete
+    private List<ShopItemModel> _shopItems       = new();
+    private bool                _shopItemsLoaded = false;
+
     // New ingredient form fields
-    private string _newIngName     = "";
-    private double _newIngQty      = 1;
-    private string _newIngUnitStr  = nameof(MealUnit.Piece);
-    private bool   _newIngOptional = false;
-    private bool   _newIngFresh    = false;
-    private bool   _newIngBasic    = false;
+    private string _newIngName       = "";
+    private string _newIngShopItemId = "";
+    private double _newIngQty        = 1;
+    private string _newIngUnitStr    = nameof(MealUnit.Piece);
+    private bool   _newIngOptional   = false;
+    private bool   _newIngFresh      = false;
+    private bool   _newIngBasic      = false;
 
     protected override async Task OnInitializedAsync()
     {
+        // Start shop items load immediately so it runs in parallel
+        var shopItemsTask = Http.GetFromJsonAsync<List<ShopItemModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+
         if (IsNew)
         {
             Recipe = new MealRecipeModel { BasePortions = 4, IsActive = true };
@@ -271,6 +297,32 @@
                 Recipe = new MealRecipeModel();
             }
         }
+
+        try
+        {
+            _shopItems = await shopItemsTask ?? new List<ShopItemModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shop items: {ex.Message}");
+            _shopItems = new List<ShopItemModel>();
+        }
+        _shopItemsLoaded = true;
+    }
+
+    private void OnIngredientShopItemChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel> args)
+    {
+        if (args.ItemData != null)
+        {
+            // Catalogue item selected — use its real Id
+            _newIngShopItemId = args.ItemData.Id;
+            _newIngName       = args.ItemData.Name;
+        }
+        else
+        {
+            // Free-form text — derive a slug id from what was typed
+            _newIngShopItemId = args.Value ?? "";
+        }
     }
 
     private void AddIngredient()
@@ -281,7 +333,9 @@
 
         var ing = new MealIngredientModel
         {
-            ShopItemId   = _newIngName.Trim().ToLowerInvariant().Replace(" ", "-"),
+            ShopItemId   = string.IsNullOrWhiteSpace(_newIngShopItemId)
+                               ? _newIngName.Trim().ToLowerInvariant().Replace(" ", "-")
+                               : _newIngShopItemId,
             ShopItemName = _newIngName.Trim(),
             Quantity     = _newIngQty,
             Unit         = unit,
@@ -295,12 +349,13 @@
         Recipe.Ingredients = list;
 
         // Reset form
-        _newIngName     = "";
-        _newIngQty      = 1;
-        _newIngUnitStr  = nameof(MealUnit.Piece);
-        _newIngOptional = false;
-        _newIngFresh    = false;
-        _newIngBasic    = false;
+        _newIngName       = "";
+        _newIngShopItemId = "";
+        _newIngQty        = 1;
+        _newIngUnitStr    = nameof(MealUnit.Piece);
+        _newIngOptional   = false;
+        _newIngFresh      = false;
+        _newIngBasic      = false;
     }
 
     private void RemoveIngredient(MealIngredientModel ing)

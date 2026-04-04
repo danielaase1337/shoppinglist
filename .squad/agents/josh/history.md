@@ -77,3 +77,15 @@
 - Mock setup: 3 seeded recipes with varying PopularityScore, IsFresh, IsActive states
 - ✅ All 12 tests PASS
 - ✅ dotnet test Api.Tests/ → 12/12 green
+
+## WeekMenuController Tests (2026-04-07)
+
+- **File written**: `Api.Tests/Controllers/WeekMenuControllerTests.cs` — 16 tests for `WeekMenuController`.
+- **Controller existed**: Glenn had already created `WeekMenuController.cs` in parallel; tests were adapted to match actual implementation.
+- **Two-repo pattern**: `WeekMenuController` takes two repos — `IGenericRepository<WeekMenu>` + `IGenericRepository<MealRecipe>`. Both mocked in test class constructor.
+- **`ReturnsAsync` type inference bug**: `ReturnsAsync(new List<T>())` fails silently for `Task<ICollection<T>>` return types — Moq returns null at runtime, causing `allRecipes` to be null in the generate test. **Fix**: use `Returns(Task.FromResult<ICollection<T>>(list))` with explicit type parameter when the method returns an interface collection type.
+- **Generate shopping list pattern**: Controller calls `_mealRepository.Get()` (all recipes, not by ID) to build a lookup dict. CustomIngredients on DailyMeal override recipe ingredients when `.Any()` is true.
+- **Ordering**: GetAll returns Year DESC, WeekNumber DESC — test 1 verifies this with 2 menus.
+- **Soft-delete pattern**: Same as MealRecipeController — Get → IsActive=false → Update. `_repository.Delete()` is never called (verified with `Times.Never`).
+- ✅ All 16 tests PASS (`dotnet test --filter "WeekMenu"` → 16/16 green)
+- ✅ **Critical finding documented**: Moq ReturnsAsync silently returns null for `ICollection<T>`. Use `Returns(Task.FromResult<ICollection<T>>())` with explicit generic type. This pattern applies to ALL future repository Get() mocks returning interface collections.
