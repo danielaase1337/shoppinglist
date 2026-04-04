@@ -28,7 +28,13 @@ namespace BlazorApp.Client.Common
                 { "itemcategory","api/itemcategory" },
                 { "itemcategorys", "api/itemcategorys" },
                 { "frequentshoppinglist", "api/frequentshoppinglist" },
-                { "frequentshoppinglists", "api/frequentshoppinglists" }
+                { "frequentshoppinglists", "api/frequentshoppinglists" },
+                { "mealrecipe", "api/mealrecipe" },
+                { "mealrecipes", "api/mealrecipes" },
+                { "weekmenu", "api/weekmenu" },
+                { "weekmenus", "api/weekmenus" },
+                { "inventoryitem", "api/inventoryitem" },
+                { "inventoryitems", "api/inventoryitems" }
             };
         }
         public string GetApiUrl(ShoppingListKeysEnum key)
