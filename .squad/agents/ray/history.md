@@ -47,7 +47,44 @@
 
 **CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
 
-### 2025-01-22 — Full Data Architecture Review (data-findings.md)
+### 2026-04-04 — Phase 1 Data Models for Meal Planning ✅ COMPLETE
+
+**Summary:** Implemented all new data model files for meal planning Phase 1 per the authoritative spec in `peter/meal-planning-v1-scope.md`.
+
+**New files created:**
+- `Shared/Shared/MealUnit.cs` — `MealUnit` enum in `Shared` root namespace (15 values: Gram through Package)
+- `Shared/Shared/MealUnitExtensions.cs` — `ToNorwegian()` extension method for display names
+- `Shared/Shared/FireStoreDataModels/InventoryItem.cs` — New Firestore entity for pantry tracking
+- `Shared/Shared/HandlelisteModels/InventoryItemModel.cs` — DTO mirror of InventoryItem
+
+**Updated Firestore models:**
+- `MealIngredient.cs` — Removed EntityBase inheritance; changed to ShopItemId/ShopItemName/Quantity(double)/Unit(MealUnit)/IsOptional/IsFresh/IsBasic fields per D3 (embedded, no standalone collection)
+- `MealRecipe.cs` — Added MealType, IsFresh, PrepTimeMinutes, Effort (MealEffort), BasePortions fields
+- `DailyMeal.cs` — Removed EntityBase inheritance; replaced WeekMenuId+DayOfWeek+MealRecipe with Day+MealRecipeId+IsSuggested per D3 (ref-based, not embedded)
+- `WeekMenu.cs` — Replaced CreatedDate with PlanningStartDate (Thursday week anchor)
+- `MealCategory.cs` — Added Chicken, Pasta, Celebration, Other; added MealType and MealEffort enums
+
+**Updated DTO models:**
+- `MealIngredientModel.cs` — Mirrors new MealIngredient (no EntityBase)
+- `MealRecipeModel.cs` — Mirrors new MealRecipe with new fields
+- `DailyMealModel.cs` — Mirrors new DailyMeal (no EntityBase, uses MealRecipeId reference)
+- `WeekMenuModel.cs` — PlanningStartDate replaces CreatedDate
+- `HandlelisteModels/MealCategory.cs` — Same enum additions as Firestore side
+
+**Updated supporting files:**
+- `Api/ShoppingListProfile.cs` — Added `InventoryItem ↔ InventoryItemModel` AutoMapper mapping
+- `Repository/MemoryGenericRepository.cs` — Updated seed data to new MealIngredient structure; added `FirestoreMealType`/`FirestoreMealEffort` using aliases to resolve ambiguity from duplicate enums in both namespaces
+
+**No change needed to `GoogleDbContext.cs`** — Convention-based naming already handles `InventoryItem → inventoryitems` automatically (D4).
+
+**Validation:** `dotnet build Shared.csproj` clean; `dotnet test Api.Tests.csproj` — 110 passed, 0 failed.
+
+**Key patterns confirmed:**
+- `MealUnit` lives in root `Shared` namespace (shared across FireStoreDataModels and HandlelisteModels)
+- Embedded classes (MealIngredient, DailyMeal) do NOT inherit EntityBase
+- Root collection entities (MealRecipe, WeekMenu, InventoryItem) DO inherit EntityBase
+- Duplicate enums in both namespaces (MealCategory, MealType, MealEffort) require using-aliases in files that import both namespaces simultaneously
+
 - **CRITICAL BUG:** `GoogleDbContext.GetCollectionKey()` only maps 4 types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all fall through to `"misc"` — they will corrupt each other in production.
 - **CRITICAL BUG:** `WeekMenu` and `DailyMeal` are not registered in `Program.cs` DI — the week menu feature is entirely unwired.
 - **DESIGN ISSUE:** `MealIngredient` is both embedded inside `MealRecipe.Ingredients[]` AND has its own `IGenericRepository<MealIngredient>` registered in DI. These two storage strategies are contradictory. The standalone repo writes to a "misc" collection that nothing reads.
@@ -60,3 +97,19 @@
 - **SECURITY:** Zero user isolation. No `OwnerId`/`UserId` on any entity. Adding Firebase Auth requires adding ownership fields + migration + query changes.
 - `ShelfCategory` class with `GetDefaults()` is dead code — never stored in Firestore, never used by any controller or model.
 - `GoogleDbContext` stores collection state as mutable properties (`Collection`, `CollectionKey`) — safe only because `AddTransient` creates a new instance per injection, but the design is fragile.
+
+## Orchestration Log — 2026-04-04T05:12:37Z
+**Phase 1 Meal Planning — Data Models ✅ COMPLETE**
+- Created MealUnit enum (root Shared namespace) + MealUnitExtensions
+- Created InventoryItem (Firestore) + InventoryItemModel (DTO)
+- Updated MealIngredient: removed EntityBase, double qty+MealUnit, IsFresh, IsBasic
+- Updated MealRecipe: MealType, IsFresh, PrepTimeMinutes, Effort, BasePortions
+- Updated DailyMeal: removed EntityBase, MealRecipeId string ref, IsSuggested
+- Updated WeekMenu: PlanningStartDate (Thursday anchor)
+- Extended MealCategory enum: Chicken, Pasta, Celebration, Other
+- Added MealType, MealEffort enums (both namespaces)
+- Mirror all changes in HandlelisteModels DTOs
+- Updated MemoryGenericRepository: seed data + using aliases for enum ambiguity
+- Updated ShoppingListProfile: InventoryItem AutoMapper entry
+- GoogleDbContext: no changes (D4 convention handles InventoryItem → inventoryitems)
+- ✅ Build clean, 110 API tests pass

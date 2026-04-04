@@ -1,24 +1,27 @@
-using Shared.BaseModels;
-
 namespace Shared.HandlelisteModels
 {
-    public class MealIngredientModel : EntityBase
+    public class MealIngredientModel
     {
-        public string MealRecipeId { get; set; }
-        public ShopItemModel ShopItem { get; set; }
-        public int StandardQuantity { get; set; }
+        public string ShopItemId { get; set; }
+        public string ShopItemName { get; set; }
+        public double Quantity { get; set; }
+        public MealUnit Unit { get; set; }
         public bool IsOptional { get; set; }
+        public bool IsFresh { get; set; }
+        public bool IsBasic { get; set; }
 
         public MealIngredientModel()
         {
-            StandardQuantity = 1;
+            Quantity = 1;
             IsOptional = false;
-            ShopItem = new ShopItemModel();
+            IsFresh = false;
+            IsBasic = false;
         }
 
-        public override bool IsValid()
+        public bool IsValid()
         {
-            return ShopItem != null && ShopItem.IsValid() && StandardQuantity > 0;
+            return !string.IsNullOrEmpty(ShopItemId) && !string.IsNullOrEmpty(ShopItemName) && Quantity > 0;
         }
     }
 }
+

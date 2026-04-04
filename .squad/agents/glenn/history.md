@@ -57,3 +57,25 @@
 - **Key architectural decision**: v1 = family app (D2). Auth is parsed everywhere but NOT enforced as a gate on reads. Write enforcement deferred to future sprint. Principal available for logging and v2 FamilyId path.
 - **Auth type**: Microsoft provider only (D14). SWA injects header automatically — zero JWT library dependencies.
 - **99 API tests passing** post-change.
+
+
+### MealRecipeController - Phase 1 API (2026-04-04)
+- Controller path: Api/Controllers/MealRecipeController.cs - pre-existed with defects; replaced in full
+- Three Functions: [Function(mealrecipes)] GET all by PopularityScore DESC/POST/PUT, [Function(mealrecipe)] GET/{id} 404/soft-DELETE, [Function(mealrecipesimport)] POST bulk import route mealrecipes/import
+- Soft delete: GET item, set IsActive=false + LastModified=UtcNow, call _repository.Update(). No hard delete.
+- POST sets IsActive=true and LastModified=UtcNow
+- Program.cs: MealRecipe and WeekMenu already registered in both branches. InventoryItem skipped, model not in Shared yet.
+- ShoppingListProfile.cs: already had all 4 Phase 1 mappings. No changes needed.
+- IGenericRepository.Delete() returns bool not T - old controller had broken null check; fixed via soft delete pattern.
+- AuthorizationLevel changed to Anonymous (consistent with ShopsItemsController for SWA environment).
+- Build: succeeded, 0 errors, 44 pre-existing warnings.
+
+## Orchestration Log — 2026-04-04T05:12:37Z
+**Phase 1 Meal Planning — MealRecipeController ✅ COMPLETE**
+- Implemented 3 Azure Function handlers with 6 HTTP endpoints
+- Soft-delete pattern: DELETE sets IsActive=false + LastModified, calls Update()
+- Bulk import: POST /api/mealrecipes/import deserializes list, inserts each, applies AutoMapper
+- DI registrations: MealRecipe, WeekMenu already in place (InventoryItem deferred)
+- AutoMapper: all 4 Phase 1 mappings already configured
+- AuthorizationLevel.Anonymous on all (consistent with SWA pattern)
+- ✅ Build clean, 0 errors, 44 pre-existing warnings (no new issues)

@@ -19,7 +19,13 @@ namespace BlazorApp.Client.Common
         itemcategory = 7,
         itemcategorys = 8,
         FrequentShoppingList = 9,
-        FrequentShoppingLists = 10
+        FrequentShoppingLists = 10,
+        MealRecipes = 11,
+        MealRecipe = 12,
+        WeekMenus = 13,
+        WeekMenu = 14,
+        InventoryItems = 15,
+        InventoryItem = 16
 
 
     }

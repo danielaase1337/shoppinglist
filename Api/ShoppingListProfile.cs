@@ -24,6 +24,7 @@ namespace Api
             this.CreateMap<MealIngredient, MealIngredientModel>().ReverseMap();
             this.CreateMap<WeekMenu, WeekMenuModel>().ReverseMap();
             this.CreateMap<DailyMeal, DailyMealModel>().ReverseMap();
+            this.CreateMap<InventoryItem, InventoryItemModel>().ReverseMap();
         }
     }
 }

@@ -83,3 +83,39 @@
 - PRs for feature work target `development`; only release PRs target `main`
 
 **CI/CD updated:** `.github/workflows/azure-static-web-apps-purple-meadow-02a012403.yml` now has three separate jobs: production (main), staging (development), and PR previews.
+
+### 2026-04-04 — Phase 1 Meal Planning Frontend ✅ COMPLETE
+
+**Files created:**
+- `Client/Pages/Meals/MealManagementPage.razor` — `/meals` list page: search, category filter, popularity display, edit/delete nav, `GetCategoryIcon()` helper
+- `Client/Pages/Meals/OneMealRecipePage.razor` — `/meals/new` + `/meals/{Id}` editor: full form with all spec fields, ingredient table + add-ingredient form, POST/PUT/DELETE
+
+**Files modified:**
+- `Client/Common/ShoppingListKeysEnum.cs` — Added `MealRecipes=11`, `MealRecipe=12`, `WeekMenus=13`, `WeekMenu=14`, `InventoryItems=15`, `InventoryItem=16`
+- `Client/Common/ISettings.cs` — Added 6 new URL mappings in the dictionary
+- `Client/Shared/NewNavComponent.razor` — Added "Middager" link under Admin dropdown
+- `Shared/Shared/HandlelisteModels/MealRecipeModel.cs` — (Already updated by Ray) Confirmed correct; no changes needed.
+
+**Patterns followed:**
+- `@using Shared` added per-page for `MealUnit` (lives in `Shared` namespace, not `Shared.HandlelisteModels`)
+- `ISettings.GetApiUrl` / `GetApiUrlId` for all API calls — no hardcoded URLs
+- String-backed enum bindings for `<select>` elements (Blazor-safe pattern)
+- `LoadingComponent` while data null (matches ShoppingListMainPage pattern)
+- New items appended at end of Ingredients list (ingredients are ordered by user intent, not auto-sorted)
+- `LastModified = DateTime.UtcNow` set on Save
+
+**Build status:** Client pages compile correctly. `Shared` project has pre-existing errors in `MemoryGenericRepository.cs` (Ray's domain): ambiguous `MealType`/`MealEffort` references (same enums in both Firestore and HandlelisteModels namespaces) + dummy data uses old `MealIngredient` properties (`Id`, `Name`, `ShopItem`, `StandardQuantity`) before Ray's model update. Client will build clean once Ray resolves those.
+
+## Orchestration Log — 2026-04-04T05:12:37Z
+**Phase 1 Meal Planning — Meal Pages Frontend ✅ COMPLETE**
+- Created MealManagementPage.razor (/meals): list, search, category filter, popularity score, soft-delete with inactive label
+- Created OneMealRecipePage.razor (/meals/{id}, /meals/new): create/edit form, ingredient management (autocomplete ShopItem, qty+unit, freshness flags)
+- Updated ShoppingListKeysEnum: +6 values (MealRecipes, MealRecipe, WeekMenus, WeekMenu, InventoryItems, InventoryItem)
+- Updated ISettings: +6 API URL mappings
+- Updated NewNavComponent: added "Middager" link under Admin dropdown
+- Decision: @using Shared per-page (not _Imports.razor) for MealUnit namespace safety
+- Decision: String-backed enum bindings on <select> (not direct enum bind) for cross-namespace stability
+- Decision: Ingredients append to end (not position 0) to preserve recipe order
+- Decision: Soft-delete UX — list reflects IsActive=false, detail navigates away
+- ✅ Pages compile clean, ready for integration
+

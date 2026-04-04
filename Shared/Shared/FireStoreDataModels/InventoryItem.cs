@@ -1,9 +1,11 @@
 using Google.Cloud.Firestore;
+using Shared.BaseModels;
+using System;
 
 namespace Shared.FireStoreDataModels
 {
     [FirestoreData]
-    public class MealIngredient
+    public class InventoryItem : EntityBase
     {
         [FirestoreProperty]
         public string ShopItemId { get; set; }
@@ -12,27 +14,27 @@ namespace Shared.FireStoreDataModels
         public string ShopItemName { get; set; }
 
         [FirestoreProperty]
-        public double Quantity { get; set; }
+        public double QuantityInStock { get; set; }
 
         [FirestoreProperty]
         public MealUnit Unit { get; set; }
 
         [FirestoreProperty]
-        public bool IsOptional { get; set; }
+        public double LowerThreshold { get; set; }
 
         [FirestoreProperty]
-        public bool IsFresh { get; set; }
+        public DateTime? LastUpdated { get; set; }
 
         [FirestoreProperty]
-        public bool IsBasic { get; set; }
+        public string ItemCategory { get; set; }
 
-        public MealIngredient()
+        [FirestoreProperty]
+        public string SourceMealRecipeId { get; set; }
+
+        public InventoryItem()
         {
-            Quantity = 1;
-            IsOptional = false;
-            IsFresh = false;
-            IsBasic = false;
+            QuantityInStock = 0;
+            LowerThreshold = 0;
         }
     }
 }
-
