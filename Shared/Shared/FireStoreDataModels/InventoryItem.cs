@@ -31,10 +31,14 @@ namespace Shared.FireStoreDataModels
         [FirestoreProperty]
         public string SourceMealRecipeId { get; set; }
 
+        [FirestoreProperty]
+        public bool IsActive { get; set; }
+
         public InventoryItem()
         {
             QuantityInStock = 0;
             LowerThreshold = 0;
+            IsActive = true;
         }
     }
 }

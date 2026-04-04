@@ -1,0 +1,450 @@
+@page "/familyprofile"
+@inject HttpClient Http
+@inject ISettings Settings
+
+<div class="card-maincontainer container-sm">
+
+    <div class="card">
+        <h2>👨‍👩‍👧‍👦 Familieprofil</h2>
+        <p class="text-muted">Administrer husholdningens medlemmer og porsjonsregler for handlelisten.</p>
+    </div>
+
+    @if (_loading)
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+    else
+    {
+        @* Section 1: Family Members *@
+        <div class="card">
+            <h5>Familiemedlemmer</h5>
+
+            @if (_profile == null)
+            {
+                <p class="text-muted">Ingen familieprofil funnet.</p>
+                <button class="btn btn-primary" @onclick="CreateProfile" disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-plus"></i>
+                    }
+                    Opprett familieprofil
+                </button>
+            }
+            else
+            {
+                @if (_profile.Members != null && _profile.Members.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Navn</th>
+                                <th>Aldersgruppe</th>
+                                <th>Kostholdsnotes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in _profile.Members)
+                            {
+                                <tr>
+                                    <td>@member.Name</td>
+                                    <td>@AgeGroupLabel(member.AgeGroup)</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(member.DietaryNotes))
+                                        {
+                                            <small class="text-muted">@member.DietaryNotes</small>
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">—</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                @onclick="@(() => RemoveMember(member))"
+                                                disabled="@_saving">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted"><small>Ingen familiemedlemmer lagt til ennå.</small></p>
+                }
+
+                <div class="add-member-form mt-3">
+                    <h6>Legg til familiemedlem</h6>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-3">
+                            <label class="form-label">Navn</label>
+                            <input class="form-control form-control-sm" @bind="_newMemberName"
+                                   placeholder="f.eks. Mamma" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Aldersgruppe</label>
+                            <select class="form-select form-select-sm" @bind="_newMemberAgeGroupStr">
+                                @foreach (var ag in Enum.GetValues<AgeGroup>())
+                                {
+                                    <option value="@ag">@AgeGroupLabel(ag)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Kostholdsnotes (valgfri)</label>
+                            <textarea class="form-control form-control-sm" rows="1"
+                                      @bind="_newMemberDietaryNotes"
+                                      placeholder="f.eks. laktoseintoleranse..."></textarea>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-success"
+                                    @onclick="AddMember" disabled="@_saving">
+                                <i class="fas fa-plus"></i> Legg til
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Section 2: Portion Rules *@
+        <div class="card">
+            <h5>Porsjonsregler</h5>
+            <p class="text-muted"><small>Definer mengde per person per aldersgruppe. Brukes til å skalere handlelister fra ukemeny.</small></p>
+
+            @if (_portionRules != null && _portionRules.Any(r => r.IsActive))
+            {
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Vare</th>
+                            <th>Aldersgruppe</th>
+                            <th>Mengde/person</th>
+                            <th>Enhet</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in _portionRules.Where(r => r.IsActive))
+                        {
+                            <tr>
+                                <td>@rule.ShopItemName</td>
+                                <td>@AgeGroupLabel(rule.AgeGroup)</td>
+                                <td>@rule.QuantityPerPerson</td>
+                                <td><small>@rule.Unit.ToNorwegian()</small></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            @onclick="@(() => DeletePortionRule(rule))"
+                                            disabled="@_saving">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted"><small>Ingen porsjonsregler definert ennå.</small></p>
+            }
+
+            <div class="add-rule-form mt-3">
+                <h6>Legg til porsjonsregel</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-3">
+                        <label class="form-label">Vare</label>
+                        @if (!_shopItemsLoaded)
+                        {
+                            <div class="form-control form-control-sm d-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <small class="text-muted">Laster varer...</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <SfAutoComplete TValue="string" TItem="ShopItemModel"
+                                            Placeholder="Søk etter vare..."
+                                            @bind-Value="@_newRuleShopItemName"
+                                            DataSource="@_shopItems"
+                                            FilterType="FilterType.Contains"
+                                            Highlight>
+                                <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                                <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                                    ValueChange="@OnRuleShopItemChanged" />
+                            </SfAutoComplete>
+                        }
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label">Aldersgruppe</label>
+                        <select class="form-select form-select-sm" @bind="_newRuleAgeGroupStr">
+                            @foreach (var ag in Enum.GetValues<AgeGroup>())
+                            {
+                                <option value="@ag">@AgeGroupLabel(ag)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label">Mengde/person</label>
+                        <input type="number" step="0.5" min="0.1"
+                               class="form-control form-control-sm"
+                               @bind="_newRuleQty" />
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label">Enhet</label>
+                        <select class="form-select form-select-sm" @bind="_newRuleUnitStr">
+                            @foreach (var u in Enum.GetValues<MealUnit>())
+                            {
+                                <option value="@u">@u.ToNorwegian()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-outline-success"
+                                @onclick="AddPortionRule"
+                                disabled="@(_saving || !_shopItemsLoaded)">
+                            <i class="fas fa-plus"></i> Legg til
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private FamilyProfileModel? _profile;
+    private List<PortionRuleModel>? _portionRules;
+    private bool _loading = true;
+    private bool _saving = false;
+
+    private List<ShopItemModel> _shopItems = new();
+    private bool _shopItemsLoaded = false;
+
+    // New member form
+    private string _newMemberName = "";
+    private string _newMemberAgeGroupStr = nameof(AgeGroup.Adult);
+    private string? _newMemberDietaryNotes;
+
+    // New portion rule form
+    private string _newRuleShopItemName = "";
+    private string _newRuleShopItemId = "";
+    private string _newRuleAgeGroupStr = nameof(AgeGroup.Adult);
+    private double _newRuleQty = 1.0;
+    private string _newRuleUnitStr = nameof(MealUnit.Piece);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var shopItemsTask = Http.GetFromJsonAsync<List<ShopItemModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+        var portionRulesTask = Http.GetFromJsonAsync<List<PortionRuleModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.PortionRules));
+
+        try
+        {
+            var profiles = await Http.GetFromJsonAsync<List<FamilyProfileModel>>(
+                Settings.GetApiUrl(ShoppingListKeysEnum.FamilyProfiles));
+            _profile = profiles?.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading family profile: {ex.Message}");
+        }
+
+        try
+        {
+            _portionRules = await portionRulesTask ?? new List<PortionRuleModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading portion rules: {ex.Message}");
+            _portionRules = new List<PortionRuleModel>();
+        }
+
+        try
+        {
+            _shopItems = await shopItemsTask ?? new List<ShopItemModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shop items: {ex.Message}");
+            _shopItems = new List<ShopItemModel>();
+        }
+
+        _shopItemsLoaded = true;
+        _loading = false;
+    }
+
+    private async Task CreateProfile()
+    {
+        _saving = true;
+        try
+        {
+            var newProfile = new FamilyProfileModel
+            {
+                Name = "Familieprofil",
+                LastModified = DateTime.UtcNow
+            };
+            var response = await Http.PostAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.FamilyProfiles), newProfile);
+            if (response.IsSuccessStatusCode)
+                _profile = await response.Content.ReadFromJsonAsync<FamilyProfileModel>();
+            else
+                Console.WriteLine($"❌ Create profile failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error creating profile: {ex.Message}");
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task AddMember()
+    {
+        if (_profile == null || string.IsNullOrWhiteSpace(_newMemberName)) return;
+
+        var ageGroup = Enum.TryParse<AgeGroup>(_newMemberAgeGroupStr, out var ag) ? ag : AgeGroup.Adult;
+        var member = new FamilyMemberModel
+        {
+            Name = _newMemberName.Trim(),
+            AgeGroup = ageGroup,
+            DietaryNotes = string.IsNullOrWhiteSpace(_newMemberDietaryNotes) ? null : _newMemberDietaryNotes.Trim()
+        };
+
+        var list = _profile.Members?.ToList() ?? new List<FamilyMemberModel>();
+        list.Add(member);
+        _profile.Members = list;
+        await UpdateProfile();
+
+        _newMemberName = "";
+        _newMemberAgeGroupStr = nameof(AgeGroup.Adult);
+        _newMemberDietaryNotes = null;
+    }
+
+    private async Task RemoveMember(FamilyMemberModel member)
+    {
+        if (_profile == null) return;
+        var list = _profile.Members?.ToList() ?? new List<FamilyMemberModel>();
+        list.Remove(member);
+        _profile.Members = list;
+        await UpdateProfile();
+    }
+
+    private async Task UpdateProfile()
+    {
+        if (_profile == null) return;
+        _saving = true;
+        try
+        {
+            _profile.LastModified = DateTime.UtcNow;
+            var response = await Http.PutAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.FamilyProfiles), _profile);
+            if (!response.IsSuccessStatusCode)
+                Console.WriteLine($"❌ Update profile failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error updating profile: {ex.Message}");
+        }
+        finally { _saving = false; }
+    }
+
+    private void OnRuleShopItemChanged(ChangeEventArgs<string, ShopItemModel> args)
+    {
+        if (args.ItemData != null)
+        {
+            _newRuleShopItemId = args.ItemData.Id;
+            _newRuleShopItemName = args.ItemData.Name;
+        }
+        else
+        {
+            _newRuleShopItemId = args.Value ?? "";
+        }
+    }
+
+    private async Task AddPortionRule()
+    {
+        if (string.IsNullOrWhiteSpace(_newRuleShopItemName) || _newRuleQty <= 0) return;
+
+        var ageGroup = Enum.TryParse<AgeGroup>(_newRuleAgeGroupStr, out var ag) ? ag : AgeGroup.Adult;
+        var unit = Enum.TryParse<MealUnit>(_newRuleUnitStr, out var u) ? u : MealUnit.Piece;
+
+        var rule = new PortionRuleModel
+        {
+            ShopItemId = string.IsNullOrWhiteSpace(_newRuleShopItemId)
+                ? _newRuleShopItemName.Trim().ToLowerInvariant().Replace(" ", "-")
+                : _newRuleShopItemId,
+            ShopItemName = _newRuleShopItemName.Trim(),
+            AgeGroup = ageGroup,
+            QuantityPerPerson = _newRuleQty,
+            Unit = unit,
+            IsActive = true,
+            LastModified = DateTime.UtcNow
+        };
+
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.PortionRules), rule);
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<PortionRuleModel>();
+                if (created != null)
+                {
+                    _portionRules ??= new List<PortionRuleModel>();
+                    _portionRules.Add(created);
+                }
+                _newRuleShopItemName = "";
+                _newRuleShopItemId = "";
+                _newRuleAgeGroupStr = nameof(AgeGroup.Adult);
+                _newRuleQty = 1.0;
+                _newRuleUnitStr = nameof(MealUnit.Piece);
+            }
+            else
+            {
+                Console.WriteLine($"❌ Add portion rule failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error adding portion rule: {ex.Message}");
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task DeletePortionRule(PortionRuleModel rule)
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.DeleteAsync(
+                Settings.GetApiUrlId(ShoppingListKeysEnum.PortionRule, rule.Id));
+            if (response.IsSuccessStatusCode)
+                _portionRules?.Remove(rule);
+            else
+                Console.WriteLine($"❌ Delete portion rule failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error deleting portion rule: {ex.Message}");
+        }
+        finally { _saving = false; }
+    }
+
+    private static string AgeGroupLabel(AgeGroup ag) => ag switch
+    {
+        AgeGroup.Adult   => "Voksen",
+        AgeGroup.Child   => "Barn",
+        AgeGroup.Toddler => "Småbarn",
+        _                => ag.ToString()
+    };
+}

@@ -1,0 +1,461 @@
+@page "/inventory"
+@using Shared
+@inject HttpClient Http
+@inject ISettings Settings
+@inject NavigationManager Navigation
+
+<div class="card-maincontainer container-sm">
+
+    <div class="card">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2>🏪 Lager</h2>
+                <p class="text-muted">Administrer pantry og fryseinnhold</p>
+            </div>
+        </div>
+    </div>
+
+    @if (_items == null)
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+    else
+    {
+        @* Freeze shortcut *@
+        <div class="card">
+            <h5>🧊 Legg til frossen middag</h5>
+            <div class="row g-2 align-items-end">
+                <div class="col-6">
+                    <label class="form-label">Velg rett som ble laget dobbelt</label>
+                    <select class="form-select" @bind="_freezeRecipeId">
+                        <option value="">-- Velg middag --</option>
+                        @foreach (var recipe in _recipes ?? Enumerable.Empty<MealRecipeModel>())
+                        {
+                            <option value="@recipe.Id">@recipe.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-info" @onclick="AddFrozenMeal" disabled="@(string.IsNullOrEmpty(_freezeRecipeId) || _saving)">
+                        🧊 Legg til frossen porsjon
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* Add item form *@
+        <div class="card">
+            <h5>Legg til vare</h5>
+            <div class="row g-2 align-items-end">
+                <div class="col-3">
+                    <label class="form-label">Varenavn</label>
+                    @if (!_shopItemsLoaded)
+                    {
+                        <div class="form-control form-control-sm d-flex align-items-center">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <small class="text-muted">Laster varer...</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <SfAutoComplete TValue="string" TItem="ShopItemModel"
+                                        Placeholder="Søk etter vare..."
+                                        @bind-Value="@_newName"
+                                        DataSource="@_shopItems"
+                                        FilterType="FilterType.Contains"
+                                        Highlight>
+                            <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                            <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                                ValueChange="@OnNewItemShopItemChanged" />
+                        </SfAutoComplete>
+                    }
+                </div>
+                <div class="col-2">
+                    <label class="form-label">Antall på lager</label>
+                    <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newQty" />
+                </div>
+                <div class="col-2">
+                    <label class="form-label">Nedre grense</label>
+                    <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newThreshold" />
+                </div>
+                <div class="col-2">
+                    <label class="form-label">Enhet</label>
+                    <select class="form-select form-select-sm" @bind="_newUnitStr">
+                        @foreach (var u in Enum.GetValues<MealUnit>())
+                        {
+                            <option value="@u">@u.ToNorwegian()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-sm btn-success" @onclick="AddItem" disabled="@(string.IsNullOrWhiteSpace(_newName) || _saving)">
+                        <i class="fas fa-plus"></i> Legg til
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* Inventory table *@
+        <div class="card">
+            @if (!_items.Any())
+            {
+                <p class="text-muted"><small>Ingen varer på lager ennå.</small></p>
+            }
+            else
+            {
+                <table class="table table-sm inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Navn</th>
+                            <th>Antall</th>
+                            <th>Enhet</th>
+                            <th>Grense</th>
+                            <th>Status</th>
+                            <th>Juster</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in GetSortedItems())
+                        {
+                            @if (_editingId == item.Id)
+                            {
+                                <tr class="table-warning">
+                                    <td>
+                                        <input class="form-control form-control-sm" @bind="item.Name" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.5" min="0" class="form-control form-control-sm"
+                                               style="width:80px" @bind="item.QuantityInStock" />
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" style="width:80px"
+                                                value="@item.Unit.ToString()"
+                                                @onchange="@(e => item.Unit = Enum.TryParse<MealUnit>(e.Value?.ToString(), out var u) ? u : item.Unit)">
+                                            @foreach (var u in Enum.GetValues<MealUnit>())
+                                            {
+                                                <option value="@u">@u.ToNorwegian()</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.5" min="0" class="form-control form-control-sm"
+                                               style="width:70px" @bind="item.LowerThreshold" />
+                                    </td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary me-1" @onclick="@(() => SaveEdit(item))" disabled="@_saving">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr class="@(item.QuantityInStock <= item.LowerThreshold && item.LowerThreshold > 0 ? "table-danger" : "")">
+                                    <td class="clickable-row" @onclick="@(() => StartEdit(item.Id))">@item.Name</td>
+                                    <td>@item.QuantityInStock</td>
+                                    <td><small>@item.Unit.ToNorwegian()</small></td>
+                                    <td><small class="text-muted">@item.LowerThreshold</small></td>
+                                    <td>
+                                        @if (item.QuantityInStock <= item.LowerThreshold && item.LowerThreshold > 0)
+                                        {
+                                            <span title="Under nedre grense">🔴</span>
+                                        }
+                                        else
+                                        {
+                                            <span title="OK">🟢</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-success me-1"
+                                                @onclick="@(() => Adjust(item, 1))"
+                                                disabled="@_saving"
+                                                title="Legg til 1">+1</button>
+                                        <button class="btn btn-sm btn-outline-warning"
+                                                @onclick="@(() => Adjust(item, -1))"
+                                                disabled="@(_saving || item.QuantityInStock <= 0)"
+                                                title="Trekk fra 1">-1</button>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="@(() => DeleteItem(item))"
+                                                disabled="@_saving"
+                                                title="Slett">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+    private List<InventoryItemModel>? _items;
+    private List<MealRecipeModel>?   _recipes;
+    private List<ShopItemModel>      _shopItems       = new();
+    private bool                     _shopItemsLoaded = false;
+    private bool                     _saving          = false;
+    private string?                  _editingId       = null;
+
+    // Add-item form
+    private string _newName       = "";
+    private string _newShopItemId = "";
+    private double _newQty        = 1;
+    private double _newThreshold  = 0;
+    private string _newUnitStr    = nameof(MealUnit.Piece);
+
+    // Freeze shortcut
+    private string _freezeRecipeId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var shopItemsTask = Http.GetFromJsonAsync<List<ShopItemModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+
+        var recipesTask = Http.GetFromJsonAsync<List<MealRecipeModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes));
+
+        try
+        {
+            _items = await Http.GetFromJsonAsync<List<InventoryItemModel>>(
+                Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems))
+                ?? new List<InventoryItemModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading inventory: {ex.Message}");
+            _items = new List<InventoryItemModel>();
+        }
+
+        try
+        {
+            _shopItems = await shopItemsTask ?? new List<ShopItemModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shop items: {ex.Message}");
+            _shopItems = new List<ShopItemModel>();
+        }
+        _shopItemsLoaded = true;
+
+        try
+        {
+            _recipes = await recipesTask ?? new List<MealRecipeModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading recipes: {ex.Message}");
+            _recipes = new List<MealRecipeModel>();
+        }
+    }
+
+    private IEnumerable<InventoryItemModel> GetSortedItems()
+        => _items!.OrderBy(i => i.ItemCategory ?? "")
+                  .ThenBy(i => i.Name);
+
+    private void OnNewItemShopItemChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel> args)
+    {
+        if (args.ItemData != null)
+        {
+            _newShopItemId = args.ItemData.Id;
+            _newName       = args.ItemData.Name;
+        }
+        else
+        {
+            _newShopItemId = args.Value ?? "";
+        }
+    }
+
+    private async Task AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+
+        var unit = Enum.TryParse<MealUnit>(_newUnitStr, out var u) ? u : MealUnit.Piece;
+        var item = new InventoryItemModel
+        {
+            ShopItemId      = string.IsNullOrWhiteSpace(_newShopItemId)
+                                  ? _newName.Trim().ToLowerInvariant().Replace(" ", "-")
+                                  : _newShopItemId,
+            ShopItemName    = _newName.Trim(),
+            Name            = _newName.Trim(),
+            QuantityInStock = _newQty,
+            LowerThreshold  = _newThreshold,
+            Unit            = unit,
+            LastUpdated     = DateTime.UtcNow,
+            LastModified    = DateTime.UtcNow
+        };
+
+        await PostItem(item);
+        ResetAddForm();
+    }
+
+    private async Task AddFrozenMeal()
+    {
+        if (string.IsNullOrEmpty(_freezeRecipeId)) return;
+
+        var recipe = _recipes?.FirstOrDefault(r => r.Id == _freezeRecipeId);
+        if (recipe == null) return;
+
+        var item = new InventoryItemModel
+        {
+            ShopItemId          = _freezeRecipeId,
+            ShopItemName        = recipe.Name,
+            Name                = $"{recipe.Name} (frossen)",
+            QuantityInStock     = 1,
+            LowerThreshold      = 0,
+            Unit                = MealUnit.Piece,
+            SourceMealRecipeId  = _freezeRecipeId,
+            LastUpdated         = DateTime.UtcNow,
+            LastModified        = DateTime.UtcNow
+        };
+
+        await PostItem(item);
+        _freezeRecipeId = "";
+    }
+
+    private async Task PostItem(InventoryItemModel item)
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems), item);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<InventoryItemModel>();
+                if (created != null)
+                    _items!.Insert(0, created);
+            }
+            else
+            {
+                Console.WriteLine($"❌ Create inventory item failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error creating inventory item: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Adjust(InventoryItemModel item, double delta)
+    {
+        _saving = true;
+        try
+        {
+            var request = new { Id = item.Id, Delta = delta };
+            var response = await Http.PostAsJsonAsync(
+                $"{Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems)}/adjust", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                item.QuantityInStock = Math.Max(0, item.QuantityInStock + delta);
+                item.LastUpdated = DateTime.UtcNow;
+            }
+            else
+            {
+                Console.WriteLine($"❌ Adjust failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error adjusting: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void StartEdit(string id) => _editingId = id;
+
+    private void CancelEdit() => _editingId = null;
+
+    private async Task SaveEdit(InventoryItemModel item)
+    {
+        _saving = true;
+        try
+        {
+            item.LastModified = DateTime.UtcNow;
+            item.LastUpdated  = DateTime.UtcNow;
+
+            var response = await Http.PutAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems), item);
+
+            if (response.IsSuccessStatusCode)
+                _editingId = null;
+            else
+                Console.WriteLine($"❌ Update inventory item failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error updating inventory item: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteItem(InventoryItemModel item)
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.DeleteAsync(
+                Settings.GetApiUrlId(ShoppingListKeysEnum.InventoryItem, item.Id));
+
+            if (response.IsSuccessStatusCode)
+                _items!.Remove(item);
+            else
+                Console.WriteLine($"❌ Delete inventory item failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error deleting inventory item: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ResetAddForm()
+    {
+        _newName       = "";
+        _newShopItemId = "";
+        _newQty        = 1;
+        _newThreshold  = 0;
+        _newUnitStr    = nameof(MealUnit.Piece);
+    }
+}
+
+<style>
+    .inventory-table td {
+        vertical-align: middle;
+    }
+
+    .clickable-row {
+        cursor: pointer;
+        text-decoration: underline dotted;
+    }
+
+    .clickable-row:hover {
+        color: #0d6efd;
+    }
+</style>

@@ -13,11 +13,13 @@ namespace Shared.HandlelisteModels
         public DateTime? LastUpdated { get; set; }
         public string ItemCategory { get; set; }
         public string SourceMealRecipeId { get; set; }
+        public bool IsActive { get; set; }
 
         public InventoryItemModel()
         {
             QuantityInStock = 0;
             LowerThreshold = 0;
+            IsActive = true;
         }
 
         public override bool IsValid()

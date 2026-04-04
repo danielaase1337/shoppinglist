@@ -98,11 +98,42 @@
             </div>
         </div>
 
+        @* Phase 3: Use-up suggestion panel *@
+        @if (_useUpSuggestions.Any())
+        {
+            foreach (var suggestion in _useUpSuggestions)
+            {
+                <div class="card use-up-panel">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <span>💡 Du bruker halv <strong>@suggestion.IngredientName</strong> i en rett. Disse rettene bruker også <strong>@suggestion.IngredientName</strong>:</span>
+                            @foreach (var meal in suggestion.SuggestedMeals)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary ms-2"
+                                        @onclick="@(() => AddToNextEmptySlot(meal))">
+                                    @GetCategoryIcon(meal.Category) @meal.Name
+                                </button>
+                            }
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @onclick="@(() => DismissSuggestion(suggestion.IngredientShopItemId))">×</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
         @if (_generatedList != null)
         {
             <div class="card generated-list-card">
                 <h5>📝 Generert handleliste</h5>
                 <p class="text-muted">Uke @_menu.WeekNumber @_menu.Year</p>
+
+                @if (_scalingApplied)
+                {
+                    <p class="text-info"><small>📐 Mengder tilpasset familieprofil</small></p>
+                }
 
                 @if (_generatedList.ShoppingItems != null && _generatedList.ShoppingItems.Any())
                 {
@@ -172,7 +203,17 @@
     private bool _savingList = false;
     private ShoppingListModel? _generatedList;
 
+    // Phase 5 — portion scaling
+    private FamilyProfileModel? _familyProfile;
+    private List<PortionRuleModel>? _portionRules;
+    private bool _scalingApplied = false;
+
     private bool IsNew => string.IsNullOrEmpty(Id) || Id == "new";
+
+    // Phase 3 — use-up suggestion state
+    private record UseUpSuggestion(string IngredientName, string IngredientShopItemId, List<MealRecipeModel> SuggestedMeals);
+    private List<UseUpSuggestion> _useUpSuggestions = new();
+    private HashSet<string> _dismissedIngredientIds = new();
 
     private static readonly DayOfWeek[] WeekOrder =
     {
@@ -182,9 +223,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Load recipes in parallel with menu
+        // Load recipes, family profile and portion rules in parallel with menu
         var recipesTask = Http.GetFromJsonAsync<List<MealRecipeModel>>(
             Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes));
+        var familyProfileTask = Http.GetFromJsonAsync<List<FamilyProfileModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.FamilyProfiles));
+        var portionRulesTask = Http.GetFromJsonAsync<List<PortionRuleModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.PortionRules));
 
         if (IsNew)
         {
@@ -225,6 +270,26 @@
             _recipes = new List<MealRecipeModel>();
         }
 
+        try
+        {
+            var profiles = await familyProfileTask;
+            _familyProfile = profiles?.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading family profile: {ex.Message}");
+        }
+
+        try
+        {
+            _portionRules = await portionRulesTask ?? new List<PortionRuleModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading portion rules: {ex.Message}");
+            _portionRules = new List<PortionRuleModel>();
+        }
+
         _recipesLoaded = true;
         ApplyFridaySuggestion();
     }
@@ -247,6 +312,62 @@
         meal.IsSuggested = false;
         var recipe = _recipes?.FirstOrDefault(r => r.Id == meal.MealRecipeId);
         meal.MealRecipeName = recipe?.Name ?? "";
+        UpdateUseUpSuggestions();
+    }
+
+    private void UpdateUseUpSuggestions()
+    {
+        _useUpSuggestions.Clear();
+        if (_recipes == null) return;
+
+        var selectedIds = _menu!.DailyMeals
+            .Where(d => !string.IsNullOrEmpty(d.MealRecipeId))
+            .Select(d => d.MealRecipeId)
+            .ToHashSet();
+
+        foreach (var recipeId in selectedIds)
+        {
+            var recipe = _recipes.FirstOrDefault(r => r.Id == recipeId);
+            if (recipe?.Ingredients == null) continue;
+
+            foreach (var ing in recipe.Ingredients.Where(i => i.Quantity < 1.0))
+            {
+                if (_dismissedIngredientIds.Contains(ing.ShopItemId)) continue;
+                if (_useUpSuggestions.Any(s => s.IngredientShopItemId == ing.ShopItemId)) continue;
+
+                var others = _recipes
+                    .Where(r => r.Id != recipeId &&
+                                r.IsActive &&
+                                !selectedIds.Contains(r.Id) &&
+                                r.Ingredients != null &&
+                                r.Ingredients.Any(i => i.ShopItemId == ing.ShopItemId))
+                    .ToList();
+
+                if (others.Any())
+                    _useUpSuggestions.Add(new UseUpSuggestion(ing.ShopItemName, ing.ShopItemId, others));
+            }
+        }
+    }
+
+    private void AddToNextEmptySlot(MealRecipeModel recipe)
+    {
+        var emptySlot = WeekOrder
+            .Select(d => GetOrCreateDailyMeal(d))
+            .FirstOrDefault(m => string.IsNullOrEmpty(m.MealRecipeId));
+
+        if (emptySlot != null)
+        {
+            emptySlot.MealRecipeId = recipe.Id;
+            emptySlot.MealRecipeName = recipe.Name;
+            emptySlot.IsSuggested = false;
+        }
+        UpdateUseUpSuggestions();
+    }
+
+    private void DismissSuggestion(string shopItemId)
+    {
+        _dismissedIngredientIds.Add(shopItemId);
+        _useUpSuggestions.RemoveAll(s => s.IngredientShopItemId == shopItemId);
     }
 
     private void ApplyFridaySuggestion()
@@ -342,7 +463,11 @@
             var response = await Http.PostAsync(url, null);
 
             if (response.IsSuccessStatusCode)
+            {
                 _generatedList = await response.Content.ReadFromJsonAsync<ShoppingListModel>();
+                _scalingApplied = false;
+                ApplyPortionScaling();
+            }
             else
                 Console.WriteLine($"❌ Generate failed: {response.StatusCode}");
         }
@@ -388,6 +513,36 @@
         finally
         {
             _savingList = false;
+        }
+    }
+
+    private void ApplyPortionScaling()
+    {
+        if (_generatedList?.ShoppingItems == null) return;
+        if (_familyProfile?.Members == null || !_familyProfile.Members.Any()) return;
+        if (_portionRules == null || !_portionRules.Any()) return;
+
+        foreach (var item in _generatedList.ShoppingItems)
+        {
+            if (item.Varen == null) continue;
+
+            var matchingRules = _portionRules
+                .Where(r => r.IsActive && r.ShopItemId == item.Varen.Id)
+                .ToList();
+            if (!matchingRules.Any()) continue;
+
+            double scaledQty = 0;
+            foreach (var ageGroup in Enum.GetValues<AgeGroup>())
+            {
+                var rule = matchingRules.FirstOrDefault(r => r.AgeGroup == ageGroup);
+                var memberCount = _familyProfile.Members.Count(m => m.AgeGroup == ageGroup);
+                if (rule != null) scaledQty += rule.QuantityPerPerson * memberCount;
+            }
+            if (scaledQty > 0)
+            {
+                item.Mengde = (int)Math.Ceiling(scaledQty);
+                _scalingApplied = true;
+            }
         }
     }
 
@@ -446,5 +601,11 @@
 
     .generated-list-card {
         border-left: 4px solid #0d6efd;
+    }
+
+    .use-up-panel {
+        border-left: 4px solid #ffc107;
+        background-color: #fffdf0;
+        padding: 0.5rem 1rem;
     }
 </style>

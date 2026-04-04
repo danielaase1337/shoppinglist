@@ -25,6 +25,11 @@ namespace Api
             this.CreateMap<WeekMenu, WeekMenuModel>().ReverseMap();
             this.CreateMap<DailyMeal, DailyMealModel>().ReverseMap();
             this.CreateMap<InventoryItem, InventoryItemModel>().ReverseMap();
+
+            // Phase 5 — Family & Portion Planning
+            this.CreateMap<FamilyProfile, FamilyProfileModel>().ReverseMap();
+            this.CreateMap<FamilyMember, FamilyMemberModel>().ReverseMap();
+            this.CreateMap<PortionRule, PortionRuleModel>().ReverseMap();
         }
     }
 }
