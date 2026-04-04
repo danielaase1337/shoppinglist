@@ -251,3 +251,84 @@ SfAutoComplete configuration mirrors existing autocomplete usage. Event handler 
 ### Phase 3+: Meal Suggestion Algorithm (AI Foreslå Meny)
 **Status:** Deferred pending API spec refinement.  
 **Scope:** Suggestion endpoint, category weighting, recent-meal exclusion.
+
+---
+
+## Dinner Seed Data — MemoryGenericRepository (Glenn)
+**Date:** 2026-04-08  
+**Author:** Glenn (Backend Dev)  
+**Status:** ✅ IMPLEMENTED
+
+### D1 — Family Dinner Parsing
+**Decision:** Replace 5-item placeholder MealRecipe list with 62 real unique meals from `Api.Tests/Helpers/dinners.txt`.  
+**Rationale:** Development mode needs realistic recipe data for testing meal planning. dinners.txt contains family's actual dinner history (723 entries).  
+**Parsing logic:** Strip day-prefix, normalize case, merge near-duplicates (laks variants distinct), filter noise (rester, ferie, events).  
+**Result:** 62 meaningful dishes extracted with zero placeholder artifacts.
+
+### D2 — Category Distribution
+**Distribution achieved:**
+- **KidsLike (14):** pizza, taco, pannekaker, pølse og potetmos, nuggets, fiskeburger, pølsegnocchi, nachos, etc.
+- **Fish (11):** laks, fiskeboller, fiskegrateng, fiskekaker, salmalaks, laks i pita, hvit fisk, fiskesuppe, torsk, fiskepakke, kveite
+- **Meat (12):** lapskaus, kjøttkaker, biff, spareribs, bulgogi, kjøttboller, fårikål, raspeballer, vossakorv, benløse fugler, nakkekoteletter, finnebiff
+- **Vegetarian (6):** tomatsuppe, linsegryte, marokkansk bønnegryte, veggisburger, gulrotsuppe, quinoaburger
+- **Chicken (8):** kylling gong bao, tikka masala, kyllingform, kyllingsuppe, kyllinglår, kyllingklubber, hønsefrikassé, kalkun
+- **Pasta (4):** lasagne, spagetti og kjøttsaus, pastaform, one pot pasta
+- **Celebration (3):** pinnekjøtt, ribbe, medisterkaker
+- **Other (3):** wok, enchiladas, drunken noodles
+
+### D3 — Effort Classification
+- **Quick (≤20 min):** grøt, pannekaker, pølse og potetmos, nuggets, fiskeburger, pølsegnocchi, fiskepinner
+- **Weekend (45+ min):** taco, lasagne, kjøttkaker, biff, spareribs, bulgogi, fårikål, raspeballer, pinnekjøtt, ribbe, kylling gong bao, tikka masala, kalkun
+- **Normal (20–45 min):** all others
+
+### D4 — MealType Classification
+- **Frozen (1 entry):** fiskepinner (pre-frozen product)
+- **FreshCook (61 entries):** everything else
+
+### D5 — Seed Record Properties
+- `IsActive = true`
+- `BasePortions = 4` (family meal standard)
+- `LastModified = DateTime.UtcNow`
+- `Id = Guid.NewGuid().ToString()` (regenerated per dev restart)
+- `PopularityScore` reflects real-world family frequency (pizza=100, taco=90, laks=85, ..., drunken noodles=34)
+
+### D6 — Code Pattern for 62 Entries
+**Old pattern:** One verbose `new MealRecipe { ... }` object per item + `if (x is TEntity e) await Insert(e)`.  
+**New pattern:** `List<MealRecipe> recipes = new() { ... }; foreach (var r in recipes) await Insert(r as TEntity);`  
+**Reason:** 62 entries in verbose pattern would be unmaintainable.
+
+### Impact
+- Development mode has realistic test data for meal planning feature validation
+- Popularity scores enable sorting/suggestion testing
+- Production Firestore unaffected (DEBUG-only path)
+
+---
+
+## mealplanningv2 PR Delivery (Peter)
+**Date:** 2026-06-XX  
+**Author:** Peter (Lead)  
+**Requested by:** Daniel Aase  
+**Status:** PR #67 OPENED
+
+### Summary
+Complete 5-phase meal planning system delivered to `main` via PR #67.
+
+### PR Details
+- **URL:** https://github.com/danielaase1337/shoppinglist/pull/67
+- **Branch:** `mealplanningv2` → `main`
+- **Title:** feat: Full meal planning system — Phases 1–5
+- **Test Suite:** 177+ tests passing, 0 build errors
+
+### Issues Closed (20 total)
+#29, #46–#62, #66 (all Phase 1–5 implementation issues).
+
+### Architecture Decisions Embedded
+- OwnerId isolation (#66): FamilyProfile structure in place; per-user scoping deferred to auth hardening sprint (per D2).
+- Moq pattern documented: `Task<ICollection<T>>` requires explicit generic parameter in `.ReturnsAsync()`.
+- Soft-delete standard across all meal-related entities.
+- String-backed enum bindings for cross-namespace safety (Blazor limitation).
+
+### Next Steps
+1. Daniel reviews and merges PR #67
+2. Issues #64 (variety engine) and #65 (Google Keep import) tracked for future sprint
+3. OwnerId scoping tracked as follow-on to auth hardening sprint
