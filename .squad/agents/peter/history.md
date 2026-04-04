@@ -8,6 +8,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **CRITICAL RULE — Azure Functions AuthorizationLevel**: ALL Azure Functions in this project MUST use `AuthorizationLevel.Anonymous`. Azure SWA does NOT inject function keys when proxying `/api/*` to the Functions backend. `AuthorizationLevel.Function` causes 401 responses → SWA redirects to `/welcome` (HTML) → client JSON parsers see `<` at byte 0 → `ExpectedStartOfValueNotFound` crash. (2026-03-28)
+- **CRITICAL RULE — Staging Firestore guard**: `Api/Program.cs` must check BOTH `GOOGLE_CLOUD_PROJECT` AND `GOOGLE_APPLICATION_CREDENTIALS` before using production Firestore repos. Without both, `GoogleFireBaseGenericRepository` throws at constructor time, crashing the entire Functions host → all `/api/*` return HTML. The `useMemoryDb` fallback is the safety net for staging. (2026-03-28)
+- **Startup crash signature**: `ManagedError: AggregateException (ExpectedStartOfValueNotFound, < LineNumber: 1 | BytePositionInLine: 0)` at `callEntryPoint` = an API endpoint called at startup is returning HTML instead of JSON. Check: (1) AuthorizationLevel.Function on any controller, (2) Functions host crash due to missing Firestore credentials. (2026-03-28)
 - App uses a dual-model pattern: `FireStoreDataModels` (with Firestore attributes) and `HandlelisteModels` (DTOs). AutoMapper with `.ReverseMap()` bridges them.
 - Core shop-specific sorting runs client-side in `OneShoppingListPage.razor` via `SortShoppingList()`.
 - Norwegian property names (`Varen`, `Mengde`, `ItemCateogries`) must be preserved — backward compatibility with Firestore data.

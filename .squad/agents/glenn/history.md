@@ -124,3 +124,11 @@
 - Fiskepinner gets `MealType = Frozen` (the only frozen item in the seed list).
 - Replaced old per-entity verbose pattern with compact `List<MealRecipe> + foreach (var r in recipes) await Insert(r as TEntity)`.
 - ✅ Build clean, 0 errors, 113 pre-existing warnings (no new issues).
+
+### Staging Crash Fix — useMemoryDb Logic (2026-04-09)
+- **Bug**: Blazor startup crash in staging — `< at byte 0` = API returning HTML not JSON. Azure Functions host was crashing on startup and returning an HTML 500 for every request.
+- **Root cause**: `useMemoryDb` only checked `GOOGLE_CLOUD_PROJECT`. If staging has `GOOGLE_CLOUD_PROJECT` set (e.g. inherited from build config or app settings) but does NOT have `GOOGLE_APPLICATION_CREDENTIALS` (the Firestore key file path), `GoogleFireBaseGenericRepository` throws during initialization → host crash.
+- **DI registrations**: All 10 repositories are symmetric between debug and production blocks (ShoppingList, ShopItem, ItemCategory, Shop, FrequentShoppingList, MealRecipe, WeekMenu, FamilyProfile, PortionRule, InventoryItem). NOT the issue.
+- **Fix**: Extended `useMemoryDb` condition in `Api/Program.cs` to also return true when `GOOGLE_APPLICATION_CREDENTIALS` is not set. Production Firestore now requires BOTH env vars to be present AND environment != Development.
+- **Safe fallback**: Staging gets in-memory repos (with seed data) instead of crashing. Real production (GOOGLE_CLOUD_PROJECT + GOOGLE_APPLICATION_CREDENTIALS both set) is unaffected.
+- ✅ Build clean, 0 errors, 33 pre-existing warnings (no new issues).

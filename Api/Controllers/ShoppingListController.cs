@@ -30,7 +30,7 @@ namespace Api.Controllers
         }
 
         [Function("shoppinglists")]
-        public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Function, "get", "post", "put")] HttpRequestData req)
+        public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put")] HttpRequestData req)
         {
             try
             {
@@ -147,7 +147,7 @@ namespace Api.Controllers
         }
 
         [Function("shoppinglist")]
-        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Function, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
+        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
         {
             if(req.Method== "GET")
             {
