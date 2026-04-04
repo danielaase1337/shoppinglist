@@ -16,19 +16,21 @@ namespace Api.Controllers
     {
         private readonly ILogger _logger;
         private readonly IGenericRepository<ShoppingList> repo;
+        private readonly IGenericRepository<InventoryItem> _inventoryRepository;
 
         //private readonly IGoogleDbContext dbContext;
         private readonly IMapper mapper;
 
-        public GetAllShoppingListsFunction(ILoggerFactory loggerFactory, IGenericRepository<ShoppingList> repo, IMapper mapper)
+        public GetAllShoppingListsFunction(ILoggerFactory loggerFactory, IGenericRepository<ShoppingList> repo, IMapper mapper, IGenericRepository<InventoryItem> inventoryRepository)
         {
             _logger = loggerFactory.CreateLogger<GetAllShoppingListsFunction>();
             this.repo = repo;
             this.mapper = mapper;
+            _inventoryRepository = inventoryRepository;
         }
 
         [Function("shoppinglists")]
-        public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Function, "get", "post", "put")] HttpRequestData req)
+        public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put")] HttpRequestData req)
         {
             try
             {
@@ -96,19 +98,41 @@ namespace Api.Controllers
                 else if (req.Method == "PUT")
                 {
                     var requestBody = await req.ReadFromJsonAsync<ShoppingListModel>();
-                    var shoppinglist = mapper.Map<ShoppingList>(requestBody);
+                    var updatedList = mapper.Map<ShoppingList>(requestBody);
                     
                     // Update LastModified timestamp
-                    shoppinglist.LastModified = DateTime.UtcNow;
+                    updatedList.LastModified = DateTime.UtcNow;
                     
-                    var addRes = await repo.Update(shoppinglist);
+                    // Fetch existing state before update for IsDone transition detection
+                    var existing = await repo.Get(updatedList.Id);
+                    
+                    var addRes = await repo.Update(updatedList);
                     if (addRes == null)
                         return await GetErroRespons("Could not update shoppinglist", req);
-                    else
+
+                    // When a shopping list transitions from not-done to done, add items to inventory
+                    if (existing != null && !existing.IsDone && updatedList.IsDone)
                     {
-                        await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));
-                        return response;
+                        var allInventory = await _inventoryRepository.Get();
+
+                        foreach (var item in updatedList.ShoppingItems ?? Enumerable.Empty<ShoppingListItem>())
+                        {
+                            if (item?.Varen == null) continue;
+
+                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == item.Varen.Id && i.IsActive);
+
+                            if (inventoryItem != null)
+                            {
+                                inventoryItem.QuantityInStock += item.Mengde;
+                                inventoryItem.LastModified = DateTime.UtcNow;
+                                await _inventoryRepository.Update(inventoryItem);
+                            }
+                            // If no inventory item exists, don't auto-create — user manages inventory explicitly
+                        }
                     }
+
+                    await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));
+                    return response;
                 }
 
                 return req.CreateResponse(HttpStatusCode.NotFound);
@@ -123,7 +147,7 @@ namespace Api.Controllers
         }
 
         [Function("shoppinglist")]
-        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Function, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
+        public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
         {
             if(req.Method== "GET")
             {

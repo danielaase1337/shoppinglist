@@ -1,33 +1,32 @@
 using Google.Cloud.Firestore;
 using Shared.BaseModels;
-using System;
-using System.Collections.Generic;
 
 namespace Shared.FireStoreDataModels
 {
     [FirestoreData]
-    public class WeekMenu : EntityBase
+    public class PortionRule : EntityBase
     {
         [FirestoreProperty]
-        public int WeekNumber { get; set; }
+        public string ShopItemId { get; set; }
 
         [FirestoreProperty]
-        public int Year { get; set; }
+        public string ShopItemName { get; set; }
 
         [FirestoreProperty]
-        public DateTime PlanningStartDate { get; set; }
+        public AgeGroup AgeGroup { get; set; }
 
         [FirestoreProperty]
-        public ICollection<DailyMeal> DailyMeals { get; set; }
+        public double QuantityPerPerson { get; set; }
+
+        [FirestoreProperty]
+        public MealUnit Unit { get; set; }
 
         [FirestoreProperty]
         public bool IsActive { get; set; }
 
-        public WeekMenu()
+        public PortionRule()
         {
-            DailyMeals = new List<DailyMeal>();
             IsActive = true;
         }
     }
 }
-

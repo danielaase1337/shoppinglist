@@ -1,0 +1,208 @@
+@page "/meals"
+@using Shared
+@inject HttpClient Http
+@inject ISettings Settings
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<div class="card-maincontainer container-sm">
+
+    <div class="card">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2>Middagsretter</h2>
+                <p class="text-muted">Administrer og søk i middagsregisteret</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-success" @onclick="NavigateToNew">
+                    <i class="fas fa-plus"></i> Ny middag
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (AllRecipes != null)
+    {
+        <!-- Search and filter bar -->
+        <div class="card">
+            <div class="row align-items-center">
+                <div class="col-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input class="form-control"
+                               placeholder="Søk etter middag..."
+                               @bind="@_searchText"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+                <div class="col-4">
+                    <select class="form-select" @bind="@_categoryFilter">
+                        <option value="">-- Alle kategorier --</option>
+                        @foreach (var cat in Enum.GetValues<MealCategory>())
+                        {
+                            <option value="@cat">@GetCategoryIcon(cat) @cat</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-2 text-end">
+                    <span class="badge bg-info text-white">@GetFilteredRecipes().Count() retter</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipe list -->
+        <div class="card">
+            @if (GetFilteredRecipes().Any())
+            {
+                <ul class="todo-list">
+                    @foreach (var recipe in GetFilteredRecipes())
+                    {
+                        <li class="@recipe.CssComleteEditClassName">
+                            <div class="parent-horizontal-stack align-items-center">
+                                <div class="col-auto meal-icon" title="@recipe.Category">
+                                    @GetCategoryIcon(recipe.Category)
+                                </div>
+                                <div class="col">
+                                    <strong>@recipe.Name</strong>
+                                    <div class="meal-meta text-muted">
+                                        @if (recipe.PopularityScore > 0)
+                                        {
+                                            <small>⭐ @recipe.PopularityScore</small>
+                                        }
+                                        @if (!recipe.IsActive)
+                                        {
+                                            <small class="text-danger"> (inaktiv)</small>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="btn-group" role="group">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                @onclick="@(() => NavigateToEdit(recipe.Id))">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                @onclick="@(() => DeleteRecipe(recipe))">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Ingen retter funnet som matcher søket.
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+
+</div>
+
+@code {
+    private IList<MealRecipeModel>? AllRecipes;
+    private string _searchText = "";
+    private string _categoryFilter = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            AllRecipes = await Http.GetFromJsonAsync<List<MealRecipeModel>>(
+                Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading meal recipes: {ex.Message}");
+            AllRecipes = new List<MealRecipeModel>();
+        }
+    }
+
+    private IEnumerable<MealRecipeModel> GetFilteredRecipes()
+    {
+        if (AllRecipes == null) return Enumerable.Empty<MealRecipeModel>();
+
+        var result = AllRecipes.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+            result = result.Where(r => r.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(_categoryFilter) && Enum.TryParse<MealCategory>(_categoryFilter, out var cat))
+            result = result.Where(r => r.Category == cat);
+
+        return result.OrderByDescending(r => r.PopularityScore).ThenBy(r => r.Name);
+    }
+
+    private static string GetCategoryIcon(MealCategory cat) => cat switch
+    {
+        MealCategory.KidsLike    => "👶",
+        MealCategory.Fish        => "🐟",
+        MealCategory.Meat        => "🥩",
+        MealCategory.Vegetarian  => "🥬",
+        MealCategory.Chicken     => "🍗",
+        MealCategory.Pasta       => "🍝",
+        MealCategory.Celebration => "🎉",
+        MealCategory.Other       => "❓",
+        _                        => "🍽️"
+    };
+
+    private void NavigateToNew() => Navigation.NavigateTo("/meals/new");
+
+    private void NavigateToEdit(string id) => Navigation.NavigateTo($"/meals/{id}");
+
+    private async Task DeleteRecipe(MealRecipeModel recipe)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Er du sikker på at du vil slette '{recipe.Name}'? (Merk: maten merkes som inaktiv.)");
+        if (!confirmed) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync(
+                Settings.GetApiUrlId(ShoppingListKeysEnum.MealRecipe, recipe.Id));
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Soft-delete: mark inactive locally so list updates immediately
+                recipe.IsActive = false;
+                Console.WriteLine($"✅ Deleted recipe: {recipe.Name}");
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Delete failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error deleting recipe: {ex.Message}");
+        }
+    }
+}
+
+<style>
+    .meal-icon {
+        font-size: 1.4rem;
+        min-width: 2.5rem;
+        text-align: center;
+    }
+
+    .meal-meta {
+        font-size: 0.8rem;
+        margin-top: 2px;
+    }
+
+    .meal-meta small {
+        margin-right: 0.5rem;
+    }
+</style>

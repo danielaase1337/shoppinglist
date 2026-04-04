@@ -8,6 +8,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **CRITICAL RULE — Azure Functions AuthorizationLevel**: ALL Azure Functions in this project MUST use `AuthorizationLevel.Anonymous`. Azure SWA does NOT inject function keys when proxying `/api/*` to the Functions backend. `AuthorizationLevel.Function` causes 401 responses → SWA redirects to `/welcome` (HTML) → client JSON parsers see `<` at byte 0 → `ExpectedStartOfValueNotFound` crash. (2026-03-28)
+- **CRITICAL RULE — Staging Firestore guard**: `Api/Program.cs` must check BOTH `GOOGLE_CLOUD_PROJECT` AND `GOOGLE_APPLICATION_CREDENTIALS` before using production Firestore repos. Without both, `GoogleFireBaseGenericRepository` throws at constructor time, crashing the entire Functions host → all `/api/*` return HTML. The `useMemoryDb` fallback is the safety net for staging. (2026-03-28)
+- **Startup crash signature**: `ManagedError: AggregateException (ExpectedStartOfValueNotFound, < LineNumber: 1 | BytePositionInLine: 0)` at `callEntryPoint` = an API endpoint called at startup is returning HTML instead of JSON. Check: (1) AuthorizationLevel.Function on any controller, (2) Functions host crash due to missing Firestore credentials. (2026-03-28)
 - App uses a dual-model pattern: `FireStoreDataModels` (with Firestore attributes) and `HandlelisteModels` (DTOs). AutoMapper with `.ReverseMap()` bridges them.
 - Core shop-specific sorting runs client-side in `OneShoppingListPage.razor` via `SortShoppingList()`.
 - Norwegian property names (`Varen`, `Mengde`, `ItemCateogries`) must be preserved — backward compatibility with Firestore data.
@@ -28,39 +31,25 @@
 - **D9 (MealIngredient DI):** ✅ RE-APPLIED by Ray. Removed orphaned `IGenericRepository<MealIngredient>` DI registration (was marked complete 2026-03-23 but not actually applied). Now correctly implements D3 (embedding strategy).
 - **Verification:** All tests passing (90 API + 61 Client). No regressions introduced.
 
-## PRD Synthesis — 2026-03-22
+## Core Context — PRD Synthesis & Initial Phase (2026-03-22 to 2026-03-23)
 
-### Key Architectural Decisions
-- **AD-1:** Auth via Azure SWA built-in authentication (GitHub + Microsoft providers). No Firebase Auth — avoids mixing cloud ecosystems.
-- **AD-2:** Hybrid data isolation — shared product catalogue (ShopItem, ItemCategory), per-user lists/shops/menus via `OwnerId` field.
-- **AD-3:** MealIngredient stored embedded in MealRecipe, not as separate collection. Remove standalone MealIngredient repository.
-- **AD-4:** WeekMenu uses recipe ID references, not full MealRecipe embedding. Prevents document bloat.
-- **AD-5:** Convention-based collection key fallback to prevent future `"misc"` collection bugs.
-- **AD-6:** Error message scrubbing in production — generic messages to callers, full details to ILogger.
+**Scope & Architecture:**
+- Auth via Azure SWA (Microsoft AAD provider) — no Firebase Auth
+- Hybrid data isolation: shared catalogue (ShopItem, ItemCategory), per-user lists via OwnerId
+- MealIngredient embedded in MealRecipe (no separate repo)
+- WeekMenu uses recipe ID references (no embedding)
+- Convention-based Firestore collection keys to prevent "misc" corruption
+- Error scrubbing: generic messages to callers, full details to ILogger
 
-### Critical Bugs Found
-1. `GetCollectionKey()` maps 5 entity types (FrequentShoppingList, MealRecipe, MealIngredient, WeekMenu, DailyMeal) to `"misc"` — active data corruption risk.
-2. WeekMenu/DailyMeal have no DI registration — entire feature is unwired.
-3. All 65 API tests call mocks directly, not controller methods — zero controller code tested.
-4. No tests run in CI — GitHub Actions builds but never runs `dotnet test`.
-5. `ShopItemCategoryController.RunOne` has no try/catch — unhandled exceptions leak to callers.
-6. `ShopsController` uses `.Result` instead of `await` — potential deadlocks.
+**P0 Bugs Found & Fixed (Sprint 0):**
+- ✅ GetCollectionKey() mapped 5 entity types to "misc" — fixed by Ray (D4 convention)
+- ✅ WeekMenu/DailyMeal DI registration missing — fixed by Ray (D9)
+- ✅ 65 API tests called mocks, not controllers — fixed by Josh (real controller tests)
+- ✅ No CI test execution — fixed by Josh (added dotnet test step)
+- ✅ ShopItemCategoryController missing try/catch — fixed by Glenn
+- ✅ ShopsController used .Result blocking call — fixed by Glenn
 
-### GitHub Issue Filed
-- **Issue #15**: PRD: Shoppinglist App — Next Evolution (Auth, Meal Planning, UI, Performance)
-- URL: https://github.com/danielaase1337/shoppinglist/issues/15
-
-## PRD Decomposition — 2026-03-23
-
-### Sub-Tickets Created (18 total from PRD #15)
-- **Sprint 0 (P0 bugs):** #16 (collection keys, Ray), #17 (DI registration, Ray), #18 (CI tests, Josh), #19 (test audit, Josh), #20 (try/catch, Glenn), #21 (.Result deadlock, Glenn)
-- **Sprint 1 (Auth):** #22 (SWA config, Glenn), #23 (auth middleware, Glenn), #24 (auth UI, Blair)
-- **Sprint 2 (UI):** #25 (toast system, Blair), #26 (nav accessibility, Blair), #27 (mobile drag, Blair)
-- **Sprint 3 (Shop):** #28 (shop deletion safeguards, Blair + Glenn)
-- **Sprint 4 (Meal):** #29 (scoping only — NOT implementation, Peter)
-- **Sprint 5 (i18n):** #30 (resource file architecture, Blair)
-- **Sprint 6 (Data):** #31 (LastModified migration, Ray + Glenn), #32 (ManageMyShopsPage, Blair)
-- **Sprint 7 (Testing):** #33 (controller test rewrite, Josh)
+**GitHub Issues (#15-#33):** Issue #15 synthesized PRD into 18 sub-tickets across 7 sprints (P0 bugs, Auth, UI, Shop, Meal, i18n, Data, Testing). All P0 (#16-#21) completed and merged.
 
 ## Branching Strategy Update (2026-03-28)
 
@@ -452,3 +441,37 @@
 | #66 | [Phase 5] Family profile support — OwnerId isolation for meal planning |
 
 **Summary comment posted on #29.** Manifest filed at `.squad/decisions/inbox/peter-phase1-issues-created.md`.
+
+## 2026-06-XX — mealplanningv2 PR Opened + Issues Closed ✅
+
+**Requested by:** Daniel Aase
+
+### PR Created
+
+- **PR #67:** feat: Full meal planning system — Phases 1–5
+- **URL:** https://github.com/danielaase1337/shoppinglist/pull/67
+- **Branch:** `mealplanningv2` → `main`
+- **Test suite:** 177+ passing, 0 build errors
+
+### Issues Closed (20 total)
+
+All Phase 1–5 implementation issues commented with delivery summary and closed referencing PR #67:
+
+- **#29** — Meal planning scoping (superseded by full v2 implementation)
+- **#46–#58** — All Phase 1 MealRecipe issues (shared models, DTOs, AutoMapper, controller, client pages, tests)
+- **#59–#60** — Phase 2 WeekMenu issues (models + UI with Thu–Wed calendar + generate shopping list)
+- **#61–#62** — Phase 4 Inventory issues (InventoryItem CRUD + IsDone→stock hook + InventoryItemsPage)
+- **#63** — Phase 3 Ingredient matching suggestions (client-side use-up / fractional matching)
+- **#66** — Phase 5 Family profile (portion scaling delivered; OwnerId isolation deferred per D2)
+
+### Issues Left Open (not in this PR)
+
+- **#64** — Meal variety suggestion engine with category balancing — future sprint
+- **#65** — Google Keep meal history import tool — future sprint
+
+### Key Observations
+
+- The original v1 scope (text-history WeekMenuText entity) was correctly abandoned before implementation. The full recipe CRUD + WeekMenu + Inventory + FamilyProfile system is what shipped.
+- OwnerId isolation (#66) is partially addressed structurally but not enforced — remains on hold per D2 v1 decision until auth hardening sprint.
+- Moq pattern finding: `Task<ICollection<T>>` in `.ReturnsAsync()` requires explicit generic parameter — documented in test files and PR description.
+- Decision record filed: `.squad/decisions/inbox/peter-pr-opened.md`

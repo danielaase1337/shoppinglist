@@ -23,8 +23,11 @@ namespace ApiIsolated
 
                     // Use environment variable to determine which repository to use
                     var environment = context.HostingEnvironment.EnvironmentName;
-                    var useMemoryDb = environment == "Development" || 
-                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT"));
+                    // Use memory repos if: local Development, OR GOOGLE_CREDENTIALS not set.
+                    // GoogleDbContext reads GOOGLE_CREDENTIALS (JSON content or file path) — this is the
+                    // authoritative check for whether Firestore credentials are available.
+                    var useMemoryDb = environment == "Development" ||
+                                    string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CREDENTIALS"));
 
                     if (useMemoryDb)
                     {
@@ -36,6 +39,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, MemoryGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, MemoryGenericRepository<MealRecipe>>();
                         services.AddSingleton<IGenericRepository<WeekMenu>, MemoryGenericRepository<WeekMenu>>();
+                        services.AddSingleton<IGenericRepository<FamilyProfile>, MemoryGenericRepository<FamilyProfile>>();
+                        services.AddSingleton<IGenericRepository<PortionRule>, MemoryGenericRepository<PortionRule>>();
+                        services.AddSingleton<IGenericRepository<InventoryItem>, MemoryGenericRepository<InventoryItem>>();
                         // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
                         // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }
@@ -49,6 +55,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, GoogleFireBaseGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, GoogleFireBaseGenericRepository<MealRecipe>>();
                         services.AddSingleton<IGenericRepository<WeekMenu>, GoogleFireBaseGenericRepository<WeekMenu>>();
+                        services.AddSingleton<IGenericRepository<FamilyProfile>, GoogleFireBaseGenericRepository<FamilyProfile>>();
+                        services.AddSingleton<IGenericRepository<PortionRule>, GoogleFireBaseGenericRepository<PortionRule>>();
+                        services.AddSingleton<IGenericRepository<InventoryItem>, GoogleFireBaseGenericRepository<InventoryItem>>();
                         // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
                         // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }
