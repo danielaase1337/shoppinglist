@@ -840,6 +840,55 @@ SWA's built-in authentication handles the post-login redirect automatically when
 
 ---
 
+---
+
+## Phase 6: Staging Bug Fix (P0 — Critical Production Issue)
+
+### D-Phase6-SWA-Auth-1: ShoppingListController AuthorizationLevel
+**Status:** ✅ IMPLEMENTED (Peter, 2026-04-04)  
+**Component:** Api/Controllers/ShoppingListController.cs
+
+**Bug:** ShoppingListController used `AuthorizationLevel.Function` instead of `AuthorizationLevel.Anonymous`. All other controllers use `Anonymous`. Azure Static Web Apps proxies to `/api/*` without injecting function keys → 401 → SWA redirects to `/welcome` HTML → client JSON parser crashes on startup.
+
+**Fix:**
+```csharp
+// Changed both functions from AuthorizationLevel.Function to AuthorizationLevel.Anonymous
+public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put")] HttpRequestData req)
+public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
+```
+
+**Architecture Rule:** All Azure Functions in this project MUST use `AuthorizationLevel.Anonymous`. SWA's route rules in `staticwebapp.config.json` handle authorization; Function-level key auth is incompatible with the API proxy pattern.
+
+**Commit:** b314fde
+
+---
+
+### D-Phase6-SWA-DI-2: useMemoryDb Guard Logic (GOOGLE_APPLICATION_CREDENTIALS)
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-04)  
+**Component:** Api/Program.cs
+
+**Bug:** `useMemoryDb` only checked `GOOGLE_CLOUD_PROJECT`, not `GOOGLE_APPLICATION_CREDENTIALS`. In staging, project may be set but credentials file absent → Firestore SDK throws at DI resolution → Functions host crashes → all `/api/*` return HTML 500.
+
+**Fix:**
+```csharp
+// Added third OR-condition to check GOOGLE_APPLICATION_CREDENTIALS
+var useMemoryDb = environment == "Development" || 
+                string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT")) ||
+                string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS"));
+```
+
+**Behavior Matrix:**
+| Environment | GOOGLE_CLOUD_PROJECT | GOOGLE_APPLICATION_CREDENTIALS | Result |
+|---|---|---|---|
+| Development (local) | any | any | Memory repos ✅ |
+| Staging (SWA preview) | set | NOT set | Memory repos ✅ (was crashing) |
+| Staging (SWA preview) | NOT set | any | Memory repos ✅ |
+| Production | set | set | Firestore ✅ |
+
+**Commit:** b73c76e
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
