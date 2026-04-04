@@ -234,6 +234,7 @@ namespace Api.Controllers
                     foreach (var ingredient in ingredients)
                     {
                         if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
+                        if (ingredient.IsBasic) continue;  // Basic/pantry items are assumed in stock — exclude from shopping list
 
                         if (aggregated.TryGetValue(ingredient.ShopItemId, out var existing))
                             aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName);
