@@ -6,6 +6,7 @@ namespace Shared.HandlelisteModels
     {
         public System.DayOfWeek Day { get; set; }
         public string MealRecipeId { get; set; }
+        public string MealRecipeName { get; set; }
         public bool IsSuggested { get; set; }
         public ICollection<MealIngredientModel> CustomIngredients { get; set; }
 

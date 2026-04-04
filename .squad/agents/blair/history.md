@@ -69,6 +69,8 @@
 
 - **`@media` in Blazor `<style>` blocks must be written `@@media`** — single `@` is parsed as a Blazor directive and causes `CS0103: The name 'media' does not exist` at compile time. This affects both `@media` and any other CSS at-rules using `@`.
 - **`ChangeEventArgs` ambiguity with Syncfusion** — `Syncfusion.Blazor.Navigations` exports its own `ChangeEventArgs`. Any page that `@using` Syncfusion and uses `@onchange` on a native `<select>` must fully qualify: `Microsoft.AspNetCore.Components.ChangeEventArgs`. Otherwise CS0104 ambiguous reference error.
+- **SfAutoComplete pattern for ShopItemModel**: `TValue="string"`, `TItem="ShopItemModel"`, `DataSource="@_shopItems"`, `@bind-Value="@_newIngName"`, `FilterType="FilterType.Contains"`, `Highlight`. Field settings: `<AutoCompleteFieldSettings Value="Name" Text="Name" />`. Event handler: `Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel>`. Check `args.ItemData != null` to distinguish catalogue selection (use `args.ItemData.Id`) from free-form text (derive slug from `args.Value`). Always reset both the name field and the id field in form reset.
+- **ShopItems loading pattern**: Start `Http.GetFromJsonAsync<List<ShopItemModel>>(Settings.GetApiUrl(ShoppingListKeysEnum.shopItems))` as a task at the top of `OnInitializedAsync` before any other awaits, so it runs in parallel with recipe loading. Await it after other tasks. Use `_shopItemsLoaded = true` flag to show spinner/disable autocomplete until ready. Enum key is `ShoppingListKeysEnum.shopItems` (lowercase s).
 
 ### 2026-03-27 — D7 Navigation Accessibility Fix ✅ COMPLETE
 - **D7 (Admin Nav Accessibility):** ✅ IMPLEMENTED. Converted CSS `:hover`-only dropdown to Blazor `@onclick` toggle. Root cause: commit 30e7e83 moved "Hyppige Lister" into admin dropdown but no click handler was added. Desktop browsers could hover, but mobile/touch couldn't. Fix applied: Added `_adminOpen` bool state in `NewNavComponent.razor`. `@onclick="ToggleAdminMenu"` on trigger span. `@onclick:stopPropagation="true"` prevents nav collapse. Added `role="button"`, `aria-haspopup="true"`, `aria-expanded` attributes. `ToggleNavMenu` resets `_adminOpen` when navbar collapses. Extended `app.css` `.admin-dropdown:hover` selectors to also match `.admin-dropdown.open` class. Result: Both hover (desktop) and click-toggle (mobile/all) work. Fully accessible. **Frequent lists now visible on all devices.**
@@ -286,7 +288,29 @@
 
 **Build status:** Client pages compile correctly. `Shared` project has pre-existing errors in `MemoryGenericRepository.cs` (Ray's domain): ambiguous `MealType`/`MealEffort` references (same enums in both Firestore and HandlelisteModels namespaces) + dummy data uses old `MealIngredient` properties (`Id`, `Name`, `ShopItem`, `StandardQuantity`) before Ray's model update. Client will build clean once Ray resolves those.
 
-## Orchestration Log — 2026-04-04T05:12:37Z
+### 2026-04-07 — Phase 2 WeekMenu Pages ✅ COMPLETE
+
+**Files created:**
+- `Client/Pages/Meals/WeekMenuListPage.razor` — `/weekmenus` list page: ISO week auto-calc, active/inactive badge, days-planned count, sort by active→year→week
+- `Client/Pages/Meals/OneWeekMenuPage.razor` — `/weekmenus/new` + `/weekmenus/{Id}`: Thursday-first 7-day planner, `<select>` per day (not SfAutoComplete), Friday KidsLike/pizza auto-suggestion, generate-shoppinglist inline preview, POST/PUT/navigate
+
+**Files modified:**
+- `Shared/Shared/HandlelisteModels/DailyMealModel.cs` — Added `MealRecipeName` property (was missing; needed for denormalized display)
+- `Client/Shared/NewNavComponent.razor` — Added "Ukemeny" nav link under Admin dropdown (after "Middager")
+
+**Patterns followed:**
+- `ISettings.GetApiUrl` / `GetApiUrlId` for all API calls
+- `@using Shared` per-page for `MealCategory` enum (not _Imports.razor)
+- `select` with `@onchange` instead of SfAutoComplete for 7-row planner (perf)
+- `LoadingComponent` while data loading
+- `LastModified = DateTime.UtcNow` on save
+- Generate shopping list inline card (no JS modal — no modal infrastructure in app)
+- "Generer handleliste" button hidden until menu is saved (has Id)
+
+**Build status:** ✅ 0 errors, warnings only (pre-existing)
+**Integration:** Fully integrated with WeekMenuController API and 16 passing unit tests
+
+
 **Phase 1 Meal Planning — Meal Pages Frontend ✅ COMPLETE**
 - Created MealManagementPage.razor (/meals): list, search, category filter, popularity score, soft-delete with inactive label
 - Created OneMealRecipePage.razor (/meals/{id}, /meals/new): create/edit form, ingredient management (autocomplete ShopItem, qty+unit, freshness flags)

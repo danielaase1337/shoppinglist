@@ -1,0 +1,450 @@
+@page "/weekmenus/new"
+@page "/weekmenus/{Id}"
+@using Shared
+@using System.Globalization
+@inject HttpClient Http
+@inject ISettings Settings
+@inject NavigationManager Navigation
+
+<div class="card-maincontainer container-sm">
+
+    <div class="card">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2>@(IsNew ? "Ny ukemeny" : $"Uke {_menu?.WeekNumber} {_menu?.Year}")</h2>
+            </div>
+            <div class="col-auto">
+                <a href="/weekmenus" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Tilbake
+                </a>
+            </div>
+        </div>
+    </div>
+
+    @if (_menu != null && _recipesLoaded)
+    {
+        <div class="card">
+            <h5>Planlegger</h5>
+            <table class="table week-planner-table mb-0">
+                <tbody>
+                    @foreach (var day in WeekOrder)
+                    {
+                        var meal = GetOrCreateDailyMeal(day);
+                        <tr>
+                            <td class="day-label">@DayLabel(day)</td>
+                            <td>
+                                <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
+                                        value="@meal.MealRecipeId"
+                                        @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))">
+                                    <option value="">-- Velg middag --</option>
+                                    @foreach (var recipe in GetSortedRecipes())
+                                    {
+                                        <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
+                                    }
+                                </select>
+                                @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
+                                {
+                                    <small class="suggested-badge">forslag</small>
+                                }
+                            </td>
+                            <td class="day-icon">
+                                @if (!string.IsNullOrEmpty(meal.MealRecipeId))
+                                {
+                                    var recipe = _recipes?.FirstOrDefault(r => r.Id == meal.MealRecipeId);
+                                    if (recipe != null)
+                                    {
+                                        @GetCategoryIcon(recipe.Category)
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <button class="btn btn-primary" @onclick="Save" disabled="@_saving">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save"></i>
+                        }
+                        Lagre
+                    </button>
+                </div>
+                @if (!IsNew)
+                {
+                    <div class="col-auto">
+                        <button class="btn btn-outline-info" @onclick="GenerateShoppingList"
+                                disabled="@(_generating || _saving)">
+                            @if (_generating)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <span>📝</span>
+                            }
+                            Generer handleliste
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_generatedList != null)
+        {
+            <div class="card generated-list-card">
+                <h5>📝 Generert handleliste</h5>
+                <p class="text-muted">Uke @_menu.WeekNumber @_menu.Year</p>
+
+                @if (_generatedList.ShoppingItems != null && _generatedList.ShoppingItems.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Vare</th>
+                                <th>Mengde</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _generatedList.ShoppingItems)
+                            {
+                                <tr>
+                                    <td>@item.Varen?.Name</td>
+                                    <td>@item.Mengde</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">
+                        <small>Ingen varer generert. Har du lagt til ingredienser på middagsrettene?</small>
+                    </p>
+                }
+
+                <div class="row mt-3">
+                    <div class="col-auto">
+                        <button class="btn btn-success" @onclick="SaveShoppingList" disabled="@_savingList">
+                            @if (_savingList)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save"></i>
+                            }
+                            Lagre som handleliste
+                        </button>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-secondary" @onclick="@(() => _generatedList = null)">
+                            Avbryt
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private WeekMenuModel? _menu;
+    private List<MealRecipeModel>? _recipes;
+    private bool _recipesLoaded = false;
+    private bool _saving = false;
+    private bool _generating = false;
+    private bool _savingList = false;
+    private ShoppingListModel? _generatedList;
+
+    private bool IsNew => string.IsNullOrEmpty(Id) || Id == "new";
+
+    private static readonly DayOfWeek[] WeekOrder =
+    {
+        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load recipes in parallel with menu
+        var recipesTask = Http.GetFromJsonAsync<List<MealRecipeModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes));
+
+        if (IsNew)
+        {
+            var weekNumber = ISOWeek.GetWeekOfYear(DateTime.Now);
+            var year = ISOWeek.GetYear(DateTime.Now);
+
+            _menu = new WeekMenuModel
+            {
+                Name = $"Uke {weekNumber} {year}",
+                WeekNumber = weekNumber,
+                Year = year,
+                PlanningStartDate = DateTime.UtcNow,
+                IsActive = true
+            };
+        }
+        else
+        {
+            try
+            {
+                _menu = await Http.GetFromJsonAsync<WeekMenuModel>(
+                    Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, Id!));
+                _menu ??= new WeekMenuModel();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error loading week menu {Id}: {ex.Message}");
+                _menu = new WeekMenuModel();
+            }
+        }
+
+        try
+        {
+            _recipes = await recipesTask ?? new List<MealRecipeModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading recipes: {ex.Message}");
+            _recipes = new List<MealRecipeModel>();
+        }
+
+        _recipesLoaded = true;
+        ApplyFridaySuggestion();
+    }
+
+    private DailyMealModel GetOrCreateDailyMeal(DayOfWeek day)
+    {
+        var existing = _menu!.DailyMeals.FirstOrDefault(d => d.Day == day);
+        if (existing != null) return existing;
+
+        var newMeal = new DailyMealModel { Day = day };
+        var list = _menu.DailyMeals.ToList();
+        list.Add(newMeal);
+        _menu.DailyMeals = list;
+        return newMeal;
+    }
+
+    private void OnMealSelected(DailyMealModel meal, string? recipeId)
+    {
+        meal.MealRecipeId = recipeId ?? "";
+        meal.IsSuggested = false;
+        var recipe = _recipes?.FirstOrDefault(r => r.Id == meal.MealRecipeId);
+        meal.MealRecipeName = recipe?.Name ?? "";
+    }
+
+    private void ApplyFridaySuggestion()
+    {
+        if (_recipes == null || !_recipes.Any()) return;
+
+        var friday = GetOrCreateDailyMeal(DayOfWeek.Friday);
+        if (!string.IsNullOrEmpty(friday.MealRecipeId)) return;
+
+        var suggestion = _recipes
+            .Where(r => r.IsActive)
+            .OrderByDescending(r => r.PopularityScore)
+            .FirstOrDefault(r =>
+                r.Category == MealCategory.KidsLike ||
+                r.Name.Contains("pizza", StringComparison.OrdinalIgnoreCase));
+
+        if (suggestion != null)
+        {
+            friday.MealRecipeId = suggestion.Id;
+            friday.MealRecipeName = suggestion.Name;
+            friday.IsSuggested = true;
+        }
+    }
+
+    private IEnumerable<MealRecipeModel> GetSortedRecipes()
+        => _recipes?.Where(r => r.IsActive)
+                    .OrderByDescending(r => r.PopularityScore)
+                    .ThenBy(r => r.Name)
+           ?? Enumerable.Empty<MealRecipeModel>();
+
+    private async Task Save()
+    {
+        if (_menu == null) return;
+
+        foreach (var day in WeekOrder)
+            GetOrCreateDailyMeal(day);
+
+        _saving = true;
+        try
+        {
+            _menu.LastModified = DateTime.UtcNow;
+
+            if (IsNew)
+            {
+                var response = await Http.PostAsJsonAsync(
+                    Settings.GetApiUrl(ShoppingListKeysEnum.WeekMenus), _menu);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var created = await response.Content.ReadFromJsonAsync<WeekMenuModel>();
+                    if (!string.IsNullOrEmpty(created?.Id))
+                    {
+                        Navigation.NavigateTo($"/weekmenus/{created.Id}", replace: true);
+                        return;
+                    }
+                    Navigation.NavigateTo("/weekmenus");
+                }
+                else
+                {
+                    Console.WriteLine($"❌ Save failed: {response.StatusCode}");
+                }
+            }
+            else
+            {
+                var response = await Http.PutAsJsonAsync(
+                    Settings.GetApiUrl(ShoppingListKeysEnum.WeekMenus), _menu);
+
+                if (!response.IsSuccessStatusCode)
+                    Console.WriteLine($"❌ Save failed: {response.StatusCode}");
+                else
+                    Console.WriteLine($"✅ Saved week menu: {_menu.Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving week menu: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task GenerateShoppingList()
+    {
+        if (string.IsNullOrEmpty(_menu?.Id)) return;
+
+        _generating = true;
+        _generatedList = null;
+        try
+        {
+            var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/generate-shoppinglist";
+            var response = await Http.PostAsync(url, null);
+
+            if (response.IsSuccessStatusCode)
+                _generatedList = await response.Content.ReadFromJsonAsync<ShoppingListModel>();
+            else
+                Console.WriteLine($"❌ Generate failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error generating shopping list: {ex.Message}");
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+    private async Task SaveShoppingList()
+    {
+        if (_generatedList == null || _menu == null) return;
+
+        _savingList = true;
+        try
+        {
+            _generatedList.Name ??= $"Uke {_menu.WeekNumber} {_menu.Year}";
+            _generatedList.LastModified = DateTime.UtcNow;
+
+            var response = await Http.PostAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), _generatedList);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<ShoppingListModel>();
+                Navigation.NavigateTo(!string.IsNullOrEmpty(created?.Id)
+                    ? $"/shoppinglist/{created.Id}"
+                    : "/shoppinglist");
+            }
+            else
+            {
+                Console.WriteLine($"❌ Save shopping list failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving shopping list: {ex.Message}");
+        }
+        finally
+        {
+            _savingList = false;
+        }
+    }
+
+    private static string DayLabel(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday    => "Mandag",
+        DayOfWeek.Tuesday   => "Tirsdag",
+        DayOfWeek.Wednesday => "Onsdag",
+        DayOfWeek.Thursday  => "Torsdag",
+        DayOfWeek.Friday    => "Fredag",
+        DayOfWeek.Saturday  => "Lørdag",
+        DayOfWeek.Sunday    => "Søndag",
+        _                   => day.ToString()
+    };
+
+    private static string GetCategoryIcon(MealCategory cat) => cat switch
+    {
+        MealCategory.KidsLike    => "👶",
+        MealCategory.Fish        => "🐟",
+        MealCategory.Meat        => "🥩",
+        MealCategory.Vegetarian  => "🥬",
+        MealCategory.Chicken     => "🍗",
+        MealCategory.Pasta       => "🍝",
+        MealCategory.Celebration => "🎉",
+        MealCategory.Other       => "❓",
+        _                        => "🍽️"
+    };
+}
+
+<style>
+    .week-planner-table td.day-label {
+        width: 110px;
+        font-weight: 600;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .week-planner-table td.day-icon {
+        width: 40px;
+        text-align: center;
+        font-size: 1.2rem;
+        vertical-align: middle;
+    }
+
+    .suggested-meal {
+        font-style: italic;
+        color: #6c757d;
+    }
+
+    .suggested-badge {
+        display: block;
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+
+    .generated-list-card {
+        border-left: 4px solid #0d6efd;
+    }
+</style>
