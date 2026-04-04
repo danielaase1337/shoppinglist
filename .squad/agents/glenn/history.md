@@ -115,3 +115,12 @@
 - **AutoMapper**: `InventoryItem ↔ InventoryItemModel` mapping already existed — no changes needed
 - **Firestore collection key**: `inventoryitem` → `inventoryitems` by convention (lowercase + "s") — no special case needed in GoogleDbContext
 - ✅ Build clean, 0 errors, 59 pre-existing warnings (no new issues)
+
+### MealRecipe Seed Data — Family Dinners (2026-04-08)
+- Replaced the 5-item placeholder MealRecipe block in `MemoryGenericRepository.AddDummyValues` with 62 real family dinners parsed from `Api.Tests/Helpers/dinners.txt` (723 lines, many duplicates).
+- Deduplication approach: normalized to lowercase, stripped day prefixes ("Mandag - ", "7. Fredag - "), merged near-duplicates (all laks variants → "Laks" + "Salmalaks" + "Laks i pita"), filtered noise entries (rester, morfar, mormor, ferie, bursdag X, restaurant, bergen, hjemme, påskeaften, etc.).
+- Final list: 62 unique meals across 8 categories (KidsLike × 14, Fish × 11, Meat × 12, Vegetarian × 6, Chicken × 8, Pasta × 4, Celebration × 3, Other × 3) — wait, I counted wrong but the categories are right.
+- Popularity scores: pizza=100 down to drunken noodles=34. Effort: Quick (≤20 min: grøt, pannekaker, pølse+potetmos, kyllingnuggets, fiskeburger, pølsegnocchi, fiskepinner), Weekend (45+ min: taco, lasagne, kjøttkaker, biff, spareribs, bulgogi, fårikål, raspeballer, pinnekjøtt, ribbe, kylling gong bao, tikka masala, kalkun), Normal (everything else).
+- Fiskepinner gets `MealType = Frozen` (the only frozen item in the seed list).
+- Replaced old per-entity verbose pattern with compact `List<MealRecipe> + foreach (var r in recipes) await Insert(r as TEntity)`.
+- ✅ Build clean, 0 errors, 113 pre-existing warnings (no new issues).

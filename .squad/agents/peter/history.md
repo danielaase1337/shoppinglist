@@ -438,3 +438,37 @@
 | #66 | [Phase 5] Family profile support — OwnerId isolation for meal planning |
 
 **Summary comment posted on #29.** Manifest filed at `.squad/decisions/inbox/peter-phase1-issues-created.md`.
+
+## 2026-06-XX — mealplanningv2 PR Opened + Issues Closed ✅
+
+**Requested by:** Daniel Aase
+
+### PR Created
+
+- **PR #67:** feat: Full meal planning system — Phases 1–5
+- **URL:** https://github.com/danielaase1337/shoppinglist/pull/67
+- **Branch:** `mealplanningv2` → `main`
+- **Test suite:** 177+ passing, 0 build errors
+
+### Issues Closed (20 total)
+
+All Phase 1–5 implementation issues commented with delivery summary and closed referencing PR #67:
+
+- **#29** — Meal planning scoping (superseded by full v2 implementation)
+- **#46–#58** — All Phase 1 MealRecipe issues (shared models, DTOs, AutoMapper, controller, client pages, tests)
+- **#59–#60** — Phase 2 WeekMenu issues (models + UI with Thu–Wed calendar + generate shopping list)
+- **#61–#62** — Phase 4 Inventory issues (InventoryItem CRUD + IsDone→stock hook + InventoryItemsPage)
+- **#63** — Phase 3 Ingredient matching suggestions (client-side use-up / fractional matching)
+- **#66** — Phase 5 Family profile (portion scaling delivered; OwnerId isolation deferred per D2)
+
+### Issues Left Open (not in this PR)
+
+- **#64** — Meal variety suggestion engine with category balancing — future sprint
+- **#65** — Google Keep meal history import tool — future sprint
+
+### Key Observations
+
+- The original v1 scope (text-history WeekMenuText entity) was correctly abandoned before implementation. The full recipe CRUD + WeekMenu + Inventory + FamilyProfile system is what shipped.
+- OwnerId isolation (#66) is partially addressed structurally but not enforced — remains on hold per D2 v1 decision until auth hardening sprint.
+- Moq pattern finding: `Task<ICollection<T>>` in `.ReturnsAsync()` requires explicit generic parameter — documented in test files and PR description.
+- Decision record filed: `.squad/decisions/inbox/peter-pr-opened.md`

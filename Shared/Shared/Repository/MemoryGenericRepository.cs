@@ -423,187 +423,90 @@ namespace Shared.Repository
                 if (trippeltrumf is TEntity trippeltrumfEntity) await Insert(trippeltrumfEntity);
             }
 
-            // Initialize MealRecipe test data with FireStore models
+            // Initialize MealRecipe seed data from family dinner history (dinners.txt)
             if (type == typeof(MealRecipe))
             {
-                var taco = new MealRecipe
+                var recipes = new List<MealRecipe>
                 {
-                    Id = "meal-1",
-                    Name = "Taco",
-                    Category = FirestoreMealCategory.KidsLike,
-                    MealType = FirestoreMealType.FreshCook,
-                    Effort = FirestoreMealEffort.Normal,
-                    PopularityScore = 47,
-                    LastUsed = DateTime.UtcNow.AddDays(-7),
-                    IsActive = true,
-                    BasePortions = 4,
-                    Ingredients = new List<MealIngredient>
-                    {
-                        new MealIngredient
-                        {
-                            ShopItemId = "mince-1",
-                            ShopItemName = "Kjøttdeig",
-                            Quantity = 500,
-                            Unit = MealUnit.Gram,
-                            IsOptional = false,
-                            IsFresh = true
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "taco-shells-1",
-                            ShopItemName = "Tacoskjell",
-                            Quantity = 1,
-                            Unit = MealUnit.Package,
-                            IsOptional = false
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "lettuce-1",
-                            ShopItemName = "Salat",
-                            Quantity = 1,
-                            Unit = MealUnit.Piece,
-                            IsOptional = false,
-                            IsFresh = true
-                        }
-                    }
-                };
-                if (taco is TEntity tacoEntity) await Insert(tacoEntity);
+                    // KidsLike
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pizza", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 100, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Taco", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 90, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pannekaker", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 77, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pølse og potetmos", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 65, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Grøt", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 62, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Hamburger", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 58, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kyllingnuggets", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 56, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskeburger", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 52, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Favaffel", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 50, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Falafel", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 44, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskepinner", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.Frozen, Effort = FirestoreMealEffort.Quick, PopularityScore = 41, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pølsegnocchi", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Quick, PopularityScore = 42, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pølseform med makaroni", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Nachos", Category = FirestoreMealCategory.KidsLike, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 36, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
 
-                var pizza = new MealRecipe
-                {
-                    Id = "meal-2",
-                    Name = "Pizza",
-                    Category = FirestoreMealCategory.KidsLike,
-                    MealType = FirestoreMealType.FreshCook,
-                    Effort = FirestoreMealEffort.Normal,
-                    PopularityScore = 42,
-                    LastUsed = DateTime.UtcNow.AddDays(-15),
-                    IsActive = true,
-                    BasePortions = 4,
-                    Ingredients = new List<MealIngredient>
-                    {
-                        new MealIngredient
-                        {
-                            ShopItemId = "pizza-base-1",
-                            ShopItemName = "Pizzabunn",
-                            Quantity = 2,
-                            Unit = MealUnit.Piece,
-                            IsOptional = false
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "pizza-sauce-1",
-                            ShopItemName = "Pizzasaus",
-                            Quantity = 1,
-                            Unit = MealUnit.Piece,
-                            IsOptional = false
-                        }
-                    }
-                };
-                if (pizza is TEntity pizzaEntity) await Insert(pizzaEntity);
+                    // Fish
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Laks", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 85, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskeboller", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 80, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskegrateng", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 80, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskekaker", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 60, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Salmalaks", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 54, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Laks i pita", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 47, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Hvit fisk", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 46, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskesuppe", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 42, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Torsk", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fiskepakke", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kveite", Category = FirestoreMealCategory.Fish, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 35, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
 
-                var fishGratin = new MealRecipe
-                {
-                    Id = "meal-3",
-                    Name = "Fiskegrateng",
-                    Category = FirestoreMealCategory.Fish,
-                    MealType = FirestoreMealType.FreshCook,
-                    Effort = FirestoreMealEffort.Normal,
-                    PopularityScore = 28,
-                    LastUsed = DateTime.UtcNow.AddDays(-3),
-                    IsActive = true,
-                    BasePortions = 4,
-                    Ingredients = new List<MealIngredient>
-                    {
-                        new MealIngredient
-                        {
-                            ShopItemId = "cod-1",
-                            ShopItemName = "Torsk",
-                            Quantity = 500,
-                            Unit = MealUnit.Gram,
-                            IsOptional = false,
-                            IsFresh = true
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "cream-1",
-                            ShopItemName = "Fløte",
-                            Quantity = 1,
-                            Unit = MealUnit.Deciliter,
-                            IsOptional = false
-                        }
-                    }
-                };
-                if (fishGratin is TEntity fishGratinEntity) await Insert(fishGratinEntity);
+                    // Meat
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Lapskaus", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 78, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kjøttkaker", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 74, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Biff", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 52, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Spareribs", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 50, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Bulgogi", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 48, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kjøttboller", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 44, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Fårikål", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 37, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Raspeballer", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Vossakorv", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Benløse fugler", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 36, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Nakkekoteletter", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 36, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Finnebiff", Category = FirestoreMealCategory.Meat, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 35, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
 
-                var steak = new MealRecipe
-                {
-                    Id = "meal-4",
-                    Name = "Biff med tilbehør",
-                    Category = FirestoreMealCategory.Meat,
-                    MealType = FirestoreMealType.FreshCook,
-                    Effort = FirestoreMealEffort.Weekend,
-                    PopularityScore = 35,
-                    LastUsed = DateTime.UtcNow.AddDays(-10),
-                    IsActive = true,
-                    BasePortions = 4,
-                    Ingredients = new List<MealIngredient>
-                    {
-                        new MealIngredient
-                        {
-                            ShopItemId = "entrecote-1",
-                            ShopItemName = "Entrecôte",
-                            Quantity = 600,
-                            Unit = MealUnit.Gram,
-                            IsOptional = false,
-                            IsFresh = true
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "potatoes-1",
-                            ShopItemName = "Poteter",
-                            Quantity = 1,
-                            Unit = MealUnit.Kilogram,
-                            IsOptional = false
-                        }
-                    }
-                };
-                if (steak is TEntity steakEntity) await Insert(steakEntity);
+                    // Vegetarian
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Tomatsuppe", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 72, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Linsegryte", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 63, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Marokkansk bønnegryte", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 43, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Veggisburger", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 42, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Gulrotsuppe", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Quinoaburger", Category = FirestoreMealCategory.Vegetarian, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 35, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
 
-                var veggiePasta = new MealRecipe
-                {
-                    Id = "meal-5",
-                    Name = "Vegetarpasta",
-                    Category = FirestoreMealCategory.Vegetarian,
-                    MealType = FirestoreMealType.FreshCook,
-                    Effort = FirestoreMealEffort.Quick,
-                    PopularityScore = 22,
-                    LastUsed = DateTime.UtcNow.AddDays(-20),
-                    IsActive = true,
-                    BasePortions = 4,
-                    Ingredients = new List<MealIngredient>
-                    {
-                        new MealIngredient
-                        {
-                            ShopItemId = "pasta-1",
-                            ShopItemName = "Pasta",
-                            Quantity = 400,
-                            Unit = MealUnit.Gram,
-                            IsOptional = false,
-                            IsBasic = true
-                        },
-                        new MealIngredient
-                        {
-                            ShopItemId = "broccoli-1",
-                            ShopItemName = "Brokkoli",
-                            Quantity = 1,
-                            Unit = MealUnit.Piece,
-                            IsOptional = false,
-                            IsFresh = true
-                        }
-                    }
+                    // Chicken
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kylling Gong Bao", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 68, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Tikka masala", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 45, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kyllingform", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 46, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kyllingsuppe", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 44, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kyllinglår", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kyllingklubber", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 40, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Hønsefrikassé", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 35, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Kalkun", Category = FirestoreMealCategory.Chicken, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 34, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+
+                    // Pasta
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Lasagne", Category = FirestoreMealCategory.Pasta, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 75, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Spagetti og kjøttsaus", Category = FirestoreMealCategory.Pasta, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 55, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pastaform", Category = FirestoreMealCategory.Pasta, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 48, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "One pot pasta", Category = FirestoreMealCategory.Pasta, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 35, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+
+                    // Celebration
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Pinnekjøtt", Category = FirestoreMealCategory.Celebration, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Ribbe", Category = FirestoreMealCategory.Celebration, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Weekend, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Medisterkaker", Category = FirestoreMealCategory.Celebration, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 36, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+
+                    // Other
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Wok", Category = FirestoreMealCategory.Other, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Enchiladas", Category = FirestoreMealCategory.Other, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 38, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
+                    new MealRecipe { Id = Guid.NewGuid().ToString(), Name = "Drunken noodles", Category = FirestoreMealCategory.Other, MealType = FirestoreMealType.FreshCook, Effort = FirestoreMealEffort.Normal, PopularityScore = 34, IsActive = true, BasePortions = 4, LastModified = DateTime.UtcNow },
                 };
-                if (veggiePasta is TEntity veggieEntity) await Insert(veggieEntity);
+                foreach (var r in recipes)
+                    await Insert(r as TEntity);
             }
         }
 
