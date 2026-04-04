@@ -98,6 +98,29 @@
 - `ShelfCategory` class with `GetDefaults()` is dead code — never stored in Firestore, never used by any controller or model.
 - `GoogleDbContext` stores collection state as mutable properties (`Collection`, `CollectionKey`) — safe only because `AddTransient` creates a new instance per injection, but the design is fragile.
 
+### 2026-04-04 — Phase 5 Data Models: FamilyProfile, FamilyMember, PortionRule, AgeGroup ✅ COMPLETE
+
+**Summary:** Created all Phase 5 entities for family profile and portion-rule support.
+
+**New files created:**
+- `Shared/Shared/AgeGroup.cs` — `AgeGroup` enum (Adult, Child, Toddler) in root `Shared` namespace alongside `MealUnit`
+- `Shared/Shared/FireStoreDataModels/FamilyProfile.cs` — `FamilyMember` (embedded, no separate collection) + `FamilyProfile : EntityBase` (Firestore collection: `familyprofiles`)
+- `Shared/Shared/HandlelisteModels/FamilyProfileModel.cs` — `FamilyMemberModel` + `FamilyProfileModel : EntityBase` with `IsValid()` guard
+- `Shared/Shared/FireStoreDataModels/PortionRule.cs` — `PortionRule : EntityBase` (Firestore collection: `portionrules`); uses `AgeGroup` + `MealUnit`
+- `Shared/Shared/HandlelisteModels/PortionRuleModel.cs` — `PortionRuleModel : EntityBase` with denormalised `ShopItemName` and `IsValid()` guard
+
+**Updated files:**
+- `Api/ShoppingListProfile.cs` — added `FamilyProfile ↔ FamilyProfileModel`, `FamilyMember ↔ FamilyMemberModel`, `PortionRule ↔ PortionRuleModel` AutoMapper entries
+- `Api/Program.cs` — added `IGenericRepository<FamilyProfile>` and `IGenericRepository<PortionRule>` in both dev (Memory) and production (Firestore) blocks
+- `Shared/Shared/Repository/GoogleDbContext.cs` — added `public const string FamilyProfiles = "familyprofiles"` and `public const string PortionRules = "portionrules"` as named constants (convention-based `GetCollectionKey()` already derives them correctly without overrides)
+
+**Key patterns:**
+- `FamilyMember` is embedded in `FamilyProfile` — no standalone Firestore collection, no standalone DI registration (same as MealIngredient/DailyMeal)
+- `AgeGroup` lives in root `Shared` namespace, identical to `MealUnit` pattern
+- `PortionRuleModel` denormalises `ShopItemName` for display without separate fetch
+
+**Validation:** `dotnet build Shared.csproj` — 0 errors, 46 warnings (pre-existing). `dotnet build Api.csproj` — 0 errors, 59 warnings (pre-existing). ✅
+
 ## Orchestration Log — 2026-04-04T05:12:37Z
 **Phase 1 Meal Planning — Data Models ✅ COMPLETE**
 - Created MealUnit enum (root Shared namespace) + MealUnitExtensions

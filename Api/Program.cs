@@ -36,6 +36,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, MemoryGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, MemoryGenericRepository<MealRecipe>>();
                         services.AddSingleton<IGenericRepository<WeekMenu>, MemoryGenericRepository<WeekMenu>>();
+                        services.AddSingleton<IGenericRepository<FamilyProfile>, MemoryGenericRepository<FamilyProfile>>();
+                        services.AddSingleton<IGenericRepository<PortionRule>, MemoryGenericRepository<PortionRule>>();
+                        services.AddSingleton<IGenericRepository<InventoryItem>, MemoryGenericRepository<InventoryItem>>();
                         // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
                         // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }
@@ -49,6 +52,9 @@ namespace ApiIsolated
                         services.AddSingleton<IGenericRepository<FrequentShoppingList>, GoogleFireBaseGenericRepository<FrequentShoppingList>>();
                         services.AddSingleton<IGenericRepository<MealRecipe>, GoogleFireBaseGenericRepository<MealRecipe>>();
                         services.AddSingleton<IGenericRepository<WeekMenu>, GoogleFireBaseGenericRepository<WeekMenu>>();
+                        services.AddSingleton<IGenericRepository<FamilyProfile>, GoogleFireBaseGenericRepository<FamilyProfile>>();
+                        services.AddSingleton<IGenericRepository<PortionRule>, GoogleFireBaseGenericRepository<PortionRule>>();
+                        services.AddSingleton<IGenericRepository<InventoryItem>, GoogleFireBaseGenericRepository<InventoryItem>>();
                         // MealIngredient: embedded in MealRecipe — no separate repository (D3/D9)
                         // DailyMeal: embedded in WeekMenu — no separate repository (D3)
                     }

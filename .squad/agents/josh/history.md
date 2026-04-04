@@ -89,3 +89,26 @@
 - **Soft-delete pattern**: Same as MealRecipeController — Get → IsActive=false → Update. `_repository.Delete()` is never called (verified with `Times.Never`).
 - ✅ All 16 tests PASS (`dotnet test --filter "WeekMenu"` → 16/16 green)
 - ✅ **Critical finding documented**: Moq ReturnsAsync silently returns null for `ICollection<T>`. Use `Returns(Task.FromResult<ICollection<T>>())` with explicit generic type. This pattern applies to ALL future repository Get() mocks returning interface collections.
+
+## Phase 5 — FamilyProfileController + PortionRuleController Tests (2026-04-08)
+
+- **Files created**: `Api.Tests/Controllers/FamilyProfileControllerTests.cs` (8 tests) + `Api.Tests/Controllers/PortionRuleControllerTests.cs` (10 tests)
+- **Both controllers already existed** (Glenn created them) — tests adapted to actual implementations, no surprises.
+- **FamilyProfile delete pattern**: No `IsActive` on model → hard delete. Test 8 verifies `_repository.Delete(id)` is called and `_repository.Update()` is NEVER called.
+- **PortionRule delete pattern**: `IsActive` present → soft delete. Test 9 verifies `Update(IsActive=false)` called; test 10 verifies `Delete()` NEVER called (both overloads).
+- **GetAll active filter**: PortionRuleController filters `IsActive==true` before returning — test 1 seeds 2 active + 1 inactive and asserts only 2 returned.
+- **`using Shared;`** needed for `AgeGroup` and `MealUnit` enums — these live in the `Shared` root namespace, not in `Shared.FireStoreDataModels`. Missing this caused initial build errors.
+- ✅ `dotnet test --filter "FamilyProfile|PortionRule"` → **18/18 green**
+
+## Phase 4 — InventoryItemController Unit Tests (2026-04-07)
+
+- **File written**: `Api.Tests/Controllers/InventoryItemControllerTests.cs` — 14 tests for `InventoryItemController`.
+- **Controller existed**: Glenn had already created `InventoryItemController.cs` with `InventoryAdjustmentModel` as a nested class in `Api.Controllers` namespace. Tests adapted to actual implementation.
+- **InventoryAdjustmentModel location**: Nested class inside `Api.Controllers` namespace (same file as controller). No separate DTO file needed — `using Api.Controllers` brings it in.
+- **MealUnit enum**: Resides in `Shared` namespace (not `Shared.FireStoreDataModels`). Add `using Shared;` to test files that reference it. `MealUnit.Stk` does NOT exist — use `MealUnit.Piece` for count-based units.
+- **Adjust endpoint uses `_repository.Get()` (all items)**: Controller fetches all inventory then does `FirstOrDefault` lookup — mock must use `Returns(Task.FromResult<ICollection<InventoryItem>>(list))` pattern.
+- **Constructor bug found and fixed**: `GetAllShoppingListsFunction` constructor was updated to 4 args (added `IGenericRepository<InventoryItem>`) but both `ShoppingListControllerTests.cs` and `ShoppingListControllerRealTests.cs` still used old 3-arg constructor → compilation failure. Fixed both files by adding `_mockInventoryRepository` field and passing it to constructor.
+- **Bonus test added**: `Update_TriggersInventoryAddition_WhenIsDoneTransitionsToTrue` added to `ShoppingListControllerRealTests.cs`. Verifies that PUT with `IsDone` false→true calls `_inventoryRepository.Update()` for each matching item. Uses `Returns(Task.FromResult<ICollection<InventoryItem>>(...))` pattern for the inventory Get() mock.
+- **Total tests**: 159 passing (was failing to build before this sprint). Net new: 14 InventoryItem + 1 bonus ShoppingList = 15 new tests.
+- ✅ `dotnet test Api.Tests/Api.Tests.csproj --filter "InventoryItem"` → 14/14 green
+- ✅ `dotnet test Api.Tests/Api.Tests.csproj` → 159/159 green

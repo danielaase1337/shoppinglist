@@ -93,3 +93,25 @@
 - AutoMapper mappings for WeekMenu/DailyMeal already in ShoppingListProfile.cs — no changes needed
 - ✅ Build clean, 0 errors, 53 pre-existing warnings (no new issues)
 - ✅ Integrated with 16 passing unit tests (josh-weekmenu-tests)
+
+### FamilyProfileController + PortionRuleController — Phase 5 API (2026-04-08)
+- **Files created**: `Api/Controllers/FamilyProfileController.cs`, `Api/Controllers/PortionRuleController.cs`
+- **FamilyProfileController**: Two Functions — `[Function("familyprofiles")]` GET (ordered by Name)/POST/PUT, `[Function("familyprofile")]` GET/{id}/DELETE. `FamilyProfile` has no `IsActive` property → hard delete via `_repository.Delete()`. POST sets `LastModified = DateTime.UtcNow` only (no IsActive — not on model).
+- **PortionRuleController**: Two Functions — `[Function("portionrules")]` GET active rules ordered by ShopItemId then AgeGroup/POST/PUT, `[Function("portionrule")]` GET/{id}/soft-DELETE. `PortionRule` has `IsActive` → soft delete: GET → set `IsActive=false` + `LastModified` → `_repository.Update()`. Never calls `_repository.Delete()`.
+- **DI registrations**: Both `FamilyProfile` and `PortionRule` repos already registered in Program.cs (Ray added them) — no changes needed.
+- **AutoMapper mappings**: `FamilyProfile↔FamilyProfileModel`, `FamilyMember↔FamilyMemberModel`, `PortionRule↔PortionRuleModel` already in ShoppingListProfile.cs — no changes needed.
+- **AuthorizationLevel.Anonymous** on all Functions (consistent with SWA pattern).
+- ✅ Build clean, 0 errors
+
+### InventoryItemController + ShoppingList IsDone hook — Phase 4 (2026-04-08)
+- **`IsActive` added** to both `InventoryItem` and `InventoryItemModel` (was missing — required for soft-delete and IsDone hook filter). Constructors default `IsActive = true`.
+- **`InventoryItemController.cs` created** at `Api/Controllers/InventoryItemController.cs`
+  - `[Function("inventoryitems")]` GET all active ordered by Name / POST (IsActive=true, LastModified=UtcNow) / PUT (LastModified=UtcNow)
+  - `[Function("inventoryitem")]` Route=`inventoryitem/{id}` — GET single (404 if not found) / soft-DELETE (IsActive=false, LastModified=UtcNow, Update)
+  - `[Function("inventoryitemsadjust")]` POST Route=`inventoryitems/adjust` — bulk adjust: fetches all inventory once (avoids N+1), adds QuantityDelta, clamps to 0 if negative, updates each item
+  - `InventoryAdjustmentModel` public class defined in same file (top-level in namespace)
+- **ShoppingListController IsDone hook**: `GetAllShoppingListsFunction` now takes `IGenericRepository<InventoryItem>` in constructor. PUT handler fetches `existing` before update, detects not-done→done transition, loads all inventory once, increments `QuantityInStock` for matching active items by ShopItemId
+- **Program.cs**: `IGenericRepository<InventoryItem>` registered in both dev (Memory) and prod (Firestore) branches
+- **AutoMapper**: `InventoryItem ↔ InventoryItemModel` mapping already existed — no changes needed
+- **Firestore collection key**: `inventoryitem` → `inventoryitems` by convention (lowercase + "s") — no special case needed in GoogleDbContext
+- ✅ Build clean, 0 errors, 59 pre-existing warnings (no new issues)

@@ -5,9 +5,38 @@
 - **Stack:** Blazor WebAssembly (.NET 9), Syncfusion Blazor components, Azure Functions API, Google Cloud Firestore
 - **Created:** 2026-03-22
 
-## Learnings
+## Core Context
 
-- `[AllowAnonymous]` in Blazor WASM requires `@using Microsoft.AspNetCore.Authorization` — **not** `Microsoft.AspNetCore.Components.Authorization` (which covers auth components). Both namespaces must be in `_Imports.razor` when using the attribute on a page. Mixing them up causes CS0246 build errors and a completely broken app.
+### Frontend Architecture
+- **UI components** in `Client/Pages/Shopping/` and `Client/Shared/`; new pages in `Client/Pages/Meals/`
+- **URL routing** via `ISettings` + `ShoppingListKeysEnum` — never hardcode API paths
+- **Auth pattern:** `SwaAuthenticationStateProvider` (reads `/.auth/me` from SWA), `<AuthorizeView>`, `<AuthorizeRouteView>` in App.razor
+- **SfAutoComplete pattern:** `TValue="string"`, `TItem="ShopItemModel"`, check `args.ItemData != null` for selection vs free-form
+- **Loading pattern:** Parallel task launch in `OnInitializedAsync`, flag-based spinners, await all at end
+- **Navigation:** Admin dropdown (Blazor-toggled, accessible) contains: Hyppige Lister, Lager (inventory), Middager, Ukemeny, Håndter butikker, Administrer varer, Administrer kategorier
+
+### Phase Completions
+- **Phase 1 (Meals):** MealRecipe CRUD pages + category icons ✅ (2026-04-04)
+- **Phase 2 (WeekMenus):** 7-day planner, Friday pizza auto-suggest, generate list preview ✅ (2026-04-07)
+- **Phase 3 (Use-Up):** Fractional ingredient matching, session-scoped dismissal, amber suggestion panel ✅ (2026-04-08)
+- **Phase 4 (Inventory):** Pantry admin, +1/-1 adjustments, frozen-meal shortcut, soft delete ✅ (2026-04-08)
+- **Phase 5 (Portion):** FamilyProfilePage (members + rules), client-side scaling in generate-list flow ✅ (2026-04-09)
+
+### Key Extensions & Helpers
+- `MealUnit.ToNorwegian()` — extension for unit display throughout
+- `AgeGroupLabel()` — static helper for AgeGroup localization (Adult/Barn/Småbarn)
+- `GetCategoryIcon()` — static helper for meal category emojis
+- `NaturalSortComparer` — existing, correct, no changes needed
+
+### Cross-Agent Integration Patterns
+- **Moq ICollection:** Requires explicit `Task.FromResult<ICollection<T>>(list)` type parameter
+- **Hard delete (FamilyProfile):** No IsActive → `repository.Delete()` direct call
+- **Soft delete (PortionRule, InventoryItem):** IsActive present → Get → set false → Update
+- **Denormalisation:** DTOs can carry lookup names (ShopItemName, RecipeName) if stored at sync time
+- **Client-side scaling:** Portion adjustments applied after API response (no new endpoint)
+
+## Learnings & Tech Details
+`[AllowAnonymous]` in Blazor WASM requires `@using Microsoft.AspNetCore.Authorization` — **not** `Microsoft.AspNetCore.Components.Authorization` (which covers auth components). Both namespaces must be in `_Imports.razor` when using the attribute on a page. Mixing them up causes CS0246 build errors and a completely broken app.
 
 - For SWA logout links, always use `post_logout_redirect_uri=/.auth/login/aad` (not `/`) — redirecting to `/` on a protected route causes a 401 that lands on the Blazor loading spinner. Pointing directly to the AAD login page bypasses Blazor entirely and gives a clean logout → login UX.
 
@@ -132,6 +161,33 @@
 **Integration:** Fully integrated with WeekMenuController API and 16 passing unit tests
 
 
+### 2026-04-08 — Phase 3 Use-Up Suggestions + Phase 4 Inventory Page ✅ COMPLETE
+
+**Files modified:**
+- `Client/Pages/Meals/OneWeekMenuPage.razor` — Phase 3: added `UseUpSuggestion` record, `_useUpSuggestions` list, `_dismissedIngredientIds` set. `OnMealSelected` now calls `UpdateUseUpSuggestions()`. New methods: `UpdateUseUpSuggestions`, `AddToNextEmptySlot`, `DismissSuggestion`. Suggestion panel renders below the planner table, dismissable per ingredient. Added `.use-up-panel` CSS with amber left border.
+- `Client/Shared/NewNavComponent.razor` — Added "Lager" nav link under Admin dropdown (after "Ukemeny")
+
+**Files created:**
+- `Client/Pages/Meals/InventoryItemsPage.razor` — `/inventory` admin page: loads inventory + recipes + shop items in parallel. Table with grouped/sorted rows, low-stock 🔴/🟢 status, inline edit on row click, +1/-1 adjust buttons (POST /api/inventoryitems/adjust), soft delete. Add-item form with SfAutoComplete (ShopItems catalogue). "🧊 Legg til frossen middag" shortcut creates item from recipe with `(frossen)` suffix and `SourceMealRecipeId`.
+
+**Patterns followed:**
+- `ShoppingListKeysEnum.InventoryItems`/`InventoryItem` — already present, confirmed
+- `ISettings` URL mappings for `inventoryitem`/`inventoryitems` — already present, confirmed
+- `MealUnit.ToNorwegian()` extension used for unit display
+- SfAutoComplete pattern identical to `OneMealRecipePage`
+- `LoadingComponent` while items null
+- `LastModified = DateTime.UtcNow` on all mutations
+
+**Use-up algorithm:**
+- Runs purely client-side on `_recipes` list — no API calls
+- Triggers on every `OnMealSelected` call
+- Scans ingredients with `Quantity < 1.0` across all currently-selected recipes
+- For each fractional ingredient, finds other active, non-selected recipes using the same `ShopItemId`
+- Dismissed suggestions are tracked in `_dismissedIngredientIds` (session-scoped `HashSet`)
+
+**Build status:** ✅ 0 errors, 79 warnings (all pre-existing)
+
+
 **Phase 1 Meal Planning — Meal Pages Frontend ✅ COMPLETE**
 - Created MealManagementPage.razor (/meals): list, search, category filter, popularity score, soft-delete with inactive label
 - Created OneMealRecipePage.razor (/meals/{id}, /meals/new): create/edit form, ingredient management (autocomplete ShopItem, qty+unit, freshness flags)
@@ -143,4 +199,29 @@
 - Decision: Ingredients append to end (not position 0) to preserve recipe order
 - Decision: Soft-delete UX — list reflects IsActive=false, detail navigates away
 - ✅ Pages compile clean, ready for integration
+
+
+### 2026-04-09 — Phase 5 FamilyProfilePage + Portion Scaling ✅ COMPLETE
+
+**Files created:**
+- `Client/Pages/Meals/FamilyProfilePage.razor` — `/familyprofile` admin page: create/view/manage family profile (one household), member list with AgeGroup Norwegian labels (Voksen/Barn/Småbarn) + dietary notes, add/remove members (PUT profile on each change), portion rules table with SfAutoComplete (ShopItems), add rule form (AgeGroup + qty + MealUnit), delete rule per row. All loads in parallel on init.
+
+**Files modified:**
+- `Client/Common/ShoppingListKeysEnum.cs` — Added `FamilyProfiles=17`, `FamilyProfile=18`, `PortionRules=19`, `PortionRule=20`
+- `Client/Common/ISettings.cs` — Added 4 new URL mappings: `familyprofile`, `familyprofiles`, `portionrule`, `portionrules`
+- `Client/Shared/NewNavComponent.razor` — Added "Familieprofil" link under Admin dropdown (after "Lager")
+- `Client/Pages/Meals/OneWeekMenuPage.razor` — Phase 5 portion scaling: `_familyProfile` + `_portionRules` loaded in parallel on init; `ApplyPortionScaling()` called after `GenerateShoppingList` response; `_scalingApplied` bool; "📐 Mengder tilpasset familieprofil" note shown in generated list preview when scaling was applied; silent skip when no profile loaded.
+
+**Patterns followed:**
+- SfAutoComplete pattern identical to `OneMealRecipePage` (TValue="string", TItem="ShopItemModel", FilterType.Contains)
+- String-backed enum bindings for `<select>` (AgeGroup, MealUnit)
+- `MealUnit.ToNorwegian()` extension used for unit display in both table and dropdown
+- `ISettings.GetApiUrl` / `GetApiUrlId` for all API calls — no hardcoded URLs
+- `LoadingComponent` while data loading
+- `LastModified = DateTime.UtcNow` on all mutations
+- Parallel task loading (shopItemsTask + portionRulesTask started before profile GET)
+- Profile assumed single-household: `profiles?.FirstOrDefault()`
+- Scaling silently skipped when no family profile or no portion rules
+
+**Build status:** ✅ 0 errors, 33 warnings (all pre-existing)
 

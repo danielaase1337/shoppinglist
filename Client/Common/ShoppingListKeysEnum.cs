@@ -25,7 +25,11 @@ namespace BlazorApp.Client.Common
         WeekMenus = 13,
         WeekMenu = 14,
         InventoryItems = 15,
-        InventoryItem = 16
+        InventoryItem = 16,
+        FamilyProfiles = 17,
+        FamilyProfile = 18,
+        PortionRules = 19,
+        PortionRule = 20
 
 
     }
