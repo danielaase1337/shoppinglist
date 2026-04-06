@@ -1,27 +1,38 @@
 using Google.Cloud.Firestore;
-using Shared.BaseModels;
 
 namespace Shared.FireStoreDataModels
 {
     [FirestoreData]
-    public class MealIngredient : EntityBase
+    public class MealIngredient
     {
         [FirestoreProperty]
-        public string MealRecipeId { get; set; }
-        
+        public string ShopItemId { get; set; }
+
         [FirestoreProperty]
-        public ShopItem ShopItem { get; set; }
-        
+        public string ShopItemName { get; set; }
+
         [FirestoreProperty]
-        public int StandardQuantity { get; set; }
-        
+        public double Quantity { get; set; }
+
+        [FirestoreProperty]
+        public MealUnit Unit { get; set; }
+
         [FirestoreProperty]
         public bool IsOptional { get; set; }
 
+        [FirestoreProperty]
+        public bool IsFresh { get; set; }
+
+        [FirestoreProperty]
+        public bool IsBasic { get; set; }
+
         public MealIngredient()
         {
-            StandardQuantity = 1;
+            Quantity = 1;
             IsOptional = false;
+            IsFresh = false;
+            IsBasic = false;
         }
     }
 }
+

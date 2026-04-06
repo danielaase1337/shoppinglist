@@ -11,6 +11,9 @@ namespace Shared.Repository
 {
     public class GoogleDbContext : IGoogleDbContext
     {
+        // Named constants for collection keys — informational; GetCollectionKey() derives these via convention
+        public const string FamilyProfiles = "familyprofiles";
+        public const string PortionRules = "portionrules";
         readonly string _projectId = "supergnisten-shoppinglist";
         public string CollectionKey { get; set; }
 

@@ -1,0 +1,492 @@
+@page "/meals/new"
+@page "/meals/{Id}"
+@using Shared
+@inject HttpClient Http
+@inject ISettings Settings
+@inject NavigationManager Navigation
+
+<div class="card-maincontainer container-sm">
+
+    <div class="card">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2>@(IsNew ? "Ny middag" : "Rediger middag")</h2>
+            </div>
+            <div class="col-auto">
+                <a href="/meals" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Tilbake
+                </a>
+            </div>
+        </div>
+    </div>
+
+    @if (Recipe != null)
+    {
+        <!-- Recipe fields -->
+        <div class="card">
+            <h5>Detaljer</h5>
+
+            <div class="mb-3">
+                <label class="form-label">Navn</label>
+                <input class="form-control" @bind="Recipe.Name" placeholder="Navn på middagen..." />
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-4">
+                    <label class="form-label">Kategori</label>
+                    <select class="form-select" @bind="@_categoryStr">
+                        @foreach (var cat in Enum.GetValues<MealCategory>())
+                        {
+                            <option value="@cat">@GetCategoryIcon(cat) @cat</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" @bind="@_mealTypeStr">
+                        @foreach (var t in Enum.GetValues<MealType>())
+                        {
+                            <option value="@t">@GetMealTypeLabel(t)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Innsats</label>
+                    <select class="form-select" @bind="@_effortStr">
+                        @foreach (var e in Enum.GetValues<MealEffort>())
+                        {
+                            <option value="@e">@GetEffortLabel(e)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-4">
+                    <label class="form-label">Forberedelsetid (min)</label>
+                    <input type="number" class="form-control" @bind="Recipe.PrepTimeMinutes" placeholder="f.eks. 30" />
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Porsjoner (standard)</label>
+                    <input type="number" class="form-control" min="1" @bind="Recipe.BasePortions" />
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-auto">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="chkActive" @bind="Recipe.IsActive" />
+                        <label class="form-check-label" for="chkActive">Aktiv</label>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="chkFresh" @bind="Recipe.IsFresh" />
+                        <label class="form-check-label" for="chkFresh">Inneholder ferskvarer</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ingredients -->
+        <div class="card">
+            <h5>Ingredienser</h5>
+
+            @if (Recipe.Ingredients != null && Recipe.Ingredients.Any())
+            {
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Vare</th>
+                            <th>Mengde</th>
+                            <th>Enhet</th>
+                            <th>Valgfri</th>
+                            <th>Fersk</th>
+                            <th title="Basisvarer ekskluderes fra generert handleliste">Basis</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ing in Recipe.Ingredients)
+                        {
+                            <tr>
+                                <td>@ing.ShopItemName</td>
+                                <td>@ing.Quantity</td>
+                                <td><small>@GetUnitLabel(ing.Unit)</small></td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsOptional" />
+                                </td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsFresh" />
+                                </td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsBasic" />
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            @onclick="@(() => RemoveIngredient(ing))">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted"><small>Ingen ingredienser lagt til ennå.</small></p>
+            }
+
+            <!-- Add ingredient form -->
+            <div class="add-ingredient-form mt-3">
+                <h6>Legg til ingrediens</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-3">
+                        <label class="form-label">Varenavn</label>
+                        @if (!_shopItemsLoaded)
+                        {
+                            <div class="form-control form-control-sm d-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <small class="text-muted">Laster varer...</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <SfAutoComplete TValue="string" TItem="ShopItemModel"
+                                            Placeholder="Søk etter vare..."
+                                            @bind-Value="@_newIngName"
+                                            DataSource="@_shopItems"
+                                            FilterType="FilterType.Contains"
+                                            Highlight>
+                                <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                                <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                                    ValueChange="@OnIngredientShopItemChanged" />
+                            </SfAutoComplete>
+                        }
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label">Mengde</label>
+                        <input type="number" step="0.5" min="0"
+                               class="form-control form-control-sm"
+                               @bind="_newIngQty" />
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label">Enhet</label>
+                        <select class="form-select form-select-sm" @bind="_newIngUnitStr">
+                            @foreach (var u in Enum.GetValues<MealUnit>())
+                            {
+                                <option value="@u">@GetUnitLabel(u)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ingOpt" @bind="_newIngOptional" />
+                            <label class="form-check-label" for="ingOpt">Valgfri</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ingFresh" @bind="_newIngFresh" />
+                            <label class="form-check-label" for="ingFresh">Fersk</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ingBasic" @bind="_newIngBasic" />
+                            <label class="form-check-label" for="ingBasic">Basis <small class="text-muted">(ekskluderes fra handleliste)</small></label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="AddIngredient">
+                            <i class="fas fa-plus"></i> Legg til
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="card">
+            <div class="row">
+                <div class="col">
+                    <button class="btn btn-primary" @onclick="Save" disabled="@_saving">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save"></i>
+                        }
+                        Lagre
+                    </button>
+                </div>
+                @if (!IsNew)
+                {
+                    <div class="col-auto">
+                        <button class="btn btn-outline-danger" @onclick="Delete" disabled="@_saving">
+                            <i class="fas fa-trash"></i> Slett
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <LoadingComponent></LoadingComponent>
+    }
+
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private MealRecipeModel? Recipe;
+    private bool IsNew => string.IsNullOrEmpty(Id) || Id == "new";
+    private bool _saving = false;
+
+    // String-backed bindings for enum selects (Blazor bind works cleanly with strings)
+    private string _categoryStr = nameof(MealCategory.Meat);
+    private string _mealTypeStr = nameof(MealType.FreshCook);
+    private string _effortStr   = nameof(MealEffort.Normal);
+
+    // ShopItems catalogue for ingredient autocomplete
+    private List<ShopItemModel> _shopItems       = new();
+    private bool                _shopItemsLoaded = false;
+
+    // New ingredient form fields
+    private string _newIngName       = "";
+    private string _newIngShopItemId = "";
+    private double _newIngQty        = 1;
+    private string _newIngUnitStr    = nameof(MealUnit.Piece);
+    private bool   _newIngOptional   = false;
+    private bool   _newIngFresh      = false;
+    private bool   _newIngBasic      = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Start shop items load immediately so it runs in parallel
+        var shopItemsTask = Http.GetFromJsonAsync<List<ShopItemModel>>(
+            Settings.GetApiUrl(ShoppingListKeysEnum.shopItems));
+
+        if (IsNew)
+        {
+            Recipe = new MealRecipeModel { BasePortions = 4, IsActive = true };
+        }
+        else
+        {
+            try
+            {
+                Recipe = await Http.GetFromJsonAsync<MealRecipeModel>(
+                    Settings.GetApiUrlId(ShoppingListKeysEnum.MealRecipe, Id!));
+
+                if (Recipe != null)
+                {
+                    _categoryStr = Recipe.Category.ToString();
+                    _mealTypeStr = Recipe.MealType.ToString();
+                    _effortStr   = Recipe.Effort.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error loading recipe {Id}: {ex.Message}");
+                Recipe = new MealRecipeModel();
+            }
+        }
+
+        try
+        {
+            _shopItems = await shopItemsTask ?? new List<ShopItemModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading shop items: {ex.Message}");
+            _shopItems = new List<ShopItemModel>();
+        }
+        _shopItemsLoaded = true;
+    }
+
+    private void OnIngredientShopItemChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, ShopItemModel> args)
+    {
+        if (args.ItemData != null)
+        {
+            // Catalogue item selected — use its real Id
+            _newIngShopItemId = args.ItemData.Id;
+            _newIngName       = args.ItemData.Name;
+        }
+        else
+        {
+            // Free-form text — derive a slug id from what was typed
+            _newIngShopItemId = args.Value ?? "";
+        }
+    }
+
+    private void AddIngredient()
+    {
+        if (string.IsNullOrWhiteSpace(_newIngName)) return;
+
+        var unit = Enum.TryParse<MealUnit>(_newIngUnitStr, out var u) ? u : MealUnit.Piece;
+
+        var ing = new MealIngredientModel
+        {
+            ShopItemId   = string.IsNullOrWhiteSpace(_newIngShopItemId)
+                               ? _newIngName.Trim().ToLowerInvariant().Replace(" ", "-")
+                               : _newIngShopItemId,
+            ShopItemName = _newIngName.Trim(),
+            Quantity     = _newIngQty,
+            Unit         = unit,
+            IsOptional   = _newIngOptional,
+            IsFresh      = _newIngFresh,
+            IsBasic      = _newIngBasic
+        };
+
+        var list = Recipe!.Ingredients?.ToList() ?? new List<MealIngredientModel>();
+        list.Add(ing);
+        Recipe.Ingredients = list;
+
+        // Reset form
+        _newIngName       = "";
+        _newIngShopItemId = "";
+        _newIngQty        = 1;
+        _newIngUnitStr    = nameof(MealUnit.Piece);
+        _newIngOptional   = false;
+        _newIngFresh      = false;
+        _newIngBasic      = false;
+    }
+
+    private void RemoveIngredient(MealIngredientModel ing)
+    {
+        var list = Recipe!.Ingredients?.ToList() ?? new List<MealIngredientModel>();
+        list.Remove(ing);
+        Recipe.Ingredients = list;
+    }
+
+    private async Task Save()
+    {
+        if (Recipe == null || string.IsNullOrWhiteSpace(Recipe.Name)) return;
+
+        _saving = true;
+        try
+        {
+            // Apply enum bindings
+            if (Enum.TryParse<MealCategory>(_categoryStr, out var cat)) Recipe.Category = cat;
+            if (Enum.TryParse<MealType>(_mealTypeStr, out var mt))      Recipe.MealType = mt;
+            if (Enum.TryParse<MealEffort>(_effortStr, out var ef))      Recipe.Effort   = ef;
+
+            Recipe.LastModified = DateTime.UtcNow;
+
+            HttpResponseMessage response;
+            if (IsNew)
+            {
+                response = await Http.PostAsJsonAsync(
+                    Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes), Recipe);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync(
+                    Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes), Recipe);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"✅ Saved recipe: {Recipe.Name}");
+                Navigation.NavigateTo("/meals");
+            }
+            else
+            {
+                Console.WriteLine($"❌ Save failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving recipe: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (Recipe == null) return;
+        _saving = true;
+        try
+        {
+            var response = await Http.DeleteAsync(
+                Settings.GetApiUrlId(ShoppingListKeysEnum.MealRecipe, Recipe.Id));
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"✅ Deleted recipe: {Recipe.Name}");
+                Navigation.NavigateTo("/meals");
+            }
+            else
+            {
+                Console.WriteLine($"❌ Delete failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error deleting recipe: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string GetCategoryIcon(MealCategory cat) => cat switch
+    {
+        MealCategory.KidsLike    => "👶",
+        MealCategory.Fish        => "🐟",
+        MealCategory.Meat        => "🥩",
+        MealCategory.Vegetarian  => "🥬",
+        MealCategory.Chicken     => "🍗",
+        MealCategory.Pasta       => "🍝",
+        MealCategory.Celebration => "🎉",
+        MealCategory.Other       => "❓",
+        _                        => "🍽️"
+    };
+
+    private static string GetMealTypeLabel(MealType t) => t switch
+    {
+        MealType.FreshCook  => "Lages fra scratch",
+        MealType.Frozen     => "Frysevare",
+        MealType.PrePrepped => "Ferdigprep",
+        MealType.Takeout    => "Takeaway",
+        _                   => t.ToString()
+    };
+
+    private static string GetEffortLabel(MealEffort e) => e switch
+    {
+        MealEffort.Quick   => "⚡ Rask (≤20 min)",
+        MealEffort.Normal  => "🍳 Normal (20–45 min)",
+        MealEffort.Weekend => "👨‍🍳 Helgemat (45+ min)",
+        _                  => e.ToString()
+    };
+
+    private static string GetUnitLabel(MealUnit u) => u switch
+    {
+        MealUnit.Gram             => "gram",
+        MealUnit.Kilogram         => "kg",
+        MealUnit.Liter            => "liter",
+        MealUnit.Deciliter        => "dl",
+        MealUnit.Tablespoon       => "ss",
+        MealUnit.TablespoonHalf   => "1/2 ss",
+        MealUnit.TablespoonQuarter=> "1/4 ss",
+        MealUnit.Teaspoon         => "ts",
+        MealUnit.TeaspoonHalf     => "1/2 ts",
+        MealUnit.TeaspoonQuarter  => "1/4 ts",
+        MealUnit.Piece            => "stk",
+        MealUnit.PieceHalf        => "1/2 stk",
+        MealUnit.PieceQuarter     => "1/4 stk",
+        MealUnit.Pinch            => "klype",
+        MealUnit.Package          => "pakke",
+        _                         => u.ToString()
+    };
+}
