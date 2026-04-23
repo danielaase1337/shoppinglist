@@ -36,6 +36,34 @@
 - **Client-side scaling:** Portion adjustments applied after API response (no new endpoint)
 
 ## Learnings & Tech Details
+
+### 2026-04-11 — Issue #71 — Duplicate PortionRule rows ✅ COMPLETE
+
+**#71 — Duplicate portion rule (`FamilyProfilePage.razor`)**
+- Added 📋 duplicate button alongside existing delete button on each active PortionRule row.
+- Clicking sets `_duplicatingRule = source` and opens an inline `table-warning` row immediately below, pre-filled with the source's ShopItem (display-only, no autocomplete), Quantity, and Unit. AgeGroup defaults to Adult so the user changes it.
+- Save POSTs a new `PortionRuleModel` to the `PortionRules` endpoint; on success inserts the returned record at `sourceIndex + 1` in `_portionRules` so the list order reflects the duplicate position.
+- Cancel sets `_duplicatingRule = null` — no API call.
+- **Key pattern**: `_duplicatingRule == rule` reference equality inside the `@foreach` renders the inline row right after the matched source row. Same `table-warning` pattern as member edit from #69.
+- **ShopItem locked on duplicate**: name displayed as `<strong>` text, not an autocomplete — the item is already resolved; only group + amount need changing.
+
+### 2026-04-10 — Bugs #68, #69, #70 Fixed ✅ COMPLETE
+
+**#68 — Inventory +/-1 buttons (`InventoryItemsPage.razor`)**
+- Root cause: `Adjust()` sent `new { Id, Delta }` but API `inventoryitemsadjust` expects `List<InventoryAdjustmentModel>` with property `QuantityDelta` (not `Delta`).
+- Fix: changed request to `new List<object> { new { Id = item.Id, QuantityDelta = delta } }` and added `StateHasChanged()` after local quantity update.
+
+**#69 — Family member edit (`FamilyProfilePage.razor`)**
+- Root cause: member table had only a delete button; no edit affordance.
+- Fix: added `_editingMember` reference + 3 edit form fields. `StartEditMember()` copies current values; `SaveEditMember()` writes back and calls `UpdateProfile()` (PUT). Member rows now show pencil + delete; edit row highlights in `table-warning` with Name input, AgeGroup select, DietaryNotes input, save/cancel.
+- Pattern: reference-based tracking (FamilyMemberModel has no Id/EntityBase).
+
+**#70 — Ingredient edit (`OneMealRecipePage.razor`)**
+- Root cause: ingredient rows were display-only for Quantity and Unit; only flag checkboxes were live-bound.
+- Fix: added `_editingIngredient` reference + 5 edit fields. `StartEditIngredient()` snapshots current values; `SaveEditIngredient()` updates ingredient and (for existing recipes) immediately calls PUT on recipe endpoint. Pencil edit button added alongside delete button; edit row in `table-warning`.
+- Pattern: same reference-based inline edit as #69. `IsNew` guard prevents spurious PUT on new recipes.
+
+**General pattern reminder:** When a model doesn't inherit EntityBase (no `Id`), use object reference equality for edit tracking (`_editingX == item`), not string Id comparison.
 `[AllowAnonymous]` in Blazor WASM requires `@using Microsoft.AspNetCore.Authorization` — **not** `Microsoft.AspNetCore.Components.Authorization` (which covers auth components). Both namespaces must be in `_Imports.razor` when using the attribute on a page. Mixing them up causes CS0246 build errors and a completely broken app.
 
 - For SWA logout links, always use `post_logout_redirect_uri=/.auth/login/aad` (not `/`) — redirecting to `/` on a protected route causes a 401 that lands on the Blazor loading spinner. Pointing directly to the AAD login page bypasses Blazor entirely and gives a clean logout → login UX.
