@@ -160,6 +160,36 @@
                                             }
                                         </div>
                                     </div>
+
+                                    @if (item.EditClicked)
+                                    {
+                                        <!-- Extended edit fields: IsBasic (#73), StockBehaviour (#75), purchase unit (#76) -->
+                                        <div class="row align-items-center mt-2">
+                                            <div class="col-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="isBasic_@item.Id"
+                                                           @bind="item.IsBasic" />
+                                                    <label class="form-check-label" for="isBasic_@item.Id">
+                                                        Basisvare
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <select class="form-select form-select-sm" @bind="item.StockBehaviour">
+                                                    <option value="@StockBehaviour.Track">Spor beholdning</option>
+                                                    <option value="@StockBehaviour.DoNotTrack">Ikke spor</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-3">
+                                                <input class="form-control form-control-sm" type="number" step="0.1" min="0"
+                                                       placeholder="Innkjøpsmengde" @bind="item.StandardPurchaseQuantity" />
+                                            </div>
+                                            <div class="col-3">
+                                                <input class="form-control form-control-sm" placeholder="Enhet (kg, stk, l)"
+                                                       @bind="item.StandardPurchaseUnit" />
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -197,6 +227,10 @@
     private string originalItemName = "";
     private string originalItemUnit = "";
     private ItemCategoryModel? originalItemCategory;
+    private bool originalIsBasic;
+    private StockBehaviour originalStockBehaviour;
+    private double originalStandardPurchaseQuantity;
+    private string originalStandardPurchaseUnit = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -317,6 +351,10 @@
         originalItemName = item.Name;
         originalItemUnit = item.Unit;
         originalItemCategory = item.ItemCategory;
+        originalIsBasic = item.IsBasic;
+        originalStockBehaviour = item.StockBehaviour;
+        originalStandardPurchaseQuantity = item.StandardPurchaseQuantity;
+        originalStandardPurchaseUnit = item.StandardPurchaseUnit;
         item.EditClicked = true;
     }
 
@@ -325,6 +363,10 @@
         item.Name = originalItemName;
         item.Unit = originalItemUnit;
         item.ItemCategory = originalItemCategory!;
+        item.IsBasic = originalIsBasic;
+        item.StockBehaviour = originalStockBehaviour;
+        item.StandardPurchaseQuantity = originalStandardPurchaseQuantity;
+        item.StandardPurchaseUnit = originalStandardPurchaseUnit;
         item.EditClicked = false;
     }
 
