@@ -33,6 +33,7 @@ namespace Api.Controllers
         private readonly IGenericRepository<WeekMenu> _repository;
         private readonly IGenericRepository<MealRecipe> _mealRepository;
         private readonly IGenericRepository<InventoryItem> _inventoryRepository;
+        private readonly IGenericRepository<ShopItem> _shopItemRepository;
         private readonly IMapper _mapper;
 
         public WeekMenuController(
@@ -40,12 +41,14 @@ namespace Api.Controllers
             IGenericRepository<WeekMenu> repository,
             IGenericRepository<MealRecipe> mealRepository,
             IGenericRepository<InventoryItem> inventoryRepository,
+            IGenericRepository<ShopItem> shopItemRepository,
             IMapper mapper)
         {
             _logger = loggerFactory.CreateLogger<WeekMenuController>();
             _repository = repository;
             _mealRepository = mealRepository;
             _inventoryRepository = inventoryRepository;
+            _shopItemRepository = shopItemRepository;
             _mapper = mapper;
         }
 
@@ -228,8 +231,12 @@ namespace Api.Controllers
                     .Where(r => r.IsActive)
                     .ToDictionary(r => r.Id, r => r) ?? new Dictionary<string, MealRecipe>();
 
-                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName)
-                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName)>();
+                // Build ShopItem lookup so IsBasic/StockBehaviour/StandardPurchase fields survive into the result
+                var allShopItems = await _shopItemRepository.Get();
+                var shopItemDict = allShopItems?.ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
+
+                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem)
+                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem)>();
 
                 foreach (var daily in weekMenu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
                 {
@@ -253,18 +260,27 @@ namespace Api.Controllers
                         if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
                         if (ingredient.IsBasic) continue;  // Basic/pantry items are assumed in stock — exclude from shopping list
 
+                        shopItemDict.TryGetValue(ingredient.ShopItemId, out var shopItem);
                         if (aggregated.TryGetValue(ingredient.ShopItemId, out var existing))
-                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName);
+                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName, existing.ShopItem ?? shopItem);
                         else
-                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty);
+                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty, shopItem);
                     }
                 }
 
-                var shoppingItems = aggregated.Select(kvp => new ShoppingListItemModel
+                var shoppingItems = aggregated.Select(kvp =>
                 {
-                    Varen = new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName },
-                    Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                    IsDone = false
+                    // Use AutoMapper to carry all ShopItem fields (IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit)
+                    var varen = kvp.Value.ShopItem != null
+                        ? _mapper.Map<ShopItemModel>(kvp.Value.ShopItem)
+                        : new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName };
+
+                    return new ShoppingListItemModel
+                    {
+                        Varen = varen,
+                        Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
+                        IsDone = false
+                    };
                 }).ToList();
 
                 // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand
