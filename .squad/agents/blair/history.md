@@ -198,6 +198,12 @@
 
 ## Learnings
 
+### 2026-05-29 — Family member inline edit (#69)
+
+- `FamilyMemberModel` is embedded in `FamilyProfileModel` and does not inherit `EntityBase`, so inline edit state must track the object reference (`_editingMember == member`) instead of an `Id` or `EditClicked` flag.
+- `StartEditMember()` should snapshot Name, AgeGroup, and DietaryNotes into dedicated edit fields; `SaveEditMember()` writes the values back and persists with `PUT api/familyprofiles` via `Settings.GetApiUrl(ShoppingListKeysEnum.FamilyProfiles)`.
+- Inline table edit with a highlighted `table-warning` row keeps the add/delete workflow consistent without introducing a modal.
+
 ### 2026-04-03 — Complete ManageMyShopsPage (#32) ✅ COMPLETE
 
 **Completed `OneShopManagmentPage.razor` (`/managemyshops/{Id}`):**
