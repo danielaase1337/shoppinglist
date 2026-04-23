@@ -50,27 +50,66 @@
                         <tbody>
                             @foreach (var member in _profile.Members)
                             {
-                                <tr>
-                                    <td>@member.Name</td>
-                                    <td>@AgeGroupLabel(member.AgeGroup)</td>
-                                    <td>
-                                        @if (!string.IsNullOrEmpty(member.DietaryNotes))
-                                        {
-                                            <small class="text-muted">@member.DietaryNotes</small>
-                                        }
-                                        else
-                                        {
-                                            <small class="text-muted">—</small>
-                                        }
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-outline-danger"
-                                                @onclick="@(() => RemoveMember(member))"
-                                                disabled="@_saving">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </td>
-                                </tr>
+                                @if (_editingMember == member)
+                                {
+                                    <tr class="table-warning">
+                                        <td>
+                                            <input class="form-control form-control-sm" @bind="_editMemberName" />
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="_editMemberAgeGroupStr">
+                                                @foreach (var ag in Enum.GetValues<AgeGroup>())
+                                                {
+                                                    <option value="@ag">@AgeGroupLabel(ag)</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input class="form-control form-control-sm" @bind="_editMemberDietaryNotes"
+                                                   placeholder="kostholdsnotes..." />
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-primary me-1"
+                                                    @onclick="SaveEditMember" disabled="@_saving">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    @onclick="CancelEditMember" disabled="@_saving">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td>@member.Name</td>
+                                        <td>@AgeGroupLabel(member.AgeGroup)</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(member.DietaryNotes))
+                                            {
+                                                <small class="text-muted">@member.DietaryNotes</small>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">—</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                                    @onclick="@(() => StartEditMember(member))"
+                                                    disabled="@_saving"
+                                                    title="Rediger">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    @onclick="@(() => RemoveMember(member))"
+                                                    disabled="@_saving">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
@@ -234,6 +273,12 @@
     private string _newMemberAgeGroupStr = nameof(AgeGroup.Adult);
     private string? _newMemberDietaryNotes;
 
+    // Edit member state
+    private FamilyMemberModel? _editingMember = null;
+    private string _editMemberName = "";
+    private string _editMemberAgeGroupStr = nameof(AgeGroup.Adult);
+    private string? _editMemberDietaryNotes;
+
     // New portion rule form
     private string _newRuleShopItemName = "";
     private string _newRuleShopItemId = "";
@@ -335,6 +380,33 @@
         var list = _profile.Members?.ToList() ?? new List<FamilyMemberModel>();
         list.Remove(member);
         _profile.Members = list;
+        await UpdateProfile();
+    }
+
+    private void StartEditMember(FamilyMemberModel member)
+    {
+        _editingMember = member;
+        _editMemberName = member.Name;
+        _editMemberAgeGroupStr = member.AgeGroup.ToString();
+        _editMemberDietaryNotes = member.DietaryNotes;
+    }
+
+    private void CancelEditMember()
+    {
+        _editingMember = null;
+    }
+
+    private async Task SaveEditMember()
+    {
+        if (_editingMember == null || string.IsNullOrWhiteSpace(_editMemberName)) return;
+
+        _editingMember.Name = _editMemberName.Trim();
+        _editingMember.AgeGroup = Enum.TryParse<AgeGroup>(_editMemberAgeGroupStr, out var ag) ? ag : AgeGroup.Adult;
+        _editingMember.DietaryNotes = string.IsNullOrWhiteSpace(_editMemberDietaryNotes)
+            ? null
+            : _editMemberDietaryNotes.Trim();
+        _editingMember = null;
+
         await UpdateProfile();
     }
 
