@@ -253,3 +253,32 @@
 
 **Build status:** ✅ 0 errors, 33 warnings (all pre-existing)
 
+
+### 2026-04-12 — Issues #73 and #74 ✅ COMPLETE
+
+**#73 — Staple items group in generated shopping list (OneWeekMenuPage.razor)**
+- The generated list preview now splits items into two groups:
+  - **Normal items** (top): IsBasic == false && !IsLikelyNotNeeded
+  - **Bottom group**: IsBasic == true || IsLikelyNotNeeded
+- Bottom group label: "Basisvarer / Trolig ikke nødvendig" (covers both IsBasic and future #76 flag)
+- Bottom group is collapsible via _staplesExpanded bool toggle (no Syncfusion, plain button)
+- Each bottom-group item shows a 🗑 delete button (RemoveGeneratedItem() — mutates list in place)
+- Added IsLikelyNotNeeded stub property to ShoppingListItemModel (Shared) for #76 — Glenn fills logic
+- "Lagre som handleliste" button text simplified to "Lagre liste"
+
+**#74 — Mark as consumed + swap (OneWeekMenuPage.razor)**
+- Added IsConsumed to DailyMealModel (Shared) — serialises to/from Firestore and API
+- Table rows gain two action cells: **Spist** (✅) and **Bytt** (🔄)
+- Consumed rows get .consumed-day CSS (opacity 0.55) and "✅ Spist" label replaces dropdown
+- Swap mode: clicking 🔄 toggles _swappingDay == day; the meal cell swaps to an inline <select> — selecting triggers OnSwapMealSelected() which calls PUT .../swap and updates local state
+- ConsumeDay() calls PUT .../consume with { DayOfWeek, MealRecipeId }; on success sets meal.IsConsumed = true and clears swap state
+
+**Enum / Settings additions**
+- WeekMenuConsume = 21, WeekMenuSwap = 22 added to ShoppingListKeysEnum
+- Dictionary entries in Settings: "weekmenuconsume" -> "api/weekmenu", "weekmenuswap" -> "api/weekmenu"
+- In page, URLs constructed via: Settings.GetApiUrlId(WeekMenu, id) + "/consume" (same pattern as generate-shoppinglist)
+
+**Key patterns re-confirmed:**
+- Never use Syncfusion for simple toggles; plain <button> + bool state is sufficient
+- DayOfWeek? nullable works cleanly as "which day is in swap mode" tracker
+- Shared model stubs with default alse are safe for Firestore (missing field → false)
