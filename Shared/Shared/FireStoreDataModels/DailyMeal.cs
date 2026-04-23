@@ -15,6 +15,10 @@ namespace Shared.FireStoreDataModels
         [FirestoreProperty]
         public bool IsSuggested { get; set; }
 
+        // #74 — Marks that this day's meal has been cooked and consumed (triggers inventory deduction)
+        [FirestoreProperty]
+        public bool IsConsumed { get; set; }
+
         [FirestoreProperty]
         public ICollection<MealIngredient> CustomIngredients { get; set; }
 
@@ -22,6 +26,7 @@ namespace Shared.FireStoreDataModels
         {
             CustomIngredients = new List<MealIngredient>();
             IsSuggested = false;
+            IsConsumed = false;
         }
     }
 }

@@ -2,9 +2,11 @@ using AutoMapper;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Shared;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -119,6 +121,9 @@ namespace Api.Controllers
                         {
                             if (item?.Varen == null) continue;
 
+                            // Only track items with StockBehaviour.Track (#75)
+                            if (item.Varen.StockBehaviour != StockBehaviour.Track) continue;
+
                             var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == item.Varen.Id && i.IsActive);
 
                             if (inventoryItem != null)
@@ -127,7 +132,19 @@ namespace Api.Controllers
                                 inventoryItem.LastModified = DateTime.UtcNow;
                                 await _inventoryRepository.Update(inventoryItem);
                             }
-                            // If no inventory item exists, don't auto-create — user manages inventory explicitly
+                            else
+                            {
+                                // Auto-create inventory entry for tracked items not yet in inventory
+                                var newInventoryItem = new InventoryItem
+                                {
+                                    ShopItemId = item.Varen.Id,
+                                    ShopItemName = item.Varen.Name,
+                                    QuantityInStock = item.Mengde,
+                                    IsActive = true,
+                                    LastModified = DateTime.UtcNow
+                                };
+                                await _inventoryRepository.Insert(newInventoryItem);
+                            }
                         }
                     }
 

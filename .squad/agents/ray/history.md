@@ -165,7 +165,30 @@ Other: Kebab, Sprø thaiboller
 
 **Lesson:** `MealType` enum in both namespaces uses `Takeout = 3` (not `Takeaway`). This tripped up initial classification — always verify enum values from source files, not from memory or spec documents.
 
-## Orchestration Log — 2026-04-04T05:12:37Z
+### 2026-04-05 — ShopItem Extensions (refs #73, #75, #76) ✅ COMPLETE
+
+**Summary:** Extended `ShopItem` (Firestore) and `ShopItemModel` (DTO) with four new properties spanning three issues. All done in one cohesive commit to avoid merge conflicts on the same model files.
+
+**New enum created:**
+- `Shared/Shared/StockBehaviour.cs` — `StockBehaviour { Track, DoNotTrack }` in root `Shared` namespace (same pattern as `MealUnit`, `AgeGroup` — shared between both model hierarchies without duplication)
+
+**Properties added to `ShopItem` + `ShopItemModel`:**
+- `IsBasic` (bool, default false) — #73: marks staple/always-stocked items
+- `StockBehaviour` (StockBehaviour, default Track) — #75: per Peter's decision, lives on ShopItem not ShoppingListItem
+- `StandardPurchaseQuantity` (double, default 0) — #76: purchase pack size (0 = not set)
+- `StandardPurchaseUnit` (string, default null) — #76: purchase unit label ("kg", "stk", "l"; null = not set)
+
+**AutoMapper:** `CreateMap<ShopItem, ShopItemModel>().ReverseMap()` handles all four fields by name convention. No profile changes needed.
+
+**Admin UI:** `ItemManagementPage.razor` edit form extended with checkbox (IsBasic), dropdown (StockBehaviour), number input (StandardPurchaseQuantity), text input (StandardPurchaseUnit). Second row below existing name/category/unit row, visible only when EditClicked. EnableEdit/CancelEdit updated to save/restore all four fields.
+
+**Firestore migration:** None required. All four properties have safe zero-value defaults — missing fields on existing documents deserialise to false/Track/0/null respectively.
+
+**Build validation:** Shared ✅ 0 errors, Api ✅ 0 errors, Client ✅ 0 errors.
+
+**Lesson:** `StockBehaviour` enum belongs in root `Shared` namespace (not `Shared.FireStoreDataModels`) so both model hierarchies can use it without cross-namespace coupling or duplication. Follow the `MealUnit`/`AgeGroup` pattern for any new enum that needs to be shared across Firestore and DTO models.
+
+
 **Phase 1 Meal Planning — Data Models ✅ COMPLETE**
 - Created MealUnit enum (root Shared namespace) + MealUnitExtensions
 - Created InventoryItem (Firestore) + InventoryItemModel (DTO)

@@ -30,21 +30,39 @@
                     @foreach (var day in WeekOrder)
                     {
                         var meal = GetOrCreateDailyMeal(day);
-                        <tr>
+                        <tr class="@(meal.IsConsumed ? "consumed-day" : "")">
                             <td class="day-label">@DayLabel(day)</td>
                             <td>
-                                <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
-                                        value="@meal.MealRecipeId"
-                                        @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))">
-                                    <option value="">-- Velg middag --</option>
-                                    @foreach (var recipe in GetSortedRecipes())
-                                    {
-                                        <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
-                                    }
-                                </select>
-                                @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
+                                @if (_swappingDay == day && !meal.IsConsumed)
                                 {
-                                    <small class="suggested-badge">forslag</small>
+                                    <select class="form-select form-select-sm"
+                                            @onchange="@(e => OnSwapMealSelected(meal, e.Value?.ToString()))">
+                                        <option value="">-- Velg ny middag --</option>
+                                        @foreach (var recipe in GetSortedRecipes())
+                                        {
+                                            <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
+                                        }
+                                    </select>
+                                }
+                                else if (meal.IsConsumed)
+                                {
+                                    <span class="text-muted fst-italic">✅ @(string.IsNullOrEmpty(meal.MealRecipeName) ? "Spist" : meal.MealRecipeName)</span>
+                                }
+                                else
+                                {
+                                    <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
+                                            value="@meal.MealRecipeId"
+                                            @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))">
+                                        <option value="">-- Velg middag --</option>
+                                        @foreach (var recipe in GetSortedRecipes())
+                                        {
+                                            <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
+                                        }
+                                    </select>
+                                    @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
+                                    {
+                                        <small class="suggested-badge">forslag</small>
+                                    }
                                 }
                             </td>
                             <td class="day-icon">
@@ -55,6 +73,30 @@
                                     {
                                         @GetCategoryIcon(recipe.Category)
                                     }
+                                }
+                            </td>
+                            <td class="day-actions">
+                                @if (meal.IsConsumed)
+                                {
+                                    <span class="text-success" title="Spist">✅</span>
+                                }
+                                else if (!string.IsNullOrEmpty(meal.MealRecipeId))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                            @onclick="@(() => ConsumeDay(meal))" title="Marker som spist">
+                                        ✅ Spist
+                                    </button>
+                                }
+                            </td>
+                            <td class="day-actions">
+                                @if (!meal.IsConsumed && !string.IsNullOrEmpty(meal.MealRecipeId))
+                                {
+                                    <button type="button"
+                                            class="btn btn-sm @(_swappingDay == day ? "btn-warning" : "btn-outline-warning")"
+                                            @onclick="@(() => _swappingDay = _swappingDay == day ? (DayOfWeek?)null : day)"
+                                            title="Bytt middag">
+                                        🔄 Bytt
+                                    </button>
                                 }
                             </td>
                         </tr>
@@ -135,7 +177,16 @@
                     <p class="text-info"><small>📐 Mengder tilpasset familieprofil</small></p>
                 }
 
-                @if (_generatedList.ShoppingItems != null && _generatedList.ShoppingItems.Any())
+                @{
+                    var normalItems = _generatedList.ShoppingItems?
+                        .Where(i => !(i.Varen?.IsBasic == true) && !i.IsLikelyNotNeeded)
+                        .ToList() ?? new List<ShoppingListItemModel>();
+                    var bottomItems = _generatedList.ShoppingItems?
+                        .Where(i => i.Varen?.IsBasic == true || i.IsLikelyNotNeeded)
+                        .ToList() ?? new List<ShoppingListItemModel>();
+                }
+
+                @if (normalItems.Any())
                 {
                     <table class="table table-sm">
                         <thead>
@@ -145,7 +196,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var item in _generatedList.ShoppingItems)
+                            @foreach (var item in normalItems)
                             {
                                 <tr>
                                     <td>@item.Varen?.Name</td>
@@ -155,7 +206,37 @@
                         </tbody>
                     </table>
                 }
-                else
+
+                @if (bottomItems.Any())
+                {
+                    <div class="staple-group mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary staple-toggle"
+                                @onclick="@(() => _staplesExpanded = !_staplesExpanded)">
+                            @(_staplesExpanded ? "▾" : "▸") Basisvarer / Trolig ikke nødvendig (@bottomItems.Count)
+                        </button>
+                        @if (_staplesExpanded)
+                        {
+                            <table class="table table-sm mt-2 mb-0">
+                                <tbody>
+                                    @foreach (var item in bottomItems.ToList())
+                                    {
+                                        <tr class="text-muted">
+                                            <td>@item.Varen?.Name</td>
+                                            <td>@item.Mengde</td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        @onclick="@(() => RemoveGeneratedItem(item))"
+                                                        title="Fjern fra listen">🗑</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                }
+
+                @if (!normalItems.Any() && !bottomItems.Any())
                 {
                     <p class="text-muted">
                         <small>Ingen varer generert. Har du lagt til ingredienser på middagsrettene?</small>
@@ -173,7 +254,7 @@
                             {
                                 <i class="fas fa-save"></i>
                             }
-                            Lagre som handleliste
+                            Lagre liste
                         </button>
                     </div>
                     <div class="col-auto">
@@ -207,6 +288,12 @@
     private FamilyProfileModel? _familyProfile;
     private List<PortionRuleModel>? _portionRules;
     private bool _scalingApplied = false;
+
+    // #73 — collapsible staple-items group in generated list preview
+    private bool _staplesExpanded = false;
+
+    // #74 — consume/swap state
+    private DayOfWeek? _swappingDay = null;
 
     private bool IsNew => string.IsNullOrEmpty(Id) || Id == "new";
 
@@ -516,8 +603,67 @@
         }
     }
 
-    private void ApplyPortionScaling()
+    // #73 — Remove an item from the generated list preview
+    private void RemoveGeneratedItem(ShoppingListItemModel item)
     {
+        if (_generatedList?.ShoppingItems == null) return;
+        var list = _generatedList.ShoppingItems.ToList();
+        list.Remove(item);
+        _generatedList.ShoppingItems = list;
+    }
+
+    // #74 — Mark a day's meal as consumed
+    private async Task ConsumeDay(DailyMealModel meal)
+    {
+        if (_menu == null) return;
+        try
+        {
+            var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/consume";
+            var response = await Http.PutAsJsonAsync(url, new { DayOfWeek = (int)meal.Day, MealRecipeId = meal.MealRecipeId });
+            if (response.IsSuccessStatusCode)
+            {
+                meal.IsConsumed = true;
+                _swappingDay = null;
+            }
+            else
+            {
+                Console.WriteLine($"❌ Consume failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error consuming meal: {ex.Message}");
+        }
+    }
+
+    // #74 — Swap the meal for a day
+    private async Task OnSwapMealSelected(DailyMealModel meal, string? newRecipeId)
+    {
+        if (_menu == null || string.IsNullOrEmpty(newRecipeId)) return;
+        _swappingDay = null;
+        try
+        {
+            var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/swap";
+            var response = await Http.PutAsJsonAsync(url, new { DayOfWeek = (int)meal.Day, NewMealRecipeId = newRecipeId });
+            if (response.IsSuccessStatusCode)
+            {
+                meal.MealRecipeId = newRecipeId;
+                var recipe = _recipes?.FirstOrDefault(r => r.Id == newRecipeId);
+                meal.MealRecipeName = recipe?.Name ?? "";
+                meal.IsSuggested = false;
+            }
+            else
+            {
+                Console.WriteLine($"❌ Swap failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error swapping meal: {ex.Message}");
+        }
+    }
+
+    private void ApplyPortionScaling()    {
         if (_generatedList?.ShoppingItems == null) return;
         if (_familyProfile?.Members == null || !_familyProfile.Members.Any()) return;
         if (_portionRules == null || !_portionRules.Any()) return;
@@ -607,5 +753,26 @@
         border-left: 4px solid #ffc107;
         background-color: #fffdf0;
         padding: 0.5rem 1rem;
+    }
+
+    /* #74 — Consumed day row */
+    .consumed-day td {
+        opacity: 0.55;
+    }
+
+    .day-actions {
+        width: 110px;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    /* #73 — Staple items collapsible group */
+    .staple-group {
+        border-top: 1px solid #dee2e6;
+        padding-top: 0.5rem;
+    }
+
+    .staple-toggle {
+        font-size: 0.85rem;
     }
 </style>

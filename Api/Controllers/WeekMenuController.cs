@@ -13,22 +13,39 @@ using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
+    // Request body for ConsumeMeal endpoint (#74)
+    public class ConsumeMealRequest
+    {
+        public int DayOfWeek { get; set; }
+        public string MealRecipeId { get; set; }
+    }
+
+    // Request body for SwapMeal endpoint (#74)
+    public class SwapMealRequest
+    {
+        public int DayOfWeek { get; set; }
+        public string NewMealRecipeId { get; set; }
+    }
+
     public class WeekMenuController : ControllerBase
     {
         private readonly ILogger _logger;
         private readonly IGenericRepository<WeekMenu> _repository;
         private readonly IGenericRepository<MealRecipe> _mealRepository;
+        private readonly IGenericRepository<InventoryItem> _inventoryRepository;
         private readonly IMapper _mapper;
 
         public WeekMenuController(
             ILoggerFactory loggerFactory,
             IGenericRepository<WeekMenu> repository,
             IGenericRepository<MealRecipe> mealRepository,
+            IGenericRepository<InventoryItem> inventoryRepository,
             IMapper mapper)
         {
             _logger = loggerFactory.CreateLogger<WeekMenuController>();
             _repository = repository;
             _mealRepository = mealRepository;
+            _inventoryRepository = inventoryRepository;
             _mapper = mapper;
         }
 
@@ -250,6 +267,31 @@ namespace Api.Controllers
                     IsDone = false
                 }).ToList();
 
+                // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand
+                var allInventory = await _inventoryRepository.Get();
+                var inventoryDict = allInventory?
+                    .Where(i => i.IsActive)
+                    .GroupBy(i => i.ShopItemId)
+                    .ToDictionary(g => g.Key, g => g.First())
+                    ?? new Dictionary<string, InventoryItem>();
+
+                foreach (var item in shoppingItems)
+                {
+                    if (item.Varen?.Id == null) continue;
+                    if (!inventoryDict.TryGetValue(item.Varen.Id, out var inv)) continue;
+
+                    var stock = inv.QuantityInStock;
+                    if (stock >= item.Mengde)
+                    {
+                        item.IsLikelyNotNeeded = true;
+                    }
+                    else if (stock > 0)
+                    {
+                        // Partially covered — reduce demand by available stock
+                        item.Mengde = (int)Math.Ceiling((double)item.Mengde - stock);
+                    }
+                }
+
                 var shoppingList = new ShoppingListModel
                 {
                     Name = $"Ukemeny Uke {weekMenu.WeekNumber} {weekMenu.Year}",
@@ -264,6 +306,116 @@ namespace Api.Controllers
             catch (Exception e)
             {
                 var msg = $"Something went wrong generating shopping list for week menu {id}";
+                _logger.LogError(e, msg);
+                return await GetErroRespons(msg, req);
+            }
+        }
+
+        // #74 — Mark a daily meal as consumed and deduct ingredients from inventory
+        [Function("weekmenuconsume")]
+        public async Task<HttpResponseData> ConsumeMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/consume")] HttpRequestData req, string weekMenuId)
+        {
+            try
+            {
+                var requestBody = await req.ReadFromJsonAsync<ConsumeMealRequest>();
+                if (requestBody == null)
+                    return await GetNoContentRespons("No consume request body", req);
+
+                var weekMenu = await _repository.Get(weekMenuId);
+                if (weekMenu == null)
+                {
+                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for consume");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
+                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
+                if (dailyMeal == null)
+                {
+                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId}");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                dailyMeal.IsConsumed = true;
+                weekMenu.LastModified = DateTime.UtcNow;
+
+                var updatedMenu = await _repository.Update(weekMenu);
+                if (updatedMenu == null)
+                    return await GetErroRespons($"Could not update week menu {weekMenuId} after consume", req);
+
+                // Deduct ingredients from inventory
+                if (!string.IsNullOrEmpty(requestBody.MealRecipeId))
+                {
+                    var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
+                    if (recipe != null && recipe.Ingredients != null)
+                    {
+                        var allInventory = await _inventoryRepository.Get();
+
+                        foreach (var ingredient in recipe.Ingredients)
+                        {
+                            if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
+
+                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
+                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
+
+                            inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
+                            inventoryItem.LastModified = DateTime.UtcNow;
+                            await _inventoryRepository.Update(inventoryItem);
+                        }
+                    }
+                }
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
+                return response;
+            }
+            catch (Exception e)
+            {
+                var msg = $"Something went wrong consuming meal in week menu {weekMenuId}";
+                _logger.LogError(e, msg);
+                return await GetErroRespons(msg, req);
+            }
+        }
+
+        // #74 — Swap the meal for a specific day without affecting inventory
+        [Function("weekmenuswap")]
+        public async Task<HttpResponseData> SwapMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/swap")] HttpRequestData req, string weekMenuId)
+        {
+            try
+            {
+                var requestBody = await req.ReadFromJsonAsync<SwapMealRequest>();
+                if (requestBody == null)
+                    return await GetNoContentRespons("No swap request body", req);
+
+                var weekMenu = await _repository.Get(weekMenuId);
+                if (weekMenu == null)
+                {
+                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for swap");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
+                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
+                if (dailyMeal == null)
+                {
+                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId} — cannot swap");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                dailyMeal.MealRecipeId = requestBody.NewMealRecipeId;
+                weekMenu.LastModified = DateTime.UtcNow;
+
+                var updatedMenu = await _repository.Update(weekMenu);
+                if (updatedMenu == null)
+                    return await GetErroRespons($"Could not update week menu {weekMenuId} after swap", req);
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
+                return response;
+            }
+            catch (Exception e)
+            {
+                var msg = $"Something went wrong swapping meal in week menu {weekMenuId}";
                 _logger.LogError(e, msg);
                 return await GetErroRespons(msg, req);
             }

@@ -29,8 +29,9 @@ namespace BlazorApp.Client.Common
         FamilyProfiles = 17,
         FamilyProfile = 18,
         PortionRules = 19,
-        PortionRule = 20
-
-
+        PortionRule = 20,
+        // #74 — Week menu action endpoints
+        WeekMenuConsume = 21,
+        WeekMenuSwap = 22
     }
 }
