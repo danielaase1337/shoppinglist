@@ -42,6 +42,7 @@ namespace Api.Tests.Controllers
     {
         private readonly Mock<IGenericRepository<WeekMenu>> _mockWeekMenuRepository;
         private readonly Mock<IGenericRepository<MealRecipe>> _mockMealRecipeRepository;
+        private readonly Mock<IGenericRepository<InventoryItem>> _mockInventoryRepository;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IMapper _mapper;
         private readonly WeekMenuController _controller;
@@ -53,6 +54,7 @@ namespace Api.Tests.Controllers
         {
             _mockWeekMenuRepository = new Mock<IGenericRepository<WeekMenu>>();
             _mockMealRecipeRepository = new Mock<IGenericRepository<MealRecipe>>();
+            _mockInventoryRepository = new Mock<IGenericRepository<InventoryItem>>();
             _loggerFactory = NullLoggerFactory.Instance;
 
             var config = new MapperConfiguration(cfg =>
@@ -66,10 +68,16 @@ namespace Api.Tests.Controllers
             });
             _mapper = config.CreateMapper();
 
+            // Default: inventory returns empty list (avoids null reference in stock comparison)
+            _mockInventoryRepository
+                .Setup(r => r.Get())
+                .ReturnsAsync(new List<InventoryItem>());
+
             _controller = new WeekMenuController(
                 _loggerFactory,
                 _mockWeekMenuRepository.Object,
                 _mockMealRecipeRepository.Object,
+                _mockInventoryRepository.Object,
                 _mapper);
         }
 
