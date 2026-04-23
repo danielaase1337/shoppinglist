@@ -132,3 +132,12 @@
 - **Fix**: Extended `useMemoryDb` condition in `Api/Program.cs` to also return true when `GOOGLE_APPLICATION_CREDENTIALS` is not set. Production Firestore now requires BOTH env vars to be present AND environment != Development.
 - **Safe fallback**: Staging gets in-memory repos (with seed data) instead of crashing. Real production (GOOGLE_CLOUD_PROJECT + GOOGLE_APPLICATION_CREDENTIALS both set) is unaffected.
 - ✅ Build clean, 0 errors, 33 pre-existing warnings (no new issues).
+
+### Issues #74, #75, #76 Backend — Consume/Swap, IsDone Hook, Stock Comparison (2026-04-23)
+- **Collaboration note**: Blair's commit `9d5da56` landed simultaneously and already contained the WeekMenuController extensions (ConsumeMeal, SwapMeal, stock comparison in generate-shoppinglist), model changes (IsConsumed on DailyMeal, IsLikelyNotNeeded on ShoppingListItem), and the IsDone StockBehaviour hook in ShoppingListController. My net contribution was fixing `WeekMenuControllerTests.cs` which had the old 4-parameter constructor — Blair's new InventoryItem injection made the test file fail to compile.
+- **#74 endpoints** (WeekMenuController): `PUT /api/weekmenu/{weekMenuId}/consume` marks a DailyMeal as consumed and deducts each ingredient's Quantity from InventoryItem.QuantityInStock (clamped at 0); `PUT /api/weekmenu/{weekMenuId}/swap` swaps MealRecipeId for a day (no inventory deduction).
+- **#75 IsDone hook** (ShoppingListController PUT): detects false→true transition, iterates ShoppingItems, skips DoNotTrack items, increments QuantityInStock on existing InventoryItems and auto-creates new ones for Track items not yet in inventory.
+- **#76 stock comparison** (WeekMenuController generate-shoppinglist): after aggregating ingredients, loads all active InventoryItems, sets `IsLikelyNotNeeded = true` when stock covers full demand, reduces Mengde to shortfall for partially-covered items.
+- **Testing pattern**: When adding a new repo dependency to a controller, always update the test constructor immediately. `WeekMenuControllerTests` needs a mock `IGenericRepository<InventoryItem>` with a default `ReturnsAsync(new List<InventoryItem>())` setup to avoid null reference in the stock comparison loop.
+- **Branch timing**: Multiple agents can push to the same branch concurrently. Always check `git diff origin/branch..HEAD --stat` after committing to confirm net diff. If most changes are already present from a teammate's commit, only your delta appears.
+- ✅ Build clean, 0 errors, 118 pre-existing warnings (no new issues).
