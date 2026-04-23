@@ -179,6 +179,12 @@
                                 <td>@rule.QuantityPerPerson</td>
                                 <td><small>@rule.Unit.ToNorwegian()</small></td>
                                 <td>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                            @onclick="@(() => StartDuplicateRule(rule))"
+                                            disabled="@_saving"
+                                            title="Dupliser rad">
+                                        📋
+                                    </button>
                                     <button type="button" class="btn btn-sm btn-outline-danger"
                                             @onclick="@(() => DeletePortionRule(rule))"
                                             disabled="@_saving">
@@ -186,6 +192,43 @@
                                     </button>
                                 </td>
                             </tr>
+                            @if (_duplicatingRule == rule)
+                            {
+                                <tr class="table-warning">
+                                    <td><strong>@rule.ShopItemName</strong></td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="_dupAgeGroupStr">
+                                            @foreach (var ag in Enum.GetValues<AgeGroup>())
+                                            {
+                                                <option value="@ag">@AgeGroupLabel(ag)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.5" min="0.1"
+                                               class="form-control form-control-sm"
+                                               @bind="_dupQty" />
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="_dupUnitStr">
+                                            @foreach (var u in Enum.GetValues<MealUnit>())
+                                            {
+                                                <option value="@u">@u.ToNorwegian()</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-primary me-1"
+                                                @onclick="SaveDuplicateRule" disabled="@_saving">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                @onclick="CancelDuplicateRule" disabled="@_saving">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -285,6 +328,12 @@
     private string _newRuleAgeGroupStr = nameof(AgeGroup.Adult);
     private double _newRuleQty = 1.0;
     private string _newRuleUnitStr = nameof(MealUnit.Piece);
+
+    // Duplicate portion rule state
+    private PortionRuleModel? _duplicatingRule = null;
+    private string _dupAgeGroupStr = nameof(AgeGroup.Adult);
+    private double _dupQty = 1.0;
+    private string _dupUnitStr = nameof(MealUnit.Piece);
 
     protected override async Task OnInitializedAsync()
     {
@@ -489,6 +538,68 @@
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Error adding portion rule: {ex.Message}");
+        }
+        finally { _saving = false; }
+    }
+
+    private void StartDuplicateRule(PortionRuleModel source)
+    {
+        _duplicatingRule = source;
+        _dupAgeGroupStr = nameof(AgeGroup.Adult);
+        _dupQty = source.QuantityPerPerson;
+        _dupUnitStr = source.Unit.ToString();
+    }
+
+    private void CancelDuplicateRule()
+    {
+        _duplicatingRule = null;
+    }
+
+    private async Task SaveDuplicateRule()
+    {
+        if (_duplicatingRule == null) return;
+
+        var ageGroup = Enum.TryParse<AgeGroup>(_dupAgeGroupStr, out var ag) ? ag : AgeGroup.Adult;
+        var unit = Enum.TryParse<MealUnit>(_dupUnitStr, out var u) ? u : MealUnit.Piece;
+
+        var rule = new PortionRuleModel
+        {
+            ShopItemId = _duplicatingRule.ShopItemId,
+            ShopItemName = _duplicatingRule.ShopItemName,
+            AgeGroup = ageGroup,
+            QuantityPerPerson = _dupQty,
+            Unit = unit,
+            IsActive = true,
+            LastModified = DateTime.UtcNow
+        };
+
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.PortionRules), rule);
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<PortionRuleModel>();
+                if (created != null)
+                {
+                    _portionRules ??= new List<PortionRuleModel>();
+                    var sourceIndex = _portionRules.IndexOf(_duplicatingRule);
+                    if (sourceIndex >= 0)
+                        _portionRules.Insert(sourceIndex + 1, created);
+                    else
+                        _portionRules.Add(created);
+                }
+                _duplicatingRule = null;
+            }
+            else
+            {
+                Console.WriteLine($"❌ Duplicate portion rule failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error duplicating portion rule: {ex.Message}");
         }
         finally { _saving = false; }
     }
