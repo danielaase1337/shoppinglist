@@ -14,6 +14,13 @@
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
+### Issue #81 — Unconsume endpoint (2026-04-23)
+- Added `[Function("weekmenuunconsume")]` — `PUT /api/weekmenu/{weekMenuId}/unconsume` — mirrors `ConsumeMeal` exactly in reverse: sets `IsConsumed = false`, restores `QuantityInStock += ingredient.Quantity` for each ingredient (no clamp needed on restore), sets `LastModified = DateTime.UtcNow`.
+- Reuses existing `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no new request type needed.
+- `WeekMenuUnconsume = 23` added to `ShoppingListKeysEnum`; `"weekmenuunconsume" → "api/weekmenu"` added to `ISettings` dict (same pattern as consume/swap).
+- 3 new tests: `Unconsume_SetsIsConsumedFalse_ReturnsOk`, `Unconsume_ReversesInventoryDeduction`, `Unconsume_Returns404_WhenMenuNotFound`.
+- ✅ 162 tests pass, 0 failures.
+
 ### Security Audit — 2025-01-29
 - **CRITICAL BUG**: `GoogleDbContext.GetCollectionKey()` only maps 4 entity types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all resolve to `"misc"` in Firestore production — data corruption bug.
 - **Auth inconsistency**: `ShoppingListController` and `MealRecipeController` use `AuthorizationLevel.Function`; all other controllers are `AuthorizationLevel.Anonymous`. No user-level auth exists anywhere.
@@ -141,3 +148,10 @@
 - **Testing pattern**: When adding a new repo dependency to a controller, always update the test constructor immediately. `WeekMenuControllerTests` needs a mock `IGenericRepository<InventoryItem>` with a default `ReturnsAsync(new List<InventoryItem>())` setup to avoid null reference in the stock comparison loop.
 - **Branch timing**: Multiple agents can push to the same branch concurrently. Always check `git diff origin/branch..HEAD --stat` after committing to confirm net diff. If most changes are already present from a teammate's commit, only your delta appears.
 - ✅ Build clean, 0 errors, 118 pre-existing warnings (no new issues).
+
+### IsBasic / StockBehaviour fix — RunGenerateShoppingList (2026-04-23)
+- **Root cause**: `aggregated` dict stored only `(double Quantity, string ShopItemName)`. Final `ShopItemModel` was hand-constructed with only `Id` and `Name` — `IsBasic`, `StockBehaviour`, `StandardPurchaseQuantity`, `StandardPurchaseUnit` were never copied.
+- **Fix**: Injected `IGenericRepository<ShopItem>` into `WeekMenuController`. In `RunGenerateShoppingList`, load all ShopItems once, build a lookup dict by Id, store the `ShopItem` ref in the aggregated tuple, then use `_mapper.Map<ShopItemModel>(shopItem)` for the final mapping. Graceful fallback (`new ShopItemModel { Id, Name }`) when ShopItem not found.
+- **Only one inline `ShopItemModel` construction existed** (line 265) — no other occurrences in other controllers.
+- **Test update pattern**: Every new repo injected into a controller also needs a new `Mock<IGenericRepository<T>>` with default `ReturnsAsync(new List<T>())` setup in the test constructor. 15/15 WeekMenu tests pass.
+- ✅ Build clean, 0 errors, 68 pre-existing warnings (no new issues). Pushed to mealplanningv2 as commit 6a98801.

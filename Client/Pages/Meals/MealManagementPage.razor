@@ -25,8 +25,8 @@
     {
         <!-- Search and filter bar -->
         <div class="card">
-            <div class="row align-items-center">
-                <div class="col-6">
+            <div class="row align-items-center g-2">
+                <div class="col-12 col-md-6">
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
                         <input class="form-control"
@@ -35,7 +35,7 @@
                                @bind:event="oninput" />
                     </div>
                 </div>
-                <div class="col-4">
+                <div class="col-12 col-md-4">
                     <select class="form-select" @bind="@_categoryFilter">
                         <option value="">-- Alle kategorier --</option>
                         @foreach (var cat in Enum.GetValues<MealCategory>())
@@ -44,7 +44,7 @@
                         }
                     </select>
                 </div>
-                <div class="col-2 text-end">
+                <div class="col-12 col-md-2 text-md-end">
                     <span class="badge bg-info text-white">@GetFilteredRecipes().Count() retter</span>
                 </div>
             </div>

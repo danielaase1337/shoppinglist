@@ -32,6 +32,8 @@ namespace BlazorApp.Client.Common
         PortionRule = 20,
         // #74 — Week menu action endpoints
         WeekMenuConsume = 21,
-        WeekMenuSwap = 22
+        WeekMenuSwap = 22,
+        // #81 — Undo consume
+        WeekMenuUnconsume = 23
     }
 }

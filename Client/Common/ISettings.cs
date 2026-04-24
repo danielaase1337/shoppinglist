@@ -40,7 +40,9 @@ namespace BlazorApp.Client.Common
                 { "portionrule", "api/portionrule" },
                 { "portionrules", "api/portionrules" },
                 { "weekmenuconsume", "api/weekmenu" },
-                { "weekmenuswap", "api/weekmenu" }
+                { "weekmenuswap", "api/weekmenu" },
+                { "weekmenuunconsume", "api/weekmenu" },
+                { "weekmenuunconsume", "api/weekmenu" }
             };
         }
         public string GetApiUrl(ShoppingListKeysEnum key)

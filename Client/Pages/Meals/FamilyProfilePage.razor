@@ -38,6 +38,7 @@
             {
                 @if (_profile.Members != null && _profile.Members.Any())
                 {
+                    <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -113,6 +114,7 @@
                             }
                         </tbody>
                     </table>
+                    </div>
                 }
                 else
                 {
@@ -122,12 +124,12 @@
                 <div class="add-member-form mt-3">
                     <h6>Legg til familiemedlem</h6>
                     <div class="row g-2 align-items-end">
-                        <div class="col-3">
+                        <div class="col-12 col-sm-3">
                             <label class="form-label">Navn</label>
                             <input class="form-control form-control-sm" @bind="_newMemberName"
                                    placeholder="f.eks. Mamma" />
                         </div>
-                        <div class="col-3">
+                        <div class="col-12 col-sm-3">
                             <label class="form-label">Aldersgruppe</label>
                             <select class="form-select form-select-sm" @bind="_newMemberAgeGroupStr">
                                 @foreach (var ag in Enum.GetValues<AgeGroup>())
@@ -136,7 +138,7 @@
                                 }
                             </select>
                         </div>
-                        <div class="col-4">
+                        <div class="col-12 col-sm-4">
                             <label class="form-label">Kostholdsnotes (valgfri)</label>
                             <textarea class="form-control form-control-sm" rows="1"
                                       @bind="_newMemberDietaryNotes"
@@ -160,6 +162,7 @@
 
             @if (_portionRules != null && _portionRules.Any(r => r.IsActive))
             {
+                <div class="table-responsive">
                 <table class="table table-sm">
                     <thead>
                         <tr>
@@ -232,6 +235,7 @@
                         }
                     </tbody>
                 </table>
+                </div>
             }
             else
             {
@@ -241,7 +245,7 @@
             <div class="add-rule-form mt-3">
                 <h6>Legg til porsjonsregel</h6>
                 <div class="row g-2 align-items-end">
-                    <div class="col-3">
+                    <div class="col-12 col-sm-3">
                         <label class="form-label">Vare</label>
                         @if (!_shopItemsLoaded)
                         {
@@ -264,7 +268,7 @@
                             </SfAutoComplete>
                         }
                     </div>
-                    <div class="col-2">
+                    <div class="col-12 col-sm-2">
                         <label class="form-label">Aldersgruppe</label>
                         <select class="form-select form-select-sm" @bind="_newRuleAgeGroupStr">
                             @foreach (var ag in Enum.GetValues<AgeGroup>())
@@ -273,13 +277,13 @@
                             }
                         </select>
                     </div>
-                    <div class="col-2">
+                    <div class="col-12 col-sm-2">
                         <label class="form-label">Mengde/person</label>
                         <input type="number" step="0.5" min="0.1"
                                class="form-control form-control-sm"
                                @bind="_newRuleQty" />
                     </div>
-                    <div class="col-2">
+                    <div class="col-12 col-sm-2">
                         <label class="form-label">Enhet</label>
                         <select class="form-select form-select-sm" @bind="_newRuleUnitStr">
                             @foreach (var u in Enum.GetValues<MealUnit>())

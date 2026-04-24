@@ -617,5 +617,134 @@ namespace Api.Tests.Controllers
             // Assert
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
+
+        // ── Test 16: Unconsume sets IsConsumed=false ──────────────────────────────
+
+        [Fact]
+        public async Task Unconsume_SetsIsConsumedFalse_ReturnsOk()
+        {
+            // Arrange: a menu with a Monday meal that is already consumed
+            var menu = new WeekMenu
+            {
+                Id = "menu-1",
+                Name = "Uke 47 2025",
+                WeekNumber = 47,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = "recipe-1", IsConsumed = true, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-1")).ReturnsAsync(menu);
+            _mockWeekMenuRepository
+                .Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu wm) => wm);
+            _mockMealRecipeRepository.Setup(r => r.Get("recipe-1")).ReturnsAsync((MealRecipe?)null);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest { DayOfWeek = (int)DayOfWeek.Monday, MealRecipeId = "recipe-1" });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, "http://localhost/api/weekmenu/menu-1/unconsume");
+
+            // Act
+            var response = await _controller.UnConsumeMeal(req, "menu-1");
+            var result = await ReadBody<WeekMenuModel>(response);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+
+            // Verify controller set IsConsumed=false and LastModified before calling Update
+            _mockWeekMenuRepository.Verify(r => r.Update(It.Is<WeekMenu>(
+                wm => wm.DailyMeals.Any(d => d.Day == DayOfWeek.Monday && !d.IsConsumed)
+                      && wm.LastModified.HasValue
+            )), Times.Once);
+        }
+
+        // ── Test 17: Unconsume reverses inventory deduction ───────────────────────
+
+        [Fact]
+        public async Task Unconsume_ReversesInventoryDeduction()
+        {
+            // Arrange: a recipe with one ingredient, and a matching inventory item with 0 stock
+            // (simulating post-consume state). After unconsume, stock should be restored.
+            const string shopItemId = "item-pasta";
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-1",
+                Name = "Bolognese",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = shopItemId, ShopItemName = "Pasta", Quantity = 400 }
+                }
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-1",
+                ShopItemId = shopItemId,
+                QuantityInStock = 0,  // depleted after consume
+                IsActive = true
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-1",
+                Name = "Uke 47 2025",
+                WeekNumber = 47,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = "recipe-1", IsConsumed = true, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-1")).ReturnsAsync(menu);
+            _mockWeekMenuRepository
+                .Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu wm) => wm);
+            _mockMealRecipeRepository.Setup(r => r.Get("recipe-1")).ReturnsAsync(recipe);
+            _mockInventoryRepository
+                .Setup(r => r.Get())
+                .ReturnsAsync(new List<InventoryItem> { inventoryItem });
+            _mockInventoryRepository
+                .Setup(r => r.Update(It.IsAny<InventoryItem>()))
+                .ReturnsAsync((InventoryItem inv) => inv);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest { DayOfWeek = (int)DayOfWeek.Monday, MealRecipeId = "recipe-1" });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, "http://localhost/api/weekmenu/menu-1/unconsume");
+
+            // Act
+            var response = await _controller.UnConsumeMeal(req, "menu-1");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Verify inventory was updated with the quantity added back (0 + 400 = 400)
+            _mockInventoryRepository.Verify(r => r.Update(It.Is<InventoryItem>(
+                inv => inv.ShopItemId == shopItemId && inv.QuantityInStock == 400
+            )), Times.Once);
+        }
+
+        // ── Test 18: Unconsume returns 404 when menu not found ────────────────────
+
+        [Fact]
+        public async Task Unconsume_Returns404_WhenMenuNotFound()
+        {
+            // Arrange
+            _mockWeekMenuRepository.Setup(r => r.Get("nonexistent")).ReturnsAsync((WeekMenu?)null);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest { DayOfWeek = (int)DayOfWeek.Monday, MealRecipeId = "recipe-1" });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, "http://localhost/api/weekmenu/nonexistent/unconsume");
+
+            // Act
+            var response = await _controller.UnConsumeMeal(req, "nonexistent");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
     }
 }

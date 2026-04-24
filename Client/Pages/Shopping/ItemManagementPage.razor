@@ -42,7 +42,13 @@
                             </select>
                         </div>
                         <div class="col-2">
-                            <input class="form-control" placeholder="Enhet" @bind="@newItemUnit">
+                            <SfComboBox TValue="string" TItem="string"
+                                        DataSource="@_unitOptions"
+                                        AllowCustom="true"
+                                        @bind-Value="@newItemUnit"
+                                        Placeholder="Enhet"
+                                        CssClass="e-small">
+                            </SfComboBox>
                         </div>
                         <div class="col-1">
                             <button type="button" class="btn btn-outline-success" @onclick="AddNewItem">
@@ -123,16 +129,22 @@
                                         </div>
 
                                         <!-- Unit -->
-                                        <div class="col-2">
-                                            @if (item.EditClicked)
-                                            {
-                                                <input class="form-control form-control-sm" @bind-value="@item.Unit" placeholder="Enhet" />
-                                            }
-                                            else
-                                            {
-                                                <small class="text-muted">@item.Unit</small>
-                                            }
-                                        </div>
+                                         <div class="col-2">
+                                             @if (item.EditClicked)
+                                             {
+                                                 <SfComboBox TValue="string" TItem="string"
+                                                             DataSource="@_unitOptions"
+                                                             AllowCustom="true"
+                                                             @bind-Value="@item.Unit"
+                                                             Placeholder="Enhet"
+                                                             CssClass="e-small">
+                                                 </SfComboBox>
+                                             }
+                                             else
+                                             {
+                                                 <small class="text-muted">@item.Unit</small>
+                                             }
+                                         </div>
 
                                         <!-- Actions -->
                                         <div class="col-3">
@@ -213,7 +225,9 @@
 @code {
     private ICollection<ShopItemModel>? AllItems { get; set; }
     private ICollection<ItemCategoryModel>? AvailableCategories { get; set; }
-    
+
+    private static readonly List<string> _unitOptions = new() { "Stk", "kg", "g", "L", "dl", "ml", "pk", "boks", "pose" };
+
     // New item form
     private string newItemName = "";
     private string newItemCategoryId = "";
