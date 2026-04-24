@@ -14,12 +14,20 @@
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
-### Issue #81 — Unconsume endpoint (2026-04-23)
+### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE
 - Added `[Function("weekmenuunconsume")]` — `PUT /api/weekmenu/{weekMenuId}/unconsume` — mirrors `ConsumeMeal` exactly in reverse: sets `IsConsumed = false`, restores `QuantityInStock += ingredient.Quantity` for each ingredient (no clamp needed on restore), sets `LastModified = DateTime.UtcNow`.
 - Reuses existing `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no new request type needed.
 - `WeekMenuUnconsume = 23` added to `ShoppingListKeysEnum`; `"weekmenuunconsume" → "api/weekmenu"` added to `ISettings` dict (same pattern as consume/swap).
 - 3 new tests: `Unconsume_SetsIsConsumedFalse_ReturnsOk`, `Unconsume_ReversesInventoryDeduction`, `Unconsume_Returns404_WhenMenuNotFound`.
 - ✅ 162 tests pass, 0 failures.
+- **Decision D30 merged** to `decisions.md`; orchestration log written; ready for integration with Blair's frontend.
+
+### IsBasic Population Audit (2026-04-24) ✅ COMPLETE
+- Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper.
+- Found single bug in `WeekMenuController.RunGenerateShoppingList` line 265.
+- Fixed: replaced inline construction with `_mapper.Map<ShopItemModel>(shopItem)` + graceful fallback.
+- Verified no additional inline mappings in other controllers.
+- **Decision D34 merged** to `decisions.md`.
 
 ### Security Audit — 2025-01-29
 - **CRITICAL BUG**: `GoogleDbContext.GetCollectionKey()` only maps 4 entity types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all resolve to `"misc"` in Firestore production — data corruption bug.

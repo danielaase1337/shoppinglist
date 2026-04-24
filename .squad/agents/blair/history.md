@@ -37,7 +37,61 @@
 
 ## Learnings & Tech Details
 
-### 2026-04-11 — Issue #71 — Duplicate PortionRule rows ✅ COMPLETE
+### 2026-04-24 — Issues #84 #82 #83 #81 ✅ COMPLETE & INTEGRATED
+
+**#84 — Remove Bytt button, unify dropdown handler (updated 2026-04-24)**
+- Confirmed handler merge complete; reduced state management complexity
+- `WeekMenuSwap = 22` enum retained (endpoint still active, button removed)
+- **Decision D33 merged** to `decisions.md`
+
+**#82 — Unit field → SfComboBox (updated 2026-04-24)**
+- Confirmed `SfComboBox` with `AllowCustom="true"` on both add form and inline edit
+- Static unit list: Stk, kg, g, L, dl, ml, pk, boks, pose (hardcoded)
+- **Decision D31 merged** to `decisions.md`
+
+**#83 — Mobile responsiveness pass (updated 2026-04-24)**
+- Week planner: `@media (max-width: 576px)` hides day-icon column; icon visible in dropdown name
+- FamilyProfilePage + InventoryPage: `col-12 col-md-N` breakpoints + `table-responsive` wrappers
+- Breakpoints tested: 576px, 768px, 992px
+- **Decision D32 merged** to `decisions.md`
+
+**#81 — Undo "spist" button (updated 2026-04-24)**
+- Added `↩ Angre` button below consumed day rows; no confirmation dialog
+- Calls `PUT /api/weekmenu/{id}/unconsume` (Glenn's backend, now complete)
+- Button disappears when day re-edits (IsConsumed = false re-enables dropdown)
+- Frontend ready; backend integrated via Decision D30
+- **Decisions D30 + D30.1 merged** to `decisions.md`
+
+---
+
+### 2026-04-12 — Issues #84 #82 #83 #81 ✅ COMPLETE
+
+**#84 — Remove Bytt button, unify dropdown handler (`OneWeekMenuPage.razor`)**
+- Removed `_swappingDay` field and the entire swap-specific dropdown branch; the regular dropdown now handles both "first-set" and "change" via a single `async Task OnMealSelected`.
+- Merged handler: updates local state (MealRecipeId, MealRecipeName, IsSuggested=false, UseUpSuggestions) then calls `PUT /weekmenu/{id}/swap` if the menu is saved (not new).
+- Removed `OnSwapMealSelected` entirely; also cleared `_swappingDay = null` reference from `ConsumeDay`.
+- Consumed days lock the dropdown by showing plain text instead — no explicit `disabled` needed.
+- `WeekMenuSwap` enum value kept (it's still used conceptually via the merged handler); just no longer has a dedicated button.
+
+**#82 — Unit field → SfComboBox in ItemManagementPage**
+- Replaced free-text `<input>` for Unit in both the add-new-item form and the inline edit row with `<SfComboBox TValue="string" TItem="string" AllowCustom="true">`.
+- `DataSource="@_unitOptions"` — static readonly list: Stk, kg, g, L, dl, ml, pk, boks, pose.
+- `@bind-Value` works identically to the old `@bind-value` on `<input>`.
+- `SfComboBox` is in `Syncfusion.Blazor.DropDowns` which is globally imported via `_Imports.razor` — no per-page `@using` needed.
+- `SfDropDownList` does NOT support custom entry; use `SfComboBox` with `AllowCustom="true"` for "dropdown + freeform" pattern.
+
+**#83 — Mobile responsiveness pass**
+- Week planner: added `@@media (max-width: 576px)` block in `<style>` (note double `@@` to escape Razor processing). Hides `day-icon` column, reduces font/padding on narrow screens.
+- MealManagementPage: search bar changed from fixed `col-6/col-4/col-2` to `col-12 col-md-6/col-md-4/col-md-2` — stacks vertically on mobile.
+- FamilyProfilePage: both tables wrapped in `<div class="table-responsive">` for horizontal scrolling; add-member and add-rule form rows use `col-12 col-sm-N` breakpoints.
+
+**#81 — Undo "spist" button**
+- Added `WeekMenuUnconsume = 23` to `ShoppingListKeysEnum.cs` and `"weekmenuunconsume": "api/weekmenu"` to `ISettings.cs`.
+- For consumed day rows, added `↩ Angre` button alongside the ✅ checkmark.
+- `UnconsumeDay` calls `PUT /weekmenu/{id}/unconsume` with `{ DayOfWeek }`, flips `meal.IsConsumed = false`, calls `StateHasChanged()` — re-enables the dropdown automatically since consumed check controls which branch renders.
+- Pattern mirrors `ConsumeDay` exactly.
+
+
 
 **#71 — Duplicate portion rule (`FamilyProfilePage.razor`)**
 - Added 📋 duplicate button alongside existing delete button on each active PortionRule row.
