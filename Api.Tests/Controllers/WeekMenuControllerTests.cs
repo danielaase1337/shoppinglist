@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Shared;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
@@ -824,6 +825,195 @@ namespace Api.Tests.Controllers
             _mockWeekMenuRepository.Verify(r => r.Update(It.Is<WeekMenu>(
                 wm => wm.DailyMeals.Any(d => d.Day == DayOfWeek.Wednesday && !d.IsConsumed)
             )), Times.Once);
+        }
+
+        // ── Test 21: Package-size calc — compatible units yields package count ────
+
+        [Fact]
+        public async Task GenerateShoppingList_PackageSize_CalculatesPackagesWhenUnitsCompatible()
+        {
+            // Arrange: 700 g demand (400 + 300), 500 g bag → should produce Mengde = 2
+            const string itemId = "item-flour";
+            var shopItem = new ShopItem
+            {
+                Id = itemId,
+                Name = "Mel",
+                StandardPurchaseQuantity = 500,
+                StandardPurchaseUnit = "g"
+            };
+
+            var recipe1 = new MealRecipe
+            {
+                Id = "recipe-a",
+                Name = "Brød",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = itemId, ShopItemName = "Mel", Quantity = 400, Unit = MealUnit.Gram }
+                }
+            };
+            var recipe2 = new MealRecipe
+            {
+                Id = "recipe-b",
+                Name = "Pizza",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = itemId, ShopItemName = "Mel", Quantity = 300, Unit = MealUnit.Gram }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-pkg",
+                Name = "Uke 47 2025",
+                WeekNumber = 47,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = "recipe-a", CustomIngredients = new List<MealIngredient>() },
+                    new DailyMeal { Day = DayOfWeek.Tuesday, MealRecipeId = "recipe-b", CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-pkg")).ReturnsAsync(menu);
+            _mockMealRecipeRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe1, recipe2 }));
+            _mockShopItemRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<ShopItem>>(new List<ShopItem> { shopItem }));
+
+            var req = TestHttpFactory.CreatePostRequest("", "http://localhost/api/weekmenu/menu-pkg/generate-shoppinglist");
+
+            // Act
+            var response = await _controller.RunGenerateShoppingList(req, "menu-pkg");
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            // Assert: 700 g demand / 500 g bag = ceil(1.4) = 2 packages
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            var item = Assert.Single(result.ShoppingItems);
+            Assert.Equal(2, item.Mengde);
+        }
+
+        // ── Test 22: Package-size calc — incompatible units falls back to raw ceil ─
+
+        [Fact]
+        public async Task GenerateShoppingList_PackageSize_FallsBackWhenUnitsIncompatible()
+        {
+            // Arrange: demand in Gram, package in "stk" — incompatible → Mengde = ceil(raw)
+            const string itemId = "item-cheese";
+            var shopItem = new ShopItem
+            {
+                Id = itemId,
+                Name = "Ost",
+                StandardPurchaseQuantity = 1,
+                StandardPurchaseUnit = "stk"  // incompatible with Gram demand
+            };
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-c",
+                Name = "Toast",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = itemId, ShopItemName = "Ost", Quantity = 200, Unit = MealUnit.Gram }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-incompat",
+                WeekNumber = 47,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = "recipe-c", CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-incompat")).ReturnsAsync(menu);
+            _mockMealRecipeRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<ShopItem>>(new List<ShopItem> { shopItem }));
+
+            var req = TestHttpFactory.CreatePostRequest("", "http://localhost/api/weekmenu/menu-incompat/generate-shoppinglist");
+
+            // Act
+            var response = await _controller.RunGenerateShoppingList(req, "menu-incompat");
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            // Assert: fallback — Mengde = ceil(200) = 200 (raw demand, not 1 stk)
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            var item = Assert.Single(result.ShoppingItems);
+            Assert.Equal(200, item.Mengde);
+        }
+
+        // ── Test 23: Package-size calc — zero StandardPurchaseQuantity falls back ─
+
+        [Fact]
+        public async Task GenerateShoppingList_PackageSize_FallsBackWhenPackageSizeIsZero()
+        {
+            // StandardPurchaseQuantity = 0 means "not configured" → no package calc
+            const string itemId = "item-oil";
+            var shopItem = new ShopItem
+            {
+                Id = itemId,
+                Name = "Olje",
+                StandardPurchaseQuantity = 0,  // not set
+                StandardPurchaseUnit = "dl"
+            };
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-d",
+                Name = "Salat",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = itemId, ShopItemName = "Olje", Quantity = 3, Unit = MealUnit.Deciliter }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-zero-pkg",
+                WeekNumber = 47,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = "recipe-d", CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-zero-pkg")).ReturnsAsync(menu);
+            _mockMealRecipeRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<ShopItem>>(new List<ShopItem> { shopItem }));
+
+            var req = TestHttpFactory.CreatePostRequest("", "http://localhost/api/weekmenu/menu-zero-pkg/generate-shoppinglist");
+
+            // Act
+            var response = await _controller.RunGenerateShoppingList(req, "menu-zero-pkg");
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            // Assert: fallback — Mengde = ceil(3) = 3 (raw dl, no package conversion)
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            var item = Assert.Single(result.ShoppingItems);
+            Assert.Equal(3, item.Mengde);
         }
     }
 }

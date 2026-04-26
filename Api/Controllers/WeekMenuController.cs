@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Shared;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
@@ -235,8 +236,10 @@ namespace Api.Controllers
                 var allShopItems = await _shopItemRepository.Get();
                 var shopItemDict = allShopItems?.ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
 
-                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem)
-                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem)>();
+                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem, unit, unitMismatch)
+                // UnitMismatch=true when the same ShopItem appears with different MealUnits across meals — in that case
+                // we cannot safely convert to packages and fall back to Math.Ceiling.
+                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem, MealUnit Unit, bool UnitMismatch)>();
 
                 foreach (var daily in weekMenu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
                 {
@@ -262,9 +265,12 @@ namespace Api.Controllers
 
                         shopItemDict.TryGetValue(ingredient.ShopItemId, out var shopItem);
                         if (aggregated.TryGetValue(ingredient.ShopItemId, out var existing))
-                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName, existing.ShopItem ?? shopItem);
+                        {
+                            var mismatch = existing.UnitMismatch || existing.Unit != ingredient.Unit;
+                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName, existing.ShopItem ?? shopItem, existing.Unit, mismatch);
+                        }
                         else
-                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty, shopItem);
+                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty, shopItem, ingredient.Unit, false);
                     }
                 }
 
@@ -283,7 +289,9 @@ namespace Api.Controllers
                     };
                 }).ToList();
 
-                // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand
+                // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand.
+                // Operates on raw ingredient quantities (same units as QuantityInStock) — must run BEFORE
+                // the package conversion below so the subtraction stays in the same unit dimension.
                 var allInventory = await _inventoryRepository.Get();
                 var inventoryDict = allInventory?
                     .Where(i => i.IsActive)
@@ -306,6 +314,24 @@ namespace Api.Controllers
                         // Partially covered — reduce demand by available stock
                         item.Mengde = (int)Math.Ceiling((double)item.Mengde - stock);
                     }
+                }
+
+                // #76 Package-size calculation: convert stock-adjusted raw demand into package count.
+                // Only applies when StandardPurchaseQuantity is set and units are compatible.
+                // Falls back to the raw Math.Ceiling value already in Mengde for unknown/incompatible units.
+                foreach (var item in shoppingItems)
+                {
+                    if (item.Varen?.Id == null) continue;
+                    if (!aggregated.TryGetValue(item.Varen.Id, out var agg)) continue;
+                    if (agg.UnitMismatch) continue;  // mixed units across meals — cannot reliably convert
+                    if (item.Varen.StandardPurchaseQuantity <= 0 || string.IsNullOrEmpty(item.Varen.StandardPurchaseUnit)) continue;
+
+                    var packages = MealUnitExtensions.CalculatePackagesNeeded(
+                        item.Mengde, agg.Unit,
+                        item.Varen.StandardPurchaseQuantity, item.Varen.StandardPurchaseUnit);
+
+                    if (packages.HasValue)
+                        item.Mengde = packages.Value;
                 }
 
                 var shoppingList = new ShoppingListModel
