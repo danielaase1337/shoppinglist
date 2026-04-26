@@ -98,6 +98,31 @@
 
 - **Landing page implemented:** Client/Pages/Landing.razor at /welcome with LandingLayout (no preload service).
 - **SWA config updated:** /welcome made anonymous; 401 redirect changed from /.auth/login/aad to /welcome.
+
+## 2026-04-24–2026-04-26 — Package Size Feature Design (D36) ✅ COMPLETE
+
+### Design Phase (Peter)
+- **Scope:** Enable package-aware shopping list generation. Recipe needs 400g chicken → chicken comes in 500g packages → buy 1 package (not raw 400g).
+- **Discovery:** StandardPurchaseQuantity (double) and StandardPurchaseUnit (string) already exist on ShopItem from issue #76. No new data model changes needed.
+- **3-part solution identified:**
+  1. **Unit bridge (Glenn):** MealUnitExtensions methods for compatibility check & normalization
+  2. **Backend calculation (Glenn):** WeekMenuController.RunGenerateShoppingList() package conversion with stock comparison
+  3. **Display layer (Blair):** Format `{Mengde} × {qty}{unit}` in UI
+- **Design document filed:** `.squad/decisions/inbox/peter-package-size-design.md` → merged as **D36** to main decisions.md
+- **Key insight:** Package size lives on ShopItem (item master), not ShoppingListItem. Fallback to Math.Ceiling when data unavailable or units incompatible.
+
+### Implementation Coordination (Peter coordinating Glenn + Blair)
+- **Glenn's PR #89:** MealUnitExtensions (4 methods) + WeekMenuController update with aggregation tuple extended to carry MealUnit. Pipeline order CRITICAL: stock comparison → package conversion (both mutate Mengde). 26 unit tests + 3 integration tests. **211 total, 0 failures.**
+- **Blair's PR #88:** OneShoppingListItemComponent display + OneWeekMenuPage FormatQuantity() helper. Package info when StandardPurchaseQuantity > 0.
+- **Blair's PR #87 (bonus):** SfComboBox pattern enforcement (D31 update) + UX fixes (OK/Avbryt buttons, Norwegian labels, "Er alltid hjemme" clarification).
+- **Parallel work streams:** No blocking dependencies between Glenn and Blair. Both can merge independently.
+- **Decisions merged:** D36, D36.1, D36.2, D36.3 (sub-decisions), D31 update, D31.1 (label fix) → all to main decisions.md.
+
+### Test Coverage
+- Unit: MealUnitExtensionsTests (11 for compatibility + normalization)
+- Unit: ShoppingListExtensionsTests (26 for package calculation)
+- Integration: WeekMenuControllerTests (3 scenarios: with package, without, incompatible units)
+- **Total test delta:** 162 → 211 tests (49 new), **0 failures**
 - **Sign-out flow fixed:** LoginDisplay.razor now redirects to /welcome instead of straight back to AAD login.
 - **Key learnings:** MainLayout cannot be used for unauthenticated pages (calls authenticated API in preload). Always use a minimal layout. SWA anonymous route must appear before /* catch-all rule.
 
@@ -373,6 +398,14 @@
 - **Slim v1 was thrown away — correctly:** The text-history + frequency-suggestions scope (WeekMenuText entity) was superseded before a single line of implementation code was written. Scoping separately from implementation gave us the flexibility to pivot cleanly. This validates the "scoping ticket before implementation ticket" pattern.
 - **Business rules belong in scope doc, not just in backlog:** Pizza Fridays, Thursday-Thursday week, and fresh ingredient perishability are hard rules that shape every phase of the data model. Capturing them explicitly in the scope doc before architecture starts prevents accidental omission.
 - **Unit system is a cross-cutting concern — freeze it first:** MealUnit enum is used by MealIngredient (Phase 1) and InventoryItem (Phase 4). Designing it once in Shared before any coding starts prevents the coordination cost of retrofitting units across two phases mid-sprint.
+
+## Learnings — Package Size Feature Design (2026-04-24)
+
+- **#76 purchase unit fields already exist on ShopItem:** `StandardPurchaseQuantity` (double) and `StandardPurchaseUnit` (string) were added in the #76 sprint by Ray. Both Firestore and DTO models have them. ItemManagementPage already has edit fields for them. The data model layer is DONE.
+- **Key gap is package-aware calculation in generate-shoppinglist:** Current `WeekMenuController.RunGenerateShoppingList()` uses `Math.Ceiling(totalQuantity)` for Mengde. It does NOT use `StandardPurchaseQuantity` to calculate how many packages to buy. This is the core missing logic.
+- **Unit compatibility is the hard problem:** MealIngredient uses `MealUnit` enum (Gram, Kilogram, etc.) while ShopItem uses `StandardPurchaseUnit` string ("kg", "stk", "l"). These must be bridged via `MealUnitExtensions.ToNorwegian()` for comparison, or a new conversion helper.
+- **Smallest correct solution:** Add package calculation ONLY in `RunGenerateShoppingList()` — no new models, no new endpoints, no new pages. Just math: `packagesNeeded = ceil(totalQuantity / packageSize)` when units are compatible.
+- **Migration is a non-issue:** `StandardPurchaseQuantity` defaults to 0, code already treats 0 as "not set". Existing items gracefully degrade to current behavior (ceil of raw quantity).
 - **Phase 4 (Inventory) can parallel-track with Phase 2 (Week Planning):** The inventory deduction step in shopping list generation degrades gracefully — if Phase 4 is not done when Phase 2 ships, generation simply produces a full list without stock deduction. This is an explicit design decision, not a bug.
 - **Ingredient matching is client-side, not an API concern:** The "use up half broccoli" logic reads the already-loaded recipe catalogue in memory. No new endpoint. No round-trip. Keep computation where the data is.
 - **Import flow: JSON bulk endpoint beats file upload UI:** For a one-time Google Keep import, building a JSON bulk POST endpoint is 20x faster than a file-upload-and-parse UI. Joshua handles the text-to-JSON conversion manually. One-time effort does not justify a general-purpose import tool.

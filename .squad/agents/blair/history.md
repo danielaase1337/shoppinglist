@@ -37,6 +37,54 @@
 
 ## Learnings & Tech Details
 
+### 2026-04-26 — Pakkestørrelse-visning (PR #88) ✅ COMPLETE
+
+**Package size display in shopping list items**
+- `OneShoppingListItemComponent.razor`: replaced plain `<input @bind-value="Mengde" />` with a `<span class="qty-display">` wrapper containing the input (narrowed to 3rem when package info present) plus a `<span class="pkg-size-label">` showing `× {qty}{unit}` (e.g. `× 500g`).
+- `StandardPurchaseQuantity` check: `> 0` (double) and `StandardPurchaseUnit` not null/empty. Format: `{Mengde} × {qty.ToString("G29")}{unit}` — `G29` avoids trailing zeros for clean display.
+- Created `OneShoppingListItemComponent.razor.css` (first scoped CSS for this component) for `qty-display` flexbox and `pkg-size-label` muted styling.
+- `OneWeekMenuPage.razor`: extracted `FormatQuantity(ShoppingListItemModel)` static helper with same logic; applied to both normal-items table and staple/bottom-items table in the generated-list preview.
+- `git add` on tracked `.razor` files can silently not stage if the files show as "modified" but aren't picked up — always verify with `git diff HEAD` after the add. Use `git commit --amend` to fix without a new commit.
+
+
+### 2026-04-24–2026-04-26 — UX Fixes & SfComboBox Unification (PR #87) ✅ COMPLETE
+
+**SfComboBox Pattern Enforcement (D31 update):**
+- Meal selection dropdown in OneWeekMenuPage: replaced plain `<select>` with `SfComboBox + AllowFiltering="true"`. Built-in name search, no `FilteringEventArgs` wiring. DataSource as stable `List<T>` field to avoid re-render churn.
+- StandardPurchaseUnit field in ItemManagementPage: replaced plain text input with `SfComboBox` using existing `_unitOptions` static list + `AllowCustom="true"`. Consistency with Unit field above. Prevents typos in unit values that break inventory matching.
+- Note: `ComboBoxTemplates` does NOT support `ValueTemplate` — only `ItemTemplate`, `HeaderTemplate`, `FooterTemplate`, `GroupTemplate`, `NoRecordsTemplate`, `ActionFailureTemplate`.
+
+**UX Improvements:**
+- OK/Avbryt (Confirm/Cancel) buttons on edit-vare modal (previously only save button).
+- Norwegian labels throughout ("Bestillingsmengde", "Bestillingsenhet" for StandardPurchaseQuantity/Unit fields).
+- "Er alltid hjemme" clarification label for IsBasic checkbox (was "Basisvare", not self-explanatory).
+- `<hr class="my-3" />` separators in ItemManagementPage for visual grouping.
+
+**Decision D31 merged** to `decisions.md` with SfComboBox pattern enforcement and unit field UI component specification.
+
+
+
+
+**FIX 1 — SfComboBox med AllowFiltering i OneWeekMenuPage**
+- Replaced plain `<select>` with `SfComboBox TValue="string" TItem="MealRecipeModel"` + `AllowFiltering="true"` — native search-as-you-type without extra filter event wiring.
+- `ComboBoxEvents` inner component used for `ValueChange` instead of `@onchange` — async-safe pattern: `ValueChange="@(async e => await OnMealSelected(meal, e.Value))"`.
+- `ComboBoxTemplates` accepts: `ItemTemplate`, `FooterTemplate`, `HeaderTemplate`, `GroupTemplate`, `NoRecordsTemplate`, `ActionFailureTemplate` — **`ValueTemplate` is NOT supported** (causes RZ9996 build error). Remove it.
+- Category icons shown via `<ItemTemplate>` only; selected value displays plain `Name` from `ComboBoxFieldSettings`.
+- DataSource must be a stable `List<T>` reference — computed once after loading into `_sortedRecipes` field. Avoids Syncfusion re-render thrash on every component render cycle.
+- `CssClass` parameter on SfComboBox adds class to root wrapper div — `font-style: italic` does NOT inherit to inner `<input>`; must add `.week-planner-table .suggested-meal .e-input-group input.e-input` rule in `.razor.css`.
+
+**FIX 2 — Bottom OK/Avbryt buttons in ItemManagementPage edit row**
+- Simple duplication: added a `<div class="row mt-2">` after the extended edit block with the same `SaveItem`/`CancelEdit` callbacks.
+- Top buttons stay as icon-only (space-efficient); bottom buttons include text ("OK" / "Avbryt") for discoverability.
+
+**FIX 3 — UX labels + divider in edit vare**
+- Added `<hr class="my-2" />` as visual divider between main row (name/category/unit) and extended row (advanced fields).
+- All extended fields now have `<label class="form-label form-label-sm mb-1 text-muted">` above them.
+- `IsBasic` sub-label changed from "Basisvare" (cryptic) to "Er alltid hjemme" (explains meaning).
+- `StockBehaviour` now labelled "Lagersporing" above the select.
+- `StandardPurchaseUnit` free-text input replaced with `SfComboBox` (same `_unitOptions` list as existing unit field) — consistent with D31 pattern.
+- `align-items-end` on the extended row grid so labels + controls bottom-align cleanly.
+
 ### 2026-04-24 — Issues #84 #82 #83 #81 ✅ COMPLETE & INTEGRATED
 
 **#84 — Remove Bytt button, unify dropdown handler (updated 2026-04-24)**

@@ -22,6 +22,24 @@
 - ✅ 162 tests pass, 0 failures.
 - **Decision D30 merged** to `decisions.md`; orchestration log written; ready for integration with Blair's frontend.
 
+### Package Size Feature — Phase 7 (2026-04-24–2026-04-26) ✅ COMPLETE
+- **Design (D36):** Peter documented 3-part solution: unit bridge, backend calculation, display layer. Related to issue #76 (purchase unit sizes already implemented).
+- **Unit Compatibility (D36.1):** Created `Shared/MealUnitExtensions.cs` with 4 new public methods:
+  - `IsCompatibleWith(MealUnit, string)` — check if ingredient unit and purchase unit are same dimension
+  - `NormalizeToBaseUnit(MealUnit, double)` — convert to base unit (gram, dl, stk)
+  - `NormalizePurchaseUnitToBase(string, double)` — convert purchase unit string to base unit
+  - `CalculatePackagesNeeded(...)` — final package count; returns null on incompatibility
+- **Package Conversion Logic (D36.2):** Updated `WeekMenuController.RunGenerateShoppingList()` with:
+  - Extended aggregation tuple to carry `MealUnit`: `(double Quantity, MealUnit Unit, string ShopItemName, ShopItem ShopItem)`
+  - **CRITICAL pipeline order:** stock comparison (subtract QuantityInStock) → package conversion (calculate packages). Both mutate Mengde; wrong order produces incorrect IsLikelyNotNeeded flags.
+  - Fallback to Math.Ceiling when StandardPurchaseQuantity unavailable or units incompatible
+  - `Mengde` becomes package count (int) when calculation succeeds; raw quantity otherwise
+- **Test Coverage:** 26 new MealUnitExtensionsTests + 3 new WeekMenuControllerTests (integration). Total: 211 tests, 0 failures.
+- **Decision D36 merged** (with D36.1, D36.2, D36.3 sub-decisions) to `decisions.md`.
+- **PR #89 status:** Ready for review → development branch.
+
+
+
 ### IsBasic Population Audit (2026-04-24) ✅ COMPLETE
 - Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper.
 - Found single bug in `WeekMenuController.RunGenerateShoppingList` line 265.
@@ -163,3 +181,12 @@
 - **Only one inline `ShopItemModel` construction existed** (line 265) — no other occurrences in other controllers.
 - **Test update pattern**: Every new repo injected into a controller also needs a new `Mock<IGenericRepository<T>>` with default `ReturnsAsync(new List<T>())` setup in the test constructor. 15/15 WeekMenu tests pass.
 - ✅ Build clean, 0 errors, 68 pre-existing warnings (no new issues). Pushed to mealplanningv2 as commit 6a98801.
+
+### Package-size Calc — squad/package-size-calc (2026-04-24) ✅ COMPLETE
+- **Four new methods** added to `Shared/Shared/MealUnitExtensions.cs`: `IsCompatibleWith`, `NormalizeToBaseUnit`, `NormalizePurchaseUnitToBase`, `CalculatePackagesNeeded`. All are pure static — zero side-effects, easy to test.
+- **`CalculatePackagesNeeded` returns null** (not 0) as the fallback signal: callers do `packages ?? (int)Math.Ceiling(raw)`. This preserves existing behaviour for unconfigured items.
+- **Ordering invariant**: stock comparison MUST run before package conversion. Both operate on `item.Mengde`, but stock comparison subtracts raw ingredient units (grams/dl/stk) while package conversion divides by package size. If package conversion ran first, `QuantityInStock` would be compared against "number of bags" instead of raw demand — wrong result.
+- **UnitMismatch flag**: added to the aggregated dict tuple. Set to true when the same ShopItemId appears with different `MealUnit` values across meals. Prevents nonsensical cross-unit summation before package calc.
+- **`using Shared;` must be added** to any test file that references `MealUnit` — it lives in the root `Shared` namespace, not `Shared.FireStoreDataModels` or `Shared.HandlelisteModels`.
+- **Branch confusion pattern**: teammates' unstaged changes travel with the working tree across branch switches. After checking out a new branch, always check `git status` to confirm only your intended files are modified before staging.
+- **211 tests pass**, 0 failures. PR #89 created targeting `development`.

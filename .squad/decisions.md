@@ -1057,3 +1057,143 @@ var useMemoryDb = environment == "Development" ||
 | D33: UX Unification | ✅ Implemented | Blair | 2026-04-24 ✅ |
 | D34: IsBasic Audit | ✅ Completed | Glenn | 2026-04-24 ✅ |
 | D35: StockBehaviour | ✅ Decided | Peter | Next Sprint |
+
+---
+
+## Phase 7: Package Size Feature Sprint (Issues #76–#88–#89) — 2026-04-26
+
+### D36 — Package Size Feature Design (Architecture)
+**Status:** ✅ DESIGNED (Peter, 2026-04-24)  
+**Related:** Issue #76 (purchase unit sizes already implemented)
+
+**Context:**
+`ShopItem` already has `StandardPurchaseQuantity` (double) and `StandardPurchaseUnit` (string) from sprint #76. The feature enables package-aware shopping list generation: recipe needs 400g chicken → chicken comes in 500g packages → buy 1 package.
+
+**Components (3-part solution):**
+1. **Unit Bridge (Glenn):** `MealUnitExtensions` — compatibility check between `MealUnit` enum and `StandardPurchaseUnit` string
+2. **Backend Calculation (Glenn):** `WeekMenuController.RunGenerateShoppingList()` — package conversion with stock comparison
+3. **Display Layer (Blair):** Format `{Mengde} × {qty}{unit}` in shopping list UI
+
+**Architecture Decisions:**
+- Package size lives on `ShopItem` (item master), not `ShoppingListItem`
+- Fallback: Math.Ceiling when package data unavailable or units incompatible
+- No new entities or API endpoints needed
+
+---
+
+### D36.1 — Package Unit Compatibility & Normalization
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** `Shared/MealUnitExtensions.cs` — 4 new public methods
+
+**Methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `IsCompatibleWith(MealUnit, string)` | Check if ingredient unit and purchase unit are same dimension |
+| `NormalizeToBaseUnit(MealUnit, double)` | Convert ingredient quantity to base unit (gram, dl, stk) |
+| `NormalizePurchaseUnitToBase(string, double)` | Convert purchase unit to base unit |
+| `CalculatePackagesNeeded(...)` | Final package count; returns null on incompatibility |
+
+**Supported Units:**
+- Weight: `g`, `gram`, `kg`, `kilogram` → base: grams
+- Volume: `dl`, `deciliter`, `l`, `liter` → base: deciliters
+- Count: `stk`, `pcs`, `pakke`, `pk` → base: count
+
+**Fallback Conditions (null returned):**
+- `StandardPurchaseQuantity <= 0`
+- `StandardPurchaseUnit` null/empty/unknown
+- Demand unit and package unit incompatible (e.g., grams vs. stk)
+- `UnitMismatch = true` (same ShopItemId used with different MealUnit across meals)
+
+---
+
+### D36.2 — Package Conversion in RunGenerateShoppingList
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** `Api/Controllers/WeekMenuController.cs` — shopping list generation
+
+**Decision: Pipeline Order (CRITICAL)**
+Stock comparison (raw-unit subtraction of `QuantityInStock`) **must run before** package conversion. Both mutate `item.Mengde`.
+
+**Canonical Pipeline:**
+1. Aggregate raw ingredient quantities per `ShopItemId`
+2. Apply stock comparison → subtract `QuantityInStock`, set `IsLikelyNotNeeded`
+3. Apply package conversion → update `Mengde` to package count
+
+**Aggregation Tuple (extended):**
+```csharp
+var aggregated = new Dictionary<string, (double Quantity, MealUnit Unit, string ShopItemName, ShopItem ShopItem)>();
+```
+
+**Impact:**
+- `item.Mengde` becomes a **package count** when StandardPurchaseQuantity is configured and units compatible
+- Falls back to raw quantity (existing behavior) when package data unavailable or incompatible
+- No per-trip configuration — fully automatic
+
+**Tests:** 3 new integration tests + 26 unit extension tests (211 total, 0 failures)
+
+---
+
+### D36.3 — Package Size Display Format
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** `OneShoppingListItemComponent` + `OneWeekMenuPage` preview
+
+**Decision:**
+- Format: `{Mengde} × {StandardPurchaseQuantity}{StandardPurchaseUnit}` (e.g., "2 × 500g")
+- G29 number format avoids trailing zeros (500 not 500.0)
+- Applied in: live shopping list + week menu preview
+- Fallback: plain `Mengde.ToString()` when package info not set
+- Style: `pkg-size-label` muted to keep numeric focus
+
+**Rationale:**
+- Compact, mobile-friendly — fits on one line
+- User sees both editable (Mengde) and informational (package size) data simultaneously
+- No modal/separate view needed
+
+**Related:** `FormatQuantity()` helper for consistency across components
+
+---
+
+### D31 — SfComboBox Pattern (UX Consistency Update)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** Multiple Blazor components
+
+**Update to D31 (existing pattern):**
+
+**1. Meal Selection in OneWeekMenuPage**
+- Replaced plain `<select>` with `SfComboBox` + `AllowFiltering="true"`
+- Built-in name search (no `FilteringEventArgs` wiring needed)
+- DataSource as stable `List<T>` field (avoid re-render churn)
+- Note: `ComboBoxTemplates` does not support `ValueTemplate` — use `ItemTemplate` only
+
+**2. StandardPurchaseUnit in ItemManagementPage**
+- Replaced plain `<input type="text">` with `SfComboBox TValue="string" TItem="string"`
+- Uses existing `_unitOptions` static list + `AllowCustom="true"`
+- Identical to pattern used for `Unit` field above
+- Enforces D31 consistency, prevents unit value typos
+
+**Rationale:** Consistency (D31), discoverability, prevents typos breaking inventory matching
+
+---
+
+### D31.1 — "Er alltid hjemme" Label Clarification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** ItemManagementPage.razor — IsBasic checkbox
+
+**Change:** Sub-label updated from "Basisvare" to "Er alltid hjemme" for clarity.
+
+**Context:** `IsBasic` enum means item is always-in-stock and should appear collapsed in generated shopping lists. Previous label was not self-explanatory.
+
+**Implementation:** Display-only, no model changes.
+
+---
+
+## Implementation Status (Phase 7 — Updated)
+
+| Decision | Status | Owner | Target Date |
+|----------|--------|-------|-------------|
+| D36: Package Size Design | ✅ Designed | Peter | 2026-04-24 ✅ |
+| D36.1: Unit Compatibility | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
+| D36.2: RunGenerateShoppingList | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
+| D36.3: Display Format | ✅ Implemented | Blair | PR #88 ✅ (2026-04-24) |
+| D31 Update: SfComboBox | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
+| D31.1 Label Clarification | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
