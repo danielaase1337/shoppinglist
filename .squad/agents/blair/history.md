@@ -37,6 +37,18 @@
 
 ## Learnings & Tech Details
 
+### 2026-04-27 — Edit-Vare UI Simplification ✅ COMPLETE
+
+**Simplified edit-vare extended row in ItemManagementPage.razor**
+- `StockBehaviour` select → plain `<input type="checkbox">` with `@onchange` event handler: `item.StockBehaviour = (bool)e.Value! ? StockBehaviour.Track : StockBehaviour.DoNotTrack`. No computed property needed — inline lambda is clean and safe.
+- `StandardPurchaseQuantity` + `StandardPurchaseUnit` merged into a single "Pakkestørrelse" `<div class="input-group input-group-sm">` containing a number `<input>` (max-width: 5rem) and `SfComboBox` with `AllowCustom="true"`. The combo has `CssClass="pkg-unit-combo"` to remove the double-border via scoped CSS (`border-left: 0; border-radius: 0 4px 4px 0`).
+- Layout changed from 4×col-3 to 3×col-4 for visual balance.
+- "Basisvare" label updated to "Er alltid hjemme".
+- Bottom Lagre/Avbryt row duplicated under the extended section (text buttons); top row keeps icon-only buttons for compactness.
+- Read-mode: added small `.pkg-hint` span (block, 0.75em, 70% opacity) showing `pk: 400g` when both quantity > 0 and unit set.
+- Created `ItemManagementPage.razor.css` (first scoped CSS for this page) for `pkg-unit-combo` and `pkg-hint` rules. Used `::deep` for the Syncfusion wrapper element.
+- `G29` format specifier for quantity display to strip trailing zeros (consistent with PR #88 pattern).
+
 ### 2026-04-26 — Pakkestørrelse-visning (PR #88) ✅ COMPLETE
 
 **Package size display in shopping list items**
