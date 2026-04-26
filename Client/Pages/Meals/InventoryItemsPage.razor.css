@@ -1,0 +1,29 @@
+.inventory-table td {
+    vertical-align: middle;
+}
+
+.clickable-row {
+    cursor: pointer;
+    text-decoration: underline dotted;
+}
+
+.clickable-row:hover {
+    color: #0d6efd;
+}
+
+/* #83 — Mobile responsiveness */
+@media (max-width: 576px) {
+    /* Stack freeze shortcut form vertically */
+    .card .row.g-2 > [class*="col-"] {
+        width: 100%;
+    }
+
+    /* Make inventory table horizontally scrollable */
+    .card:has(.inventory-table) {
+        overflow-x: auto;
+    }
+
+    .inventory-table {
+        min-width: 480px;
+    }
+}
