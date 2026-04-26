@@ -1,0 +1,13 @@
+/* #83 — Mobile responsiveness */
+@media (max-width: 576px) {
+    /* Scroll member and portion rule tables */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Stack add-member and add-rule forms vertically */
+    .row.g-2 > [class*="col-"] {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}
