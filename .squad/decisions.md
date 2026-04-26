@@ -889,6 +889,44 @@ var useMemoryDb = environment == "Development" ||
 
 ---
 
+### D-BLAIR-01 through D-BLAIR-05: Edit-Vare UX Simplification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-26)  
+**Component:** Client/Pages/Admin/ItemManagementPage.razor  
+**Branch:** mealplanningv2
+
+#### D-BLAIR-01: StockBehaviour → Single Checkbox "Spor lager"
+A dropdown for a binary enum (Track / DoNotTrack) is excessive. A labelled checkbox is immediately legible.
+Binding via `@onchange` inline lambda; no computed property needed.
+
+#### D-BLAIR-02: Pakkestørrelse as Input-Group (Number + SfComboBox)
+Showing purchase quantity and unit as two separate inputs gave no visual relationship between them.
+Merging into `<div class="input-group">` with the existing `_unitOptions` list (same as the Unit field above)
+makes the pairing obvious and consistent. `AllowCustom="true"` preserves free-text unit entry.
+
+#### D-BLAIR-03: 3×col-4 Layout
+Three equal columns (IsBasic / Spor lager / Pakkestørrelse) are cleaner than four unequal ones.
+Each column has a single, clear purpose.
+
+#### D-BLAIR-04: Bottom Lagre/Avbryt Row in Expanded Edit Section
+Top action buttons remain icon-only (space-efficient in the item row).
+A second row at the bottom of the expanded section adds text-labelled buttons for discoverability,
+following the pattern established in PR #87.
+
+#### D-BLAIR-05: Read-Mode pkg-Hint
+Small muted `pk: 400g` label below the unit badge when pakkestørrelse is set.
+Guarded by `StandardPurchaseQuantity > 0 && !string.IsNullOrEmpty(StandardPurchaseUnit)` — shows nothing for items without package info.
+
+**Rationale:**
+- UX simplifcation: fewer, clearer controls reduce cognitive load
+- Consistency: reuses existing patterns (input-group, SfComboBox, unit options)
+- Space efficiency: 3 columns vs. 4, icon buttons for quick actions
+- Discoverability: text labels on bottom buttons improve learnability
+- Non-intrusive: package hint only shows when relevant
+
+**Commit:** Awaiting team merge
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
