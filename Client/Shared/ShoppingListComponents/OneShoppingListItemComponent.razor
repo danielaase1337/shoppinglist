@@ -5,7 +5,19 @@
     <label>
         @OneShoppingListItem.Varen.Name
     </label>
-    <input @bind-value="OneShoppingListItem.Mengde" />
+    @{
+        var _qty = OneShoppingListItem.Varen?.StandardPurchaseQuantity ?? 0;
+        var _unit = OneShoppingListItem.Varen?.StandardPurchaseUnit;
+        var _hasPackageInfo = _qty > 0 && !string.IsNullOrEmpty(_unit);
+        var _pkgLabel = _hasPackageInfo ? $"× {_qty.ToString("G29")}{_unit}" : null;
+    }
+    <span class="qty-display">
+        <input @bind-value="OneShoppingListItem.Mengde" class="@(_hasPackageInfo ? "qty-input-narrow" : "")" />
+        @if (_hasPackageInfo)
+        {
+            <span class="pkg-size-label" title="@($"{OneShoppingListItem.Mengde} × {_qty.ToString("G29")}{_unit}")">@_pkgLabel</span>
+        }
+    </span>
     <button class="btn btn-sm btn-outline-danger" @onclick="@(e => DeleteVare(OneShoppingListItem))"><i class="fas fa-ban"> </i></button>
 
 </div>

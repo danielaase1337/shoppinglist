@@ -1,0 +1,18 @@
+/* Package-size quantity display — #76 */
+.qty-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.qty-input-narrow {
+    width: 3rem;
+    text-align: center;
+}
+
+.pkg-size-label {
+    font-size: 0.85em;
+    color: #6c757d;
+    white-space: nowrap;
+}
