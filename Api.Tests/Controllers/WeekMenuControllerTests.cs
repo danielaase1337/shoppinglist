@@ -746,5 +746,84 @@ namespace Api.Tests.Controllers
             // Assert
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
+
+        // ── Test 19: Unconsume returns the updated WeekMenuModel in the body ────────
+
+        [Fact]
+        public async Task Unconsume_ValidRequest_ReturnsUpdatedWeekMenu()
+        {
+            // Arrange: menu with a consumed Monday meal
+            var menu = new WeekMenu
+            {
+                Id = "menu-ret",
+                Name = "Uke 48 2025",
+                WeekNumber = 48,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Tuesday, MealRecipeId = "recipe-2", IsConsumed = true, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-ret")).ReturnsAsync(menu);
+            _mockWeekMenuRepository
+                .Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu wm) => wm);
+            _mockMealRecipeRepository.Setup(r => r.Get("recipe-2")).ReturnsAsync((MealRecipe?)null);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest { DayOfWeek = (int)DayOfWeek.Tuesday, MealRecipeId = "recipe-2" });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, "http://localhost/api/weekmenu/menu-ret/unconsume");
+
+            // Act
+            var response = await _controller.UnConsumeMeal(req, "menu-ret");
+            var result = await ReadBody<WeekMenuModel>(response);
+
+            // Assert: response is 200 and body contains the menu with name and week number intact
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            Assert.Equal("Uke 48 2025", result.Name);
+            Assert.Equal(48, result.WeekNumber);
+            Assert.Equal(2025, result.Year);
+        }
+
+        // ── Test 20: Unconsume is idempotent — already-unconsumed meal still succeeds ─
+
+        [Fact]
+        public async Task Unconsume_AlreadyNotConsumed_StillSucceeds()
+        {
+            // Arrange: menu with a Monday meal that is NOT consumed (IsConsumed=false)
+            // Calling unconsume again should be a no-op and still return 200 OK.
+            var menu = new WeekMenu
+            {
+                Id = "menu-idempotent",
+                Name = "Uke 49 2025",
+                WeekNumber = 49,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Wednesday, MealRecipeId = "recipe-3", IsConsumed = false, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get("menu-idempotent")).ReturnsAsync(menu);
+            _mockWeekMenuRepository
+                .Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu wm) => wm);
+            _mockMealRecipeRepository.Setup(r => r.Get("recipe-3")).ReturnsAsync((MealRecipe?)null);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest { DayOfWeek = (int)DayOfWeek.Wednesday, MealRecipeId = "recipe-3" });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, "http://localhost/api/weekmenu/menu-idempotent/unconsume");
+
+            // Act
+            var response = await _controller.UnConsumeMeal(req, "menu-idempotent");
+
+            // Assert: idempotent — 200 OK, IsConsumed remains false, Update still called (controller always persists)
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            _mockWeekMenuRepository.Verify(r => r.Update(It.Is<WeekMenu>(
+                wm => wm.DailyMeals.Any(d => d.Day == DayOfWeek.Wednesday && !d.IsConsumed)
+            )), Times.Once);
+        }
     }
 }
