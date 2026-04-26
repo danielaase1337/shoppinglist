@@ -1,7 +1,7 @@
 # Squad Decisions
 
-**Last Updated:** 2026-03-23  
-**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback
+**Last Updated:** 2026-04-24  
+**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback + Phase 5 completion review
 
 ---
 
@@ -895,3 +895,165 @@ var useMemoryDb = environment == "Development" ||
 - Document architectural decisions here before implementation
 - Block development if a P0/P1 decision is unresolved
 - Archive resolved decisions to history.md when next session completes
+
+---
+
+## Phase 6+: Recent Decisions (Issues #81–#84) — 2026-04-24
+
+### D30 — Issue #81 Unconsume Endpoint (Backend)
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** Azure Functions `PUT /api/weekmenu/{id}/unconsume`
+
+**Decision:**
+- Reuse `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no separate request type needed
+- **No upper-bound clamp** on inventory restore: `stock += quantity` (allows out-of-order operation tolerance)
+- Skip inventory update if `InventoryItem` missing (opt-in pattern)
+- Set `IsConsumed = false` and `LastModified = DateTime.UtcNow`
+
+**Rationale:**
+- Mirror `ConsumeMeal` logic exactly in reverse
+- No clamp prevents data loss if operations called out of sequence
+- Opt-in inventory keeps transaction minimal
+
+**Tests:**
+- ✅ `Unconsume_SetsIsConsumedFalse_ReturnsOk`
+- ✅ `Unconsume_ReversesInventoryDeduction`
+- ✅ `Unconsume_Returns404_WhenMenuNotFound`
+- ✅ 162 API tests passing (0 failures)
+
+**Configuration:**
+- `ShoppingListKeysEnum.WeekMenuUnconsume = 23`
+- `ISettings: "weekmenuunconsume" → "api/weekmenu"`
+
+---
+
+### D30.1 — Issue #81 Unconsume UI (Frontend)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor — "↩ Angre" button
+
+**Decision:**
+- No confirmation dialog (per Daniel: "keep it simple")
+- Button appears only when `IsConsumed == true`
+- Calls backend `PUT /api/weekmenu/{id}/unconsume` endpoint
+- Silently logs errors if endpoint unavailable (graceful degradation)
+
+**Rationale:**
+- Single-action reversal unlikely to trigger accidentally
+- Reduces UI clutter
+- Consistent with Daniel's simplicity direction
+
+---
+
+### D31 — Issue #82 Unit Field UI Component
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** ItemManagementPage.razor — Unit input
+
+**Decision:**
+- Use `SfComboBox` (not `SfDropDownList`) with `AllowCustom="true"`
+- Predefined unit list: Stk, kg, g, L, dl, ml, pk, boks, pose (hardcoded, no API call)
+- Applied to both add-new-item form AND inline edit row
+
+**Rationale:**
+- `SfComboBox` allows both list selection and custom input (e.g., "flaske", "glass")
+- `SfDropDownList` enforces strict selection only (too rigid)
+- Units stable; no need for server data source
+- Reduces typos while allowing exceptions
+
+---
+
+### D32 — Issue #83 Mobile Responsiveness
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor, FamilyProfilePage.razor, InventoryPage.razor
+
+**Decision:**
+- Use Bootstrap responsive breakpoints (`col-12 col-md-N`, `col-12 col-sm-N`)
+- Add single `@media (max-width: 576px)` block **only** for week-planner table (icon column hidden)
+- Apply `table-responsive` wrapper to both tables in FamilyProfilePage (horizontal scroll)
+- Prioritize content > buttons on small screens
+
+**Rationale:**
+- Minimal custom CSS; Bootstrap handles 80% of cases
+- Week planner needs surgical control for icon column (mobile: icon visible in dropdown name, so no loss)
+- Content accessibility critical for shopping use case (on-phone while shopping)
+
+**Breakpoints Tested:** 576px (mobile), 768px (tablet), 992px (desktop)
+
+---
+
+### D33 — Issue #84 Meal Selection UX Unification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor — merged dropdown handler
+
+**Decision:**
+- Remove "🔄 Bytt" button entirely
+- Merge `OnSwapMealSelected` logic into single `OnMealSelected` handler
+- Regular dropdown stays editable until `IsConsumed == true`
+- Handler flow: update local state → call `PUT /weekmenu/{id}/swap` if menu saved (not new)
+
+**Rationale:**
+- Two-button flow was redundant (selection intent already clear from dropdown)
+- Single handler reduces state management complexity (`_swappingDay` field removed)
+- Consumed days locked via plain text display (no explicit `disabled` needed)
+- `WeekMenuSwap = 22` enum kept (endpoint still used, just no dedicated button)
+
+**Code Reduction:** ~30 lines removed (swap dropdown, state field, old handler)
+
+---
+
+### D34 — IsBasic Population Bug Audit
+**Status:** ✅ COMPLETED (Glenn, 2026-04-24)  
+**Component:** WeekMenuController.RunGenerateShoppingList (Issue #77 fix verification)
+
+**Finding:**
+- Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper
+- **One bug found:** `WeekMenuController` line 265 — `Varen = new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName }`
+- **Fix applied:** Replaced with `_mapper.Map<ShopItemModel>(shopItem)` + graceful fallback
+- **Result:** IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit now populate correctly
+
+**Other Controllers Audited — No Issues:**
+- ShoppingListController, MealRecipeController, ShopsItemsController, ShopItemCategoryController, InventoryItemController — all use AutoMapper correctly
+
+**Recommendation:**
+- Add linting rule: "Never construct `ShopItemModel` inline — always use `_mapper.Map<ShopItemModel>()`"
+- Fallback pattern acceptable only when source may be unavailable
+
+---
+
+### D35 — StockBehaviour on ShopItem (Issue #75)
+**Status:** ✅ DECIDED (Peter, 2026-04-24)  
+**Component:** ShopItem + ShopItemModel + IsDone hook
+
+**Decision:**
+- Add `StockBehaviour` enum on `ShopItem`, not on `ShoppingListItem`
+- Enum values: `Track` (default), `DoNotTrack`
+- When `ShoppingList.IsDone → true`: iterate items where `Varen.StockBehaviour == Track`, upsert InventoryItem, increment `QuantityInStock`
+
+**Rationale:**
+- Item-level, not row-level: "Don't track bread" is about bread itself, not a shopping trip
+- Simplest change: 1 enum file + 1 property + 1 filter
+- No per-list decision fatigue for users
+- Inventory explicitly approximate ("Estimert lager"); auto-stock is additive, auto-deduct is subtractive, drift expected
+
+**Impact:**
+| Team | Action |
+|------|--------|
+| Ray | Add `StockBehaviour` enum + property to ShopItem/ShopItemModel, update AutoMapper |
+| Glenn | Implement IsDone hook filter |
+| Blair | Add toggle to item admin page; label inventory "Estimert lager" |
+| Josh | Tests: Track items stocked, DoNotTrack skipped |
+
+**Alternatives Rejected:**
+1. `IsMealSourced` on ShoppingListItem + `ExcludeFromStock` on ShopItem — overlapping concerns
+2. `StockBehaviour` on ShoppingListItem — per-row flexibility adds decision fatigue
+
+---
+
+| Decision | Status | Owner | Target Date |
+|----------|--------|-------|-------------|
+| D30: Unconsume Backend | ✅ Implemented | Glenn | 2026-04-24 ✅ |
+| D30.1: Unconsume Frontend | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D31: Unit Dropdown | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D32: Mobile CSS | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D33: UX Unification | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D34: IsBasic Audit | ✅ Completed | Glenn | 2026-04-24 ✅ |
+| D35: StockBehaviour | ✅ Decided | Peter | Next Sprint |

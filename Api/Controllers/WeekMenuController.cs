@@ -393,6 +393,72 @@ namespace Api.Controllers
             }
         }
 
+        // #81 — Undo consume: mark meal unconsumed and restore ingredient quantities to inventory
+        [Function("weekmenuunconsume")]
+        public async Task<HttpResponseData> UnConsumeMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/unconsume")] HttpRequestData req, string weekMenuId)
+        {
+            try
+            {
+                var requestBody = await req.ReadFromJsonAsync<ConsumeMealRequest>();
+                if (requestBody == null)
+                    return await GetNoContentRespons("No unconsume request body", req);
+
+                var weekMenu = await _repository.Get(weekMenuId);
+                if (weekMenu == null)
+                {
+                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for unconsume");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
+                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
+                if (dailyMeal == null)
+                {
+                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId}");
+                    return req.CreateResponse(HttpStatusCode.NotFound);
+                }
+
+                dailyMeal.IsConsumed = false;
+                weekMenu.LastModified = DateTime.UtcNow;
+
+                var updatedMenu = await _repository.Update(weekMenu);
+                if (updatedMenu == null)
+                    return await GetErroRespons($"Could not update week menu {weekMenuId} after unconsume", req);
+
+                // Restore ingredients to inventory (reverse the deduction)
+                if (!string.IsNullOrEmpty(requestBody.MealRecipeId))
+                {
+                    var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
+                    if (recipe != null && recipe.Ingredients != null)
+                    {
+                        var allInventory = await _inventoryRepository.Get();
+
+                        foreach (var ingredient in recipe.Ingredients)
+                        {
+                            if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
+
+                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
+                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
+
+                            inventoryItem.QuantityInStock += ingredient.Quantity;
+                            inventoryItem.LastModified = DateTime.UtcNow;
+                            await _inventoryRepository.Update(inventoryItem);
+                        }
+                    }
+                }
+
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
+                return response;
+            }
+            catch (Exception e)
+            {
+                var msg = $"Something went wrong unconsuming meal in week menu {weekMenuId}";
+                _logger.LogError(e, msg);
+                return await GetErroRespons(msg, req);
+            }
+        }
+
         // #74 — Swap the meal for a specific day without affecting inventory
         [Function("weekmenuswap")]
         public async Task<HttpResponseData> SwapMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/swap")] HttpRequestData req, string weekMenuId)

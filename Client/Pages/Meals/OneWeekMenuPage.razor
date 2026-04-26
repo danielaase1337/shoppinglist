@@ -33,18 +33,7 @@
                         <tr class="@(meal.IsConsumed ? "consumed-day" : "")">
                             <td class="day-label">@DayLabel(day)</td>
                             <td>
-                                @if (_swappingDay == day && !meal.IsConsumed)
-                                {
-                                    <select class="form-select form-select-sm"
-                                            @onchange="@(e => OnSwapMealSelected(meal, e.Value?.ToString()))">
-                                        <option value="">-- Velg ny middag --</option>
-                                        @foreach (var recipe in GetSortedRecipes())
-                                        {
-                                            <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
-                                        }
-                                    </select>
-                                }
-                                else if (meal.IsConsumed)
+                                @if (meal.IsConsumed)
                                 {
                                     <span class="text-muted fst-italic">✅ @(string.IsNullOrEmpty(meal.MealRecipeName) ? "Spist" : meal.MealRecipeName)</span>
                                 }
@@ -79,23 +68,16 @@
                                 @if (meal.IsConsumed)
                                 {
                                     <span class="text-success" title="Spist">✅</span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+                                            @onclick="@(() => UnconsumeDay(meal))" title="Angre spist">
+                                        ↩ Angre
+                                    </button>
                                 }
                                 else if (!string.IsNullOrEmpty(meal.MealRecipeId))
                                 {
                                     <button type="button" class="btn btn-sm btn-outline-success"
                                             @onclick="@(() => ConsumeDay(meal))" title="Marker som spist">
                                         ✅ Spist
-                                    </button>
-                                }
-                            </td>
-                            <td class="day-actions">
-                                @if (!meal.IsConsumed && !string.IsNullOrEmpty(meal.MealRecipeId))
-                                {
-                                    <button type="button"
-                                            class="btn btn-sm @(_swappingDay == day ? "btn-warning" : "btn-outline-warning")"
-                                            @onclick="@(() => _swappingDay = _swappingDay == day ? (DayOfWeek?)null : day)"
-                                            title="Bytt middag">
-                                        🔄 Bytt
                                     </button>
                                 }
                             </td>
@@ -292,9 +274,7 @@
     // #73 — collapsible staple-items group in generated list preview
     private bool _staplesExpanded = false;
 
-    // #74 — consume/swap state
-    private DayOfWeek? _swappingDay = null;
-
+    // #74 — consume/swap state (swap button removed in #84)
     private bool IsNew => string.IsNullOrEmpty(Id) || Id == "new";
 
     // Phase 3 — use-up suggestion state
@@ -393,13 +373,28 @@
         return newMeal;
     }
 
-    private void OnMealSelected(DailyMealModel meal, string? recipeId)
+    private async Task OnMealSelected(DailyMealModel meal, string? recipeId)
     {
         meal.MealRecipeId = recipeId ?? "";
         meal.IsSuggested = false;
         var recipe = _recipes?.FirstOrDefault(r => r.Id == meal.MealRecipeId);
         meal.MealRecipeName = recipe?.Name ?? "";
         UpdateUseUpSuggestions();
+
+        if (!IsNew && _menu != null && !string.IsNullOrEmpty(recipeId))
+        {
+            try
+            {
+                var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/swap";
+                var response = await Http.PutAsJsonAsync(url, new { DayOfWeek = (int)meal.Day, NewMealRecipeId = recipeId });
+                if (!response.IsSuccessStatusCode)
+                    Console.WriteLine($"❌ Swap failed: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error swapping meal: {ex.Message}");
+            }
+        }
     }
 
     private void UpdateUseUpSuggestions()
@@ -623,7 +618,6 @@
             if (response.IsSuccessStatusCode)
             {
                 meal.IsConsumed = true;
-                _swappingDay = null;
             }
             else
             {
@@ -636,30 +630,27 @@
         }
     }
 
-    // #74 — Swap the meal for a day
-    private async Task OnSwapMealSelected(DailyMealModel meal, string? newRecipeId)
+    // #81 — Undo consumed state for a day
+    private async Task UnconsumeDay(DailyMealModel meal)
     {
-        if (_menu == null || string.IsNullOrEmpty(newRecipeId)) return;
-        _swappingDay = null;
+        if (_menu == null) return;
         try
         {
-            var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/swap";
-            var response = await Http.PutAsJsonAsync(url, new { DayOfWeek = (int)meal.Day, NewMealRecipeId = newRecipeId });
+            var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/unconsume";
+            var response = await Http.PutAsJsonAsync(url, new { DayOfWeek = (int)meal.Day });
             if (response.IsSuccessStatusCode)
             {
-                meal.MealRecipeId = newRecipeId;
-                var recipe = _recipes?.FirstOrDefault(r => r.Id == newRecipeId);
-                meal.MealRecipeName = recipe?.Name ?? "";
-                meal.IsSuggested = false;
+                meal.IsConsumed = false;
+                StateHasChanged();
             }
             else
             {
-                Console.WriteLine($"❌ Swap failed: {response.StatusCode}");
+                Console.WriteLine($"❌ Unconsume failed: {response.StatusCode}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Error swapping meal: {ex.Message}");
+            Console.WriteLine($"❌ Error unconsuming meal: {ex.Message}");
         }
     }
 
@@ -718,61 +709,3 @@
     };
 }
 
-<style>
-    .week-planner-table td.day-label {
-        width: 110px;
-        font-weight: 600;
-        vertical-align: middle;
-        white-space: nowrap;
-    }
-
-    .week-planner-table td.day-icon {
-        width: 40px;
-        text-align: center;
-        font-size: 1.2rem;
-        vertical-align: middle;
-    }
-
-    .suggested-meal {
-        font-style: italic;
-        color: #6c757d;
-    }
-
-    .suggested-badge {
-        display: block;
-        font-size: 0.7rem;
-        color: #6c757d;
-        margin-top: 2px;
-    }
-
-    .generated-list-card {
-        border-left: 4px solid #0d6efd;
-    }
-
-    .use-up-panel {
-        border-left: 4px solid #ffc107;
-        background-color: #fffdf0;
-        padding: 0.5rem 1rem;
-    }
-
-    /* #74 — Consumed day row */
-    .consumed-day td {
-        opacity: 0.55;
-    }
-
-    .day-actions {
-        width: 110px;
-        vertical-align: middle;
-        white-space: nowrap;
-    }
-
-    /* #73 — Staple items collapsible group */
-    .staple-group {
-        border-top: 1px solid #dee2e6;
-        padding-top: 0.5rem;
-    }
-
-    .staple-toggle {
-        font-size: 0.85rem;
-    }
-</style>
