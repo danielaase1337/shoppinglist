@@ -41,7 +41,6 @@ namespace BlazorApp.Client.Common
                 { "portionrules", "api/portionrules" },
                 { "weekmenuconsume", "api/weekmenu" },
                 { "weekmenuswap", "api/weekmenu" },
-                { "weekmenuunconsume", "api/weekmenu" },
                 { "weekmenuunconsume", "api/weekmenu" }
             };
         }

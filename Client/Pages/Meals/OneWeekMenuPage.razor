@@ -69,8 +69,17 @@
                                 {
                                     <span class="text-success" title="Spist">✅</span>
                                     <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
-                                            @onclick="@(() => UnconsumeDay(meal))" title="Angre spist">
-                                        ↩ Angre
+                                            @onclick="@(() => UnconsumeDay(meal))"
+                                            disabled="@(_unconsuming == meal.Day)"
+                                            title="Angre spist">
+                                        @if (_unconsuming == meal.Day)
+                                        {
+                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <text>↩ Angre</text>
+                                        }
                                     </button>
                                 }
                                 else if (!string.IsNullOrEmpty(meal.MealRecipeId))
@@ -264,6 +273,7 @@
     private bool _saving = false;
     private bool _generating = false;
     private bool _savingList = false;
+    private DayOfWeek? _unconsuming = null;
     private ShoppingListModel? _generatedList;
 
     // Phase 5 — portion scaling
@@ -634,6 +644,7 @@
     private async Task UnconsumeDay(DailyMealModel meal)
     {
         if (_menu == null) return;
+        _unconsuming = meal.Day;
         try
         {
             var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/unconsume";
@@ -641,7 +652,6 @@
             if (response.IsSuccessStatusCode)
             {
                 meal.IsConsumed = false;
-                StateHasChanged();
             }
             else
             {
@@ -651,6 +661,11 @@
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Error unconsuming meal: {ex.Message}");
+        }
+        finally
+        {
+            _unconsuming = null;
+            StateHasChanged();
         }
     }
 
