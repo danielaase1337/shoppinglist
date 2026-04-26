@@ -10,24 +10,24 @@ namespace Shared.FireStoreDataModels
     {
         [FirestoreProperty]
         public int WeekNumber { get; set; }
-        
+
         [FirestoreProperty]
         public int Year { get; set; }
-        
+
+        [FirestoreProperty]
+        public DateTime PlanningStartDate { get; set; }
+
         [FirestoreProperty]
         public ICollection<DailyMeal> DailyMeals { get; set; }
-        
-        [FirestoreProperty]
-        public DateTime CreatedDate { get; set; }
-        
+
         [FirestoreProperty]
         public bool IsActive { get; set; }
 
         public WeekMenu()
         {
             DailyMeals = new List<DailyMeal>();
-            CreatedDate = DateTime.UtcNow;
             IsActive = true;
         }
     }
 }
+

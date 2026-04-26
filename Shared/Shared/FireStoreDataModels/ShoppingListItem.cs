@@ -18,5 +18,8 @@ namespace Shared.FireStoreDataModels
         [FirestoreProperty]
         public bool IsDone { get; set; }
 
+        // #76 — Set by generate-shoppinglist when inventory fully covers this item's demand
+        [FirestoreProperty]
+        public bool IsLikelyNotNeeded { get; set; }
     }
 }

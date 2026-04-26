@@ -69,6 +69,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/*.json",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/*",
       "allowedRoles": ["authenticated"]
     }
@@ -85,6 +89,6 @@
   },
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "/_framework/*", "/css/*", "/js/*", "/img/*", "/*.ico", "/*.png", "/*.svg"]
+    "exclude": ["/api/*", "/_framework/*", "/css/*", "/js/*", "/img/*", "/*.ico", "/*.png", "/*.svg", "/*.json"]
   }
 }

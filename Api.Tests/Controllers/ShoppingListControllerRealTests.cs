@@ -19,12 +19,14 @@ namespace Api.Tests.Controllers
     public class ShoppingListControllerRealTests
     {
         private readonly Mock<IGenericRepository<ShoppingList>> _mockRepo;
+        private readonly Mock<IGenericRepository<InventoryItem>> _mockInventoryRepo;
         private readonly IMapper _mapper;
         private readonly GetAllShoppingListsFunction _controller;
 
         public ShoppingListControllerRealTests()
         {
             _mockRepo = new Mock<IGenericRepository<ShoppingList>>();
+            _mockInventoryRepo = new Mock<IGenericRepository<InventoryItem>>();
 
             var config = new MapperConfiguration(cfg =>
             {
@@ -35,7 +37,7 @@ namespace Api.Tests.Controllers
             });
             _mapper = config.CreateMapper();
 
-            _controller = new GetAllShoppingListsFunction(NullLoggerFactory.Instance, _mockRepo.Object, _mapper);
+            _controller = new GetAllShoppingListsFunction(NullLoggerFactory.Instance, _mockRepo.Object, _mapper, _mockInventoryRepo.Object);
         }
 
         // ─── GET all ────────────────────────────────────────────────────────────────
@@ -294,6 +296,79 @@ namespace Api.Tests.Controllers
             var response = await _controller.RunAll(request);
 
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+
+        // ── Bonus: Inventory integration on IsDone transition ────────────────────────
+
+        [Fact]
+        public async Task Update_TriggersInventoryAddition_WhenIsDoneTransitionsToTrue()
+        {
+            // Arrange: existing list is not done
+            const string shopItemId = "item-melk";
+            var existing = new ShoppingList
+            {
+                Id = "list-1",
+                Name = "Ukeshandel",
+                IsDone = false,
+                LastModified = DateTime.UtcNow.AddDays(-1),
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            // PUT body: same list but IsDone=true, with one item
+            var updatedModel = new ShoppingListModel
+            {
+                Id = "list-1",
+                Name = "Ukeshandel",
+                IsDone = true,
+                ShoppingItems = new List<ShoppingListItemModel>
+                {
+                    new ShoppingListItemModel
+                    {
+                        Varen = new ShopItemModel { Id = shopItemId, Name = "Melk", Unit = "Liter", ItemCategory = new ItemCategoryModel { Id = "dairy", Name = "Meieri" } },
+                        Mengde = 2,
+                        IsDone = true
+                    }
+                }
+            };
+
+            var savedList = new ShoppingList
+            {
+                Id = "list-1",
+                Name = "Ukeshandel",
+                IsDone = true,
+                LastModified = DateTime.UtcNow,
+                ShoppingItems = new List<ShoppingListItem>()
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-melk",
+                ShopItemId = shopItemId,
+                ShopItemName = "Melk",
+                QuantityInStock = 1.0,
+                IsActive = true,
+                LastModified = DateTime.UtcNow.AddDays(-1)
+            };
+
+            _mockRepo.Setup(r => r.Get("list-1")).ReturnsAsync(existing);
+            _mockRepo.Setup(r => r.Update(It.IsAny<ShoppingList>())).ReturnsAsync(savedList);
+            _mockInventoryRepo
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<InventoryItem>>(new List<InventoryItem> { inventoryItem }));
+            _mockInventoryRepo
+                .Setup(r => r.Update(It.IsAny<InventoryItem>()))
+                .ReturnsAsync((InventoryItem inv) => inv);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(updatedModel));
+
+            // Act
+            var response = await _controller.RunAll(request);
+
+            // Assert: inventory Update was called for the matching item
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            _mockInventoryRepo.Verify(r => r.Update(It.Is<InventoryItem>(
+                inv => inv.ShopItemId == shopItemId && inv.QuantityInStock == 3.0 // 1.0 + 2 (Mengde)
+            )), Times.Once);
         }
     }
 }

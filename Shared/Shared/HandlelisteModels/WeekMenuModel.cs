@@ -8,14 +8,13 @@ namespace Shared.HandlelisteModels
     {
         public int WeekNumber { get; set; }
         public int Year { get; set; }
+        public DateTime PlanningStartDate { get; set; }
         public ICollection<DailyMealModel> DailyMeals { get; set; }
-        public DateTime CreatedDate { get; set; }
         public bool IsActive { get; set; }
 
         public WeekMenuModel()
         {
             DailyMeals = new List<DailyMealModel>();
-            CreatedDate = DateTime.UtcNow;
             IsActive = true;
         }
 
@@ -25,3 +24,4 @@ namespace Shared.HandlelisteModels
         }
     }
 }
+
