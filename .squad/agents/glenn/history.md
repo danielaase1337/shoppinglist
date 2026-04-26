@@ -14,13 +14,14 @@
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
-### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE
+### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE — PR #85
 - Added `[Function("weekmenuunconsume")]` — `PUT /api/weekmenu/{weekMenuId}/unconsume` — mirrors `ConsumeMeal` exactly in reverse: sets `IsConsumed = false`, restores `QuantityInStock += ingredient.Quantity` for each ingredient (no clamp needed on restore), sets `LastModified = DateTime.UtcNow`.
 - Reuses existing `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no new request type needed.
 - `WeekMenuUnconsume = 23` added to `ShoppingListKeysEnum`; `"weekmenuunconsume" → "api/weekmenu"` added to `ISettings` dict (same pattern as consume/swap).
 - 3 new tests: `Unconsume_SetsIsConsumedFalse_ReturnsOk`, `Unconsume_ReversesInventoryDeduction`, `Unconsume_Returns404_WhenMenuNotFound`.
-- ✅ 162 tests pass, 0 failures.
-- **Decision D30 merged** to `decisions.md`; orchestration log written; ready for integration with Blair's frontend.
+- ✅ 164 tests pass, 0 failures (final count after additional unconsume test commit b4fb06a).
+- Branch `squad/81-undo-consume` pushed; **PR #85** opened targeting `development`.
+- **Decisions filed** to `.squad/decisions/inbox/glenn-unconsume-endpoint.md` (D-Glenn-Unconsume: 4 decisions — request reuse, no upper-clamp, silent skip on missing inventory, PUT route pattern).
 
 ### IsBasic Population Audit (2026-04-24) ✅ COMPLETE
 - Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper.
