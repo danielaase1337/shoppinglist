@@ -1,0 +1,15 @@
+/* Pakkestørrelse unit combo inside input-group */
+::deep .pkg-unit-combo.e-input-group {
+    border-left: 0;
+    border-radius: 0 4px 4px 0;
+    flex: 1 1 auto;
+    min-width: 5rem;
+}
+
+/* Read-mode pakkestørrelse hint */
+.pkg-hint {
+    opacity: 0.7;
+    font-size: 0.75em;
+    display: block;
+    line-height: 1.2;
+}
