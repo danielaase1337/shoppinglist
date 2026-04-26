@@ -191,7 +191,7 @@
                             {
                                 <tr>
                                     <td>@item.Varen?.Name</td>
-                                    <td>@item.Mengde</td>
+                                    <td>@FormatQuantity(item)</td>
                                 </tr>
                             }
                         </tbody>
@@ -213,7 +213,7 @@
                                     {
                                         <tr class="text-muted">
                                             <td>@item.Varen?.Name</td>
-                                            <td>@item.Mengde</td>
+                                            <td>@FormatQuantity(item)</td>
                                             <td class="text-end">
                                                 <button type="button" class="btn btn-sm btn-outline-danger"
                                                         @onclick="@(() => RemoveGeneratedItem(item))"
@@ -606,6 +606,16 @@
         {
             _savingList = false;
         }
+    }
+
+    // #76 — Format quantity with package size: "2 × 500g", fallback to plain number
+    private static string FormatQuantity(ShoppingListItemModel item)
+    {
+        var qty = item.Varen?.StandardPurchaseQuantity ?? 0;
+        var unit = item.Varen?.StandardPurchaseUnit;
+        return (qty > 0 && !string.IsNullOrEmpty(unit))
+            ? $"{item.Mengde} × {qty.ToString("G29")}{unit}"
+            : item.Mengde.ToString();
     }
 
     // #73 — Remove an item from the generated list preview
