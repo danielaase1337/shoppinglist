@@ -311,7 +311,34 @@
 **Integration:** Fully integrated with WeekMenuController API and 16 passing unit tests
 
 
-### 2026-04-08 — Phase 3 Use-Up Suggestions + Phase 4 Inventory Page ✅ COMPLETE
+### 2026-05-29 — Three P1 Bug Fixes: Inventory, Family Edit, Ingredient Edit ✅ COMPLETE
+
+**Sprint Context:** PR #67 feedback sprint. Daniel identified 3 bugs and 6 features from sprint review. Blair fixed all 3 P1 bugs.
+
+#### Bug #68 — Inventory +/-1 Buttons (PR #90)
+- **Root cause:** Bulk payload shape mismatch with `inventoryitemsadjust` endpoint
+- **Fix:** Corrected payload structure; migrated hardcoded URL to `ISettings.GetApiUrl()`
+- **Pattern reinforced:** Always use `ISettings` for API paths; never hardcode URLs
+
+#### Bug #69 — Family Member Inline Edit (PR #92)
+- **Implementation:** Edit button per row; inline editor for name/age/dietary notes
+- **Pattern:** Follows `EditClicked` / `CssComleteEditClassName` family
+- **Persistence:** PUT to FamilyProfiles endpoint (established pattern)
+- **UI:** Row-level edit state; consistent with existing `<tr>` edit pattern
+
+#### Bug #70 — Meal Ingredient Inline Edit (PR #91)
+- **Implementation:** Inline editor row beneath read-only ingredient display
+- **Editable fields:** Quantity, Unit, Optional flag (three core attributes)
+- **Pattern:** Uses shared `EditClicked` + `CssComleteEditClassName` on `MealIngredientModel`
+- **Styling:** Scoped CSS in OneMealRecipePage.razor.css (avoids global `.edit` interference)
+- **Persistence:** PUT to MealRecipes (ingredients embedded; no separate endpoint)
+- **Decision filed:** D34 (Meal Ingredient Inline Edit Pattern) in decisions.md
+
+**Build status:** ✅ All 3 PRs built; ready for code review & merge
+**Patterns reinforced:**
+- Shared `EditClicked` pattern prevents duplication across pages
+- Scoped CSS enables reuse without style conflicts
+- Row-level edit states work better than `<tr class="edit">` styling for complex tables
 
 **Files modified:**
 - `Client/Pages/Meals/OneWeekMenuPage.razor` — Phase 3: added `UseUpSuggestion` record, `_useUpSuggestions` list, `_dismissedIngredientIds` set. `OnMealSelected` now calls `UpdateUseUpSuggestions()`. New methods: `UpdateUseUpSuggestions`, `AddToNextEmptySlot`, `DismissSuggestion`. Suggestion panel renders below the planner table, dismissable per ingredient. Added `.use-up-panel` CSS with amber left border.

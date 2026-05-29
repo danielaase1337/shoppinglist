@@ -236,10 +236,10 @@ namespace Api.Controllers
                 var allShopItems = await _shopItemRepository.Get();
                 var shopItemDict = allShopItems?.ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
 
-                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem, unit, unitMismatch)
+                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem, isBasic, unit, unitMismatch)
                 // UnitMismatch=true when the same ShopItem appears with different MealUnits across meals — in that case
                 // we cannot safely convert to packages and fall back to Math.Ceiling.
-                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem, MealUnit Unit, bool UnitMismatch)>();
+                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem, bool IsBasic, MealUnit Unit, bool UnitMismatch)>();
 
                 foreach (var daily in weekMenu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
                 {
@@ -261,16 +261,29 @@ namespace Api.Controllers
                     foreach (var ingredient in ingredients)
                     {
                         if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
-                        if (ingredient.IsBasic) continue;  // Basic/pantry items are assumed in stock — exclude from shopping list
 
                         shopItemDict.TryGetValue(ingredient.ShopItemId, out var shopItem);
                         if (aggregated.TryGetValue(ingredient.ShopItemId, out var existing))
                         {
                             var mismatch = existing.UnitMismatch || existing.Unit != ingredient.Unit;
-                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName, existing.ShopItem ?? shopItem, existing.Unit, mismatch);
+                            aggregated[ingredient.ShopItemId] = (
+                                existing.Quantity + ingredient.Quantity,
+                                string.IsNullOrEmpty(existing.ShopItemName) ? ingredient.ShopItemName ?? string.Empty : existing.ShopItemName,
+                                existing.ShopItem ?? shopItem,
+                                existing.IsBasic || ingredient.IsBasic,
+                                existing.Unit,
+                                mismatch);
                         }
                         else
-                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty, shopItem, ingredient.Unit, false);
+                        {
+                            aggregated[ingredient.ShopItemId] = (
+                                ingredient.Quantity,
+                                ingredient.ShopItemName ?? string.Empty,
+                                shopItem,
+                                ingredient.IsBasic,
+                                ingredient.Unit,
+                                false);
+                        }
                     }
                 }
 
@@ -279,7 +292,12 @@ namespace Api.Controllers
                     // Use AutoMapper to carry all ShopItem fields (IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit)
                     var varen = kvp.Value.ShopItem != null
                         ? _mapper.Map<ShopItemModel>(kvp.Value.ShopItem)
-                        : new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName };
+                        : new ShopItemModel
+                        {
+                            Id = kvp.Key,
+                            Name = kvp.Value.ShopItemName,
+                            IsBasic = kvp.Value.IsBasic
+                        };
 
                     return new ShoppingListItemModel
                     {

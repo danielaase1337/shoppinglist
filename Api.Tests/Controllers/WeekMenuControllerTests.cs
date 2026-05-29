@@ -603,6 +603,118 @@ namespace Api.Tests.Controllers
             Assert.NotEqual(recipeItemId, item.Varen.Id);  // recipe item NOT used
         }
 
+        [Fact]
+        public async Task GenerateShoppingList_IncludesBasicItems_WithMappedShopItemFields()
+        {
+            const string basicItemId = "item-milk";
+            var category = new ItemCategory { Id = "cat-dairy", Name = "Meieri" };
+            var shopItem = new ShopItem
+            {
+                Id = basicItemId,
+                Name = "Melk",
+                Unit = "stk",
+                ItemCategory = category,
+                IsBasic = true,
+                StandardPurchaseQuantity = 1,
+                StandardPurchaseUnit = "stk"
+            };
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-basic",
+                Name = "Pannekaker",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = basicItemId, ShopItemName = "Melk", Quantity = 2, IsBasic = true }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-basic",
+                Name = "Uke 48 2025",
+                WeekNumber = 48,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = recipe.Id, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockMealRecipeRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository
+                .Setup(r => r.Get())
+                .ReturnsAsync(new List<ShopItem> { shopItem });
+
+            var req = TestHttpFactory.CreatePostRequest("", $"http://localhost/api/weekmenu/{menu.Id}/generate-shoppinglist");
+
+            var response = await _controller.RunGenerateShoppingList(req, menu.Id);
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            Assert.Single(result.ShoppingItems);
+
+            var item = result.ShoppingItems.Single();
+            Assert.Equal(basicItemId, item.Varen.Id);
+            Assert.True(item.Varen.IsBasic);
+            Assert.Equal("stk", item.Varen.Unit);
+            Assert.Equal(category.Id, item.Varen.ItemCategory.Id);
+            Assert.Equal(category.Name, item.Varen.ItemCategory.Name);
+        }
+
+        [Fact]
+        public async Task GenerateShoppingList_PreservesIsBasic_WhenShopItemLookupMisses()
+        {
+            const string basicItemId = "item-fallback";
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-fallback",
+                Name = "Grøt",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = basicItemId, ShopItemName = "Havregryn", Quantity = 1, IsBasic = true }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-fallback",
+                Name = "Uke 49 2025",
+                WeekNumber = 49,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = recipe.Id, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockMealRecipeRepository
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository
+                .Setup(r => r.Get())
+                .ReturnsAsync(new List<ShopItem>());
+
+            var req = TestHttpFactory.CreatePostRequest("", $"http://localhost/api/weekmenu/{menu.Id}/generate-shoppinglist");
+
+            var response = await _controller.RunGenerateShoppingList(req, menu.Id);
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            Assert.Single(result.ShoppingItems);
+            Assert.True(result.ShoppingItems.Single().Varen.IsBasic);
+        }
+
         // ── Test 15: Generate returns 404 when WeekMenu not found ─────────────────
 
         [Fact]
