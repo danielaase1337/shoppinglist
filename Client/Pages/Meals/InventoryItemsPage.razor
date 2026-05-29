@@ -358,9 +358,12 @@
         _saving = true;
         try
         {
-            var request = new List<object> { new { Id = item.Id, QuantityDelta = delta } };
+            var request = new List<InventoryAdjustmentRequest>
+            {
+                new() { Id = item.Id, QuantityDelta = delta }
+            };
             var response = await Http.PostAsJsonAsync(
-                $"{Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems)}/adjust", request);
+                Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItemsAdjust), request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -443,6 +446,12 @@
         _newQty        = 1;
         _newThreshold  = 0;
         _newUnitStr    = nameof(MealUnit.Piece);
+    }
+
+    private sealed class InventoryAdjustmentRequest
+    {
+        public string Id { get; set; } = string.Empty;
+        public double QuantityDelta { get; set; }
     }
 }
 

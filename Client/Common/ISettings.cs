@@ -35,6 +35,7 @@ namespace BlazorApp.Client.Common
                 { "weekmenus", "api/weekmenus" },
                 { "inventoryitem", "api/inventoryitem" },
                 { "inventoryitems", "api/inventoryitems" },
+                { "inventoryitemsadjust", "api/inventoryitems/adjust" },
                 { "familyprofile", "api/familyprofile" },
                 { "familyprofiles", "api/familyprofiles" },
                 { "portionrule", "api/portionrule" },

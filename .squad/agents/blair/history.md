@@ -166,6 +166,7 @@
 **#68 — Inventory +/-1 buttons (`InventoryItemsPage.razor`)**
 - Root cause: `Adjust()` sent `new { Id, Delta }` but API `inventoryitemsadjust` expects `List<InventoryAdjustmentModel>` with property `QuantityDelta` (not `Delta`).
 - Fix: changed request to `new List<object> { new { Id = item.Id, QuantityDelta = delta } }` and added `StateHasChanged()` after local quantity update.
+- Follow-up: added dedicated client endpoint mapping `ShoppingListKeysEnum.InventoryItemsAdjust` → `api/inventoryitems/adjust` so the bulk adjust action no longer relies on `"/adjust"` string concatenation inside the Razor page.
 
 **#69 — Family member edit (`FamilyProfilePage.razor`)**
 - Root cause: member table had only a delete button; no edit affordance.
