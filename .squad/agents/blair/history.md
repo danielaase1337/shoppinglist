@@ -37,6 +37,14 @@
 
 ## Learnings & Tech Details
 
+### 2026-05-29 — Meal Ingredient Inline Edit (#70) ✅ COMPLETE
+
+**Inline edit pattern for meal ingredients on `OneMealRecipePage.razor`**
+- Switched ingredient edit state from page-only `_editingIngredient == ing` checks to the shared `EditClicked` / `CssComleteEditClassName` pattern on `MealIngredientModel`.
+- Kept display rows read-only and rendered a scoped inline editor row beneath the ingredient; this avoids accidental checkbox mutation without persistence and fits table layout better than styling `<tr class="edit">` directly.
+- Existing recipes persist ingredient edits through `PUT` to `Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes)` because ingredients are embedded in the recipe payload; there is no separate meal-ingredient endpoint.
+- Added scoped CSS in `OneMealRecipePage.razor.css` for the inline editor highlight so the shared `edit` class can be reused without relying on the global block-style `.edit` treatment.
+
 ### 2026-04-27 — Edit-Vare UI Simplification ✅ COMPLETE
 
 **Simplified edit-vare extended row in ItemManagementPage.razor**

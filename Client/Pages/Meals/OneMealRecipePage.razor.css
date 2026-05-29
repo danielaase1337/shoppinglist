@@ -1,4 +1,28 @@
 /* #83 — Mobile responsiveness */
+.ingredients-table {
+    margin-bottom: 0;
+}
+
+::deep .ingredients-table th,
+::deep .ingredients-table td {
+    vertical-align: middle;
+}
+
+::deep .ingredient-status {
+    cursor: default;
+}
+
+::deep .ingredient-inline-editor {
+    margin: 0.25rem 0 0.75rem;
+}
+
+::deep .ingredient-inline-editor.edit {
+    background-color: #fff3cd;
+    border: 1px solid #ffe69c;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
 @media (max-width: 576px) {
     /* Stack recipe fields (category, type, effort) on mobile */
     .row.mb-3 > [class*="col-4"],
