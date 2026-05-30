@@ -1,16 +1,4 @@
 {
-  "_readme": "AAD_CLIENT_ID and AAD_CLIENT_SECRET must be set as Application Settings in the Azure Static Web Apps resource in the Azure portal.",
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
-          "clientIdSettingName": "AAD_CLIENT_ID",
-          "clientSecretSettingName": "AAD_CLIENT_SECRET"
-        }
-      }
-    }
-  },
   "routes": [
     {
       "route": "/.auth/login/aad",
