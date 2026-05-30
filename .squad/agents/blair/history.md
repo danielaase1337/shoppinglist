@@ -618,3 +618,23 @@
 - Never use Syncfusion for simple toggles; plain <button> + bool state is sufficient
 - DayOfWeek? nullable works cleanly as "which day is in swap mode" tracker
 - Shared model stubs with default alse are safe for Firestore (missing field → false)
+
+## Learnings
+
+### 2026-04-04 - PR Consolidation: integration/all-squad-fixes (PR #94)
+
+Consolidated 5 open squad PRs into integration/all-squad-fixes for Daniel to validate.
+PRs included: #90 (inventory adjust), #87 (UX edit-vare), #92 (family member edit), #91 (meal ingredient edit), #93 (IsBasic generated lists).
+
+Conflicts resolved:
+- NewNavComponent.razor: Kept HEAD Authorized structure; merged richer dropdown items from incoming
+- staticwebapp.config.json: Kept both /welcome and /*.json routes
+- ItemManagementPage.razor: Used UX branch labeled layout with select for StockBehaviour
+- DailyMeal/DailyMealModel + ShoppingListController + MemoryGenericRepository: Used HEAD (more complete with IsConsumed)
+- ISettings.cs + ShoppingListKeysEnum.cs: Used HEAD (has InventoryItemsAdjust, WeekMenuConsume/Swap/Unconsume)
+- OneMealRecipePage.razor: Used incoming (adds inline ingredient edit feature)
+- WeekMenuController.cs: Used incoming (full IsBasic propagation with ShopItem lookup)
+- peter/meal-planning-v1-scope.md: Used incoming (Daniel-approved version)
+
+Lesson: Embedded git repos in .worktrees/ get staged during merges - run git rm --cached .worktrees/* to unblock push.
+All 5 individual PRs closed with reference to PR #94.
