@@ -251,3 +251,96 @@ SfAutoComplete configuration mirrors existing autocomplete usage. Event handler 
 ### Phase 3+: Meal Suggestion Algorithm (AI Foreslå Meny)
 **Status:** Deferred pending API spec refinement.  
 **Scope:** Suggestion endpoint, category weighting, recent-meal exclusion.
+
+---
+
+## Bug Fixes — Integration Phase (Glenn, Blair)
+**Date:** 2026-05-30  
+**Status:** ✅ FIXED & COMMITTED
+
+### Glenn — D-BUGFIX-1: Null-Key Guards in generate-shoppinglist
+**Context:** `POST api/weekmenu/{id}/generate-shoppinglist` threw unhandled `ArgumentNullException` inside `RunGenerateShoppingList()` when building lookup dictionaries.
+
+**Problem:** Three call sites lacked null-key validation before `.ToDictionary()`:
+1. `recipeDict` — MealRecipe with null `Id` throws on key insertion
+2. `shopItemDict` — ShopItem with null `Id` throws on key insertion
+3. `inventoryDict` — InventoryItem with null `ShopItemId` throws via GroupBy → ToDictionary
+
+Firestore-deserialized documents with missing `Id` field deserialise with `Id = null`, and `Dictionary<string, T>` rejects null keys.
+
+**Fix:** Added `.Where(r => r.Id != null)`, `.Where(s => s.Id != null)`, and `.Where(i => i.IsActive && i.ShopItemId != null)` guards immediately before each `ToDictionary` call.
+
+**File:** `Api/Controllers/WeekMenuController.cs`
+
+**Pattern for Future:**
+```csharp
+var dict = collection?
+    .Where(x => x.Id != null)
+    .ToDictionary(x => x.Id, x => x) ?? new Dictionary<string, T>();
+
+var dict = collection?
+    .Where(x => x.ForeignKeyId != null)
+    .GroupBy(x => x.ForeignKeyId)
+    .ToDictionary(g => g.Key, g => g.First()) ?? new Dictionary<string, T>();
+```
+
+**Verification:** dotnet build (0 errors), dotnet test Api.Tests (221 passed)
+
+---
+
+### Glenn — D-BUGFIX-2: IsBasic Propagation in Generated Shopping Lists
+**Context:** `WeekMenuController.RunGenerateShoppingList()` already uses AutoMapper when a `ShopItem` record is found, but generated lists lost `IsBasic` behaviour in two cases:
+1. `MealIngredient.IsBasic` items were filtered out during aggregation
+2. Fallback inline `ShopItemModel` (when catalogue lookup misses) defaulted `IsBasic` to `false`
+
+**Decision:** Keep `IsBasic` ingredients in generated shopping lists so the frontend can group them under collapsed "Basisvarer / Trolig ikke nødvendig" section. Continue using existing catalogue lookup + AutoMapper path. When lookup misses, preserve `MealIngredient.IsBasic` on fallback `ShopItemModel`.
+
+**Rationale:** Matches frontend contract in `OneWeekMenuPage.razor`, fixes issue #77 without new Firestore queries, keeps generated lists resilient when meal data references stale/missing catalogue entries.
+
+**File:** `Api/Controllers/WeekMenuController.cs` (RunGenerateShoppingList method)
+
+---
+
+### Blair — D-BUGFIX-3: InventoryItemsAdjust Endpoint Key
+**Context:** `InventoryItemsPage.razor` built bulk adjust URL by concatenating `"/adjust"` onto the inventory collection endpoint. This violated team rule: all API URLs route through `ISettings`.
+
+**Decision:** Add dedicated client key for bulk endpoint:
+- `ShoppingListKeysEnum.InventoryItemsAdjust`
+- `ISettings["inventoryitemsadjust"] = "api/inventoryitems/adjust"`
+
+**Rationale:** Keeps custom action endpoints discoverable in Settings service, reduces future breakage when routes change, maintains frontend consistency.
+
+**Files:** `Client/Common/ShoppingListKeysEnum.cs`, `Client/Common/ISettings.cs`
+
+---
+
+### Blair — D-BUGFIX-4: PR Consolidation — integration/all-squad-fixes
+**Type:** Process / Integration  
+**Date:** 2026-04-04  
+**Status:** ✅ COMPLETE
+
+Consolidated all 5 open squad PRs into single integration branch `integration/all-squad-fixes` (PR #94) for Daniel to validate in one place.
+
+**PRs Consolidated:**
+| PR | Branch | Description |
+|---|---|---|
+| #90 | squad/68-inventory-adjust-fix | fix: inventory +/-1 adjust buttons |
+| #87 | squad/ux-edit-vare-improvements | feat: UX-forbedringer — søkefilter, edit vare |
+| #92 | squad/69-family-member-edit | fix: add edit for family members |
+| #91 | squad/70-meal-ingredient-edit | fix: add ingredient edit on meal recipe page |
+| #93 | squad/77-isbasic-generated-lists | fix: populate IsBasic in generated shopping lists |
+
+All 5 PRs closed with comment pointing to PR #94.
+
+**Integration Branch:** `integration/all-squad-fixes` → PR #94
+
+**Key Merge Conflict Resolutions:**
+- NewNavComponent.razor: Keep HEAD's `<Authorized>` structure + richer dropdown items from incoming
+- staticwebapp.config.json: Keep both `/welcome` and `/*.json` routes (additive)
+- ItemManagementPage.razor: Use incoming's labeled grid layout + `<select>` for StockBehaviour
+- WeekMenuController.cs: Use incoming's full IsBasic propagation + ShopItem lookup + unit mismatch detection
+- OneMealRecipePage.razor: Use incoming's inline ingredient edit feature
+
+**Issue Resolved:** Embedded git repo `.worktrees/blair-69` blocked push. Fixed with `git rm --cached .worktrees/blair-69`.
+
+**Recommendation:** Add `.worktrees/` to `.gitignore` or ensure worktree cleanup before merges.

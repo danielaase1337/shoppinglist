@@ -216,3 +216,36 @@
 - **`using Shared;` must be added** to any test file that references `MealUnit` — it lives in the root `Shared` namespace, not `Shared.FireStoreDataModels` or `Shared.HandlelisteModels`.
 - **Branch confusion pattern**: teammates' unstaged changes travel with the working tree across branch switches. After checking out a new branch, always check `git status` to confirm only your intended files are modified before staging.
 - **211 tests pass**, 0 failures. PR #89 created targeting `development`.
+
+### 500 Error in generate-shoppinglist — Null-Key Guards (2026-05-30) ✅ COMPLETE
+- **Bug**: `POST api/weekmenu/{id}/generate-shoppinglist` threw unhandled `ArgumentNullException` inside `RunGenerateShoppingList` when building lookup dictionaries. Caught by outer `try/catch` → HTTP 500.
+- **Root cause**: Three call sites lacked null-key validation before `.ToDictionary()`:
+  1. `recipeDict` — MealRecipe with null `Id` throws on key insertion
+  2. `shopItemDict` — ShopItem with null `Id` throws on key insertion
+  3. `inventoryDict` — InventoryItem with null `ShopItemId` throws via GroupBy → ToDictionary
+- **Firestore data quality issue**: `GoogleFireBaseGenericRepository<T>.Get()` returns documents successfully even when they lack the `Id` field (e.g., legacy documents stored before `[FirestoreProperty] Id` was added). Those deserialize with `Id = null`. `Dictionary<string, T>` rejects null keys with `ArgumentNullException`.
+- **Unit tests never caught this** because mock repositories always return objects with non-null Ids.
+- **Fix**: Added `.Where(r => r.Id != null)`, `.Where(s => s.Id != null)`, and `.Where(i => i.IsActive && i.ShopItemId != null)` guards immediately before each `ToDictionary` call.
+- **Pattern for future**: Always guard `ToDictionary` on Firestore-sourced collections:
+  ```csharp
+  var dict = collection?
+      .Where(x => x.Id != null)
+      .ToDictionary(x => x.Id, x => x) ?? new Dictionary<string, T>();
+  
+  var dict = collection?
+      .Where(x => x.ForeignKeyId != null)
+      .GroupBy(x => x.ForeignKeyId)
+      .ToDictionary(g => g.Key, g => g.First()) ?? new Dictionary<string, T>();
+  ```
+- ✅ Build clean, 0 errors. dotnet test Api.Tests → 221 passed, 0 failed. Committed to `integration/all-squad-fixes`.
+- **Decision D-BUGFIX-1 merged** to `decisions.md`; session log written.
+
+### IsBasic Propagation — Generated Shopping Lists (2026-05-30) ✅ COMPLETE
+- **Context**: `WeekMenuController.RunGenerateShoppingList()` was losing `IsBasic` behaviour in two cases:
+  1. `MealIngredient.IsBasic` items were filtered out during aggregation → never reached generated list
+  2. Fallback inline `ShopItemModel` (when catalogue lookup misses) defaulted `IsBasic` to `false`
+- **Decision**: Keep `IsBasic` ingredients in generated shopping lists so the frontend can group them under collapsed "Basisvarer / Trolig ikke nødvendig" section.
+- **Implementation**: Continue using existing catalogue lookup + AutoMapper path for full `ShopItem` metadata (`IsBasic`, `ItemCategory`, `Unit`, `StockBehaviour`, purchase-size fields). When the catalogue lookup misses, preserve `MealIngredient.IsBasic` on the fallback `ShopItemModel`.
+- **Rationale**: Matches frontend contract in `OneWeekMenuPage.razor`, fixes issue #77 without adding new Firestore queries, keeps generated shopping lists resilient when meal data references stale/missing catalogue entries.
+- **Decision D-BUGFIX-2 merged** to `decisions.md`.
+

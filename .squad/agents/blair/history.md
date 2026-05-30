@@ -638,3 +638,39 @@ Conflicts resolved:
 
 Lesson: Embedded git repos in .worktrees/ get staged during merges - run git rm --cached .worktrees/* to unblock push.
 All 5 individual PRs closed with reference to PR #94.
+
+### 2026-05-30 — InventoryItemsAdjust Endpoint Key (#68) ✅ COMPLETE
+
+**Decision D-BUGFIX-3: InventoryItemsAdjust client key**
+- **Context**: `InventoryItemsPage.razor` had hardcoded URL string `"/adjust"` concatenated onto the inventory collection endpoint. This violated team rule: all API URLs route through `ISettings`.
+- **Fix**: Added dedicated client key:
+  - `ShoppingListKeysEnum.InventoryItemsAdjust`
+  - `ISettings["inventoryitemsadjust"] = "api/inventoryitems/adjust"`
+- **Rationale**: Keeps custom action endpoints discoverable in Settings service, reduces future breakage when routes change, maintains frontend consistency.
+- **Files updated**: `Client/Common/ShoppingListKeysEnum.cs`, `Client/Common/ISettings.cs`
+- **Decision D-BUGFIX-3 merged** to `decisions.md`.
+
+### 2026-05-30 — PR Consolidation: integration/all-squad-fixes Complete ✅
+
+**Decision D-BUGFIX-4: PR Consolidation — integration/all-squad-fixes (PR #94)**
+- Consolidated all 5 open squad PRs into single integration branch `integration/all-squad-fixes` (PR #94) for Daniel to validate.
+- **PRs consolidated**:
+  - #90: squad/68-inventory-adjust-fix (fix: inventory +/-1 adjust buttons)
+  - #87: squad/ux-edit-vare-improvements (feat: UX-forbedringer — søkefilter, edit vare)
+  - #92: squad/69-family-member-edit (fix: add edit for family members)
+  - #91: squad/70-meal-ingredient-edit (fix: add ingredient edit on meal recipe page)
+  - #93: squad/77-isbasic-generated-lists (fix: populate IsBasic in generated shopping lists)
+- **Key merge decisions**:
+  - NewNavComponent.razor: Kept HEAD's `<Authorized>` structure + richer dropdown items from incoming
+  - staticwebapp.config.json: Kept both `/welcome` and `/*.json` routes (additive)
+  - ItemManagementPage.razor: Used incoming's labeled grid layout + `<select>` for StockBehaviour
+  - WeekMenuController.cs: Used incoming's full IsBasic propagation + ShopItem lookup + unit mismatch detection
+  - OneMealRecipePage.razor: Used incoming's inline ingredient edit feature
+  - DailyMeal/DailyMealModel/ShoppingListController/MemoryGenericRepository: Used HEAD (more complete)
+  - ISettings.cs/ShoppingListKeysEnum.cs: Used HEAD (more enum values)
+  - peter/meal-planning-v1-scope.md: Used incoming (Daniel-approved)
+- **Bug fixed during merge**: Embedded git repo `.worktrees/blair-69` was staged as directory → infinite git hang. Fixed with `git rm --cached .worktrees/blair-69`.
+- **Lesson**: Always check `git status` after branch switches to detect teammate's unstaged changes. Add `.worktrees/` to `.gitignore` to prevent future embed issues.
+- **All 5 individual PRs closed** with reference to PR #94.
+- **Decision D-BUGFIX-4 merged** to `decisions.md`.
+
