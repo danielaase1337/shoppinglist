@@ -19,8 +19,22 @@ namespace BlazorApp.Client.Common
         itemcategory = 7,
         itemcategorys = 8,
         FrequentShoppingList = 9,
-        FrequentShoppingLists = 10
-
-
+        FrequentShoppingLists = 10,
+        MealRecipes = 11,
+        MealRecipe = 12,
+        WeekMenus = 13,
+        WeekMenu = 14,
+        InventoryItems = 15,
+        InventoryItem = 16,
+        InventoryItemsAdjust = 17,
+        FamilyProfiles = 18,
+        FamilyProfile = 19,
+        PortionRules = 20,
+        PortionRule = 21,
+        // #74 — Week menu action endpoints
+        WeekMenuConsume = 22,
+        WeekMenuSwap = 23,
+        // #81 — Undo consume
+        WeekMenuUnconsume = 24
     }
 }

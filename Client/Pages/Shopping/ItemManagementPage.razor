@@ -42,7 +42,13 @@
                             </select>
                         </div>
                         <div class="col-2">
-                            <input class="form-control" placeholder="Enhet" @bind="@newItemUnit">
+                            <SfComboBox TValue="string" TItem="string"
+                                        DataSource="@_unitOptions"
+                                        AllowCustom="true"
+                                        @bind-Value="@newItemUnit"
+                                        Placeholder="Enhet"
+                                        CssClass="e-small">
+                            </SfComboBox>
                         </div>
                         <div class="col-1">
                             <button type="button" class="btn btn-outline-success" @onclick="AddNewItem">
@@ -123,16 +129,26 @@
                                         </div>
 
                                         <!-- Unit -->
-                                        <div class="col-2">
-                                            @if (item.EditClicked)
-                                            {
-                                                <input class="form-control form-control-sm" @bind-value="@item.Unit" placeholder="Enhet" />
-                                            }
-                                            else
-                                            {
-                                                <small class="text-muted">@item.Unit</small>
-                                            }
-                                        </div>
+                                         <div class="col-2">
+                                             @if (item.EditClicked)
+                                             {
+                                                 <SfComboBox TValue="string" TItem="string"
+                                                             DataSource="@_unitOptions"
+                                                             AllowCustom="true"
+                                                             @bind-Value="@item.Unit"
+                                                             Placeholder="Enhet"
+                                                             CssClass="e-small">
+                                                 </SfComboBox>
+                                             }
+                                             else
+                                             {
+                                                 <small class="text-muted">@item.Unit</small>
+                                                 @if (item.StandardPurchaseQuantity > 0 && !string.IsNullOrEmpty(item.StandardPurchaseUnit))
+                                                 {
+                                                     <small class="text-muted ms-1 pkg-hint">pk: @(item.StandardPurchaseQuantity.ToString("G29"))@item.StandardPurchaseUnit</small>
+                                                 }
+                                             }
+                                         </div>
 
                                         <!-- Actions -->
                                         <div class="col-3">
@@ -160,6 +176,58 @@
                                             }
                                         </div>
                                     </div>
+
+                                    @if (item.EditClicked)
+                                    {
+                                        <!-- Extended edit fields: IsBasic, StockBehaviour checkbox, Pakkestørrelse input-group -->
+                                        <hr class="my-2" />
+                                        <div class="row align-items-center mt-1">
+                                            <div class="col-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="isBasic_@item.Id"
+                                                           @bind="item.IsBasic" />
+                                                    <label class="form-check-label" for="isBasic_@item.Id">
+                                                        Er alltid hjemme
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="stockTrack_@item.Id"
+                                                           checked="@(item.StockBehaviour == StockBehaviour.Track)"
+                                                           @onchange="@(e => item.StockBehaviour = (bool)e.Value! ? StockBehaviour.Track : StockBehaviour.DoNotTrack)" />
+                                                    <label class="form-check-label" for="stockTrack_@item.Id">
+                                                        Spor lager
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small mb-1">Pakkestørrelse</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input class="form-control" type="number" step="0.1" min="0"
+                                                           placeholder="0" @bind="item.StandardPurchaseQuantity" style="max-width:5rem;" />
+                                                    <SfComboBox TValue="string" TItem="string"
+                                                                DataSource="@_unitOptions"
+                                                                AllowCustom="true"
+                                                                @bind-Value="@item.StandardPurchaseUnit"
+                                                                Placeholder="enhet"
+                                                                CssClass="e-small pkg-unit-combo">
+                                                    </SfComboBox>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Bottom save/cancel row -->
+                                        <div class="row mt-2">
+                                            <div class="col">
+                                                <button type="button" class="btn btn-sm btn-success me-1" @onclick="@(() => SaveItem(item))">
+                                                    <i class="fas fa-check"></i> Lagre
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="@(() => CancelEdit(item))">
+                                                    <i class="fas fa-times"></i> Avbryt
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -183,7 +251,9 @@
 @code {
     private ICollection<ShopItemModel>? AllItems { get; set; }
     private ICollection<ItemCategoryModel>? AvailableCategories { get; set; }
-    
+
+    private static readonly List<string> _unitOptions = new() { "Stk", "kg", "g", "L", "dl", "ml", "pk", "boks", "pose" };
+
     // New item form
     private string newItemName = "";
     private string newItemCategoryId = "";
@@ -197,6 +267,10 @@
     private string originalItemName = "";
     private string originalItemUnit = "";
     private ItemCategoryModel? originalItemCategory;
+    private bool originalIsBasic;
+    private StockBehaviour originalStockBehaviour;
+    private double originalStandardPurchaseQuantity;
+    private string originalStandardPurchaseUnit = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -317,6 +391,10 @@
         originalItemName = item.Name;
         originalItemUnit = item.Unit;
         originalItemCategory = item.ItemCategory;
+        originalIsBasic = item.IsBasic;
+        originalStockBehaviour = item.StockBehaviour;
+        originalStandardPurchaseQuantity = item.StandardPurchaseQuantity;
+        originalStandardPurchaseUnit = item.StandardPurchaseUnit;
         item.EditClicked = true;
     }
 
@@ -325,6 +403,10 @@
         item.Name = originalItemName;
         item.Unit = originalItemUnit;
         item.ItemCategory = originalItemCategory!;
+        item.IsBasic = originalIsBasic;
+        item.StockBehaviour = originalStockBehaviour;
+        item.StandardPurchaseQuantity = originalStandardPurchaseQuantity;
+        item.StandardPurchaseUnit = originalStandardPurchaseUnit;
         item.EditClicked = false;
     }
 

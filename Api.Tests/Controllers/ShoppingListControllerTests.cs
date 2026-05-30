@@ -13,6 +13,7 @@ namespace Api.Tests.Controllers
     public class ShoppingListControllerTests
     {
         private readonly Mock<IGenericRepository<ShoppingList>> _mockRepository;
+        private readonly Mock<IGenericRepository<InventoryItem>> _mockInventoryRepository;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IMapper _mapper;
         private readonly GetAllShoppingListsFunction _controller;
@@ -20,6 +21,7 @@ namespace Api.Tests.Controllers
         public ShoppingListControllerTests()
         {
             _mockRepository = new Mock<IGenericRepository<ShoppingList>>();
+            _mockInventoryRepository = new Mock<IGenericRepository<InventoryItem>>();
             _loggerFactory = NullLoggerFactory.Instance;
 
             // Setup AutoMapper with the same profile as the API
@@ -32,7 +34,7 @@ namespace Api.Tests.Controllers
             });
             _mapper = config.CreateMapper();
 
-            _controller = new GetAllShoppingListsFunction(_loggerFactory, _mockRepository.Object, _mapper);
+            _controller = new GetAllShoppingListsFunction(_loggerFactory, _mockRepository.Object, _mapper, _mockInventoryRepository.Object);
         }
 
         [Fact]

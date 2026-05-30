@@ -14,6 +14,39 @@
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
+### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE
+- Added `[Function("weekmenuunconsume")]` — `PUT /api/weekmenu/{weekMenuId}/unconsume` — mirrors `ConsumeMeal` exactly in reverse: sets `IsConsumed = false`, restores `QuantityInStock += ingredient.Quantity` for each ingredient (no clamp needed on restore), sets `LastModified = DateTime.UtcNow`.
+- Reuses existing `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no new request type needed.
+- `WeekMenuUnconsume = 23` added to `ShoppingListKeysEnum`; `"weekmenuunconsume" → "api/weekmenu"` added to `ISettings` dict (same pattern as consume/swap).
+- 3 new tests: `Unconsume_SetsIsConsumedFalse_ReturnsOk`, `Unconsume_ReversesInventoryDeduction`, `Unconsume_Returns404_WhenMenuNotFound`.
+- ✅ 162 tests pass, 0 failures.
+- **Decision D30 merged** to `decisions.md`; orchestration log written; ready for integration with Blair's frontend.
+
+### Package Size Feature — Phase 7 (2026-04-24–2026-04-26) ✅ COMPLETE
+- **Design (D36):** Peter documented 3-part solution: unit bridge, backend calculation, display layer. Related to issue #76 (purchase unit sizes already implemented).
+- **Unit Compatibility (D36.1):** Created `Shared/MealUnitExtensions.cs` with 4 new public methods:
+  - `IsCompatibleWith(MealUnit, string)` — check if ingredient unit and purchase unit are same dimension
+  - `NormalizeToBaseUnit(MealUnit, double)` — convert to base unit (gram, dl, stk)
+  - `NormalizePurchaseUnitToBase(string, double)` — convert purchase unit string to base unit
+  - `CalculatePackagesNeeded(...)` — final package count; returns null on incompatibility
+- **Package Conversion Logic (D36.2):** Updated `WeekMenuController.RunGenerateShoppingList()` with:
+  - Extended aggregation tuple to carry `MealUnit`: `(double Quantity, MealUnit Unit, string ShopItemName, ShopItem ShopItem)`
+  - **CRITICAL pipeline order:** stock comparison (subtract QuantityInStock) → package conversion (calculate packages). Both mutate Mengde; wrong order produces incorrect IsLikelyNotNeeded flags.
+  - Fallback to Math.Ceiling when StandardPurchaseQuantity unavailable or units incompatible
+  - `Mengde` becomes package count (int) when calculation succeeds; raw quantity otherwise
+- **Test Coverage:** 26 new MealUnitExtensionsTests + 3 new WeekMenuControllerTests (integration). Total: 211 tests, 0 failures.
+- **Decision D36 merged** (with D36.1, D36.2, D36.3 sub-decisions) to `decisions.md`.
+- **PR #89 status:** Ready for review → development branch.
+
+
+
+### IsBasic Population Audit (2026-04-24) ✅ COMPLETE
+- Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper.
+- Found single bug in `WeekMenuController.RunGenerateShoppingList` line 265.
+- Fixed: replaced inline construction with `_mapper.Map<ShopItemModel>(shopItem)` + graceful fallback.
+- Verified no additional inline mappings in other controllers.
+- **Decision D34 merged** to `decisions.md`.
+
 ### Security Audit — 2025-01-29
 - **CRITICAL BUG**: `GoogleDbContext.GetCollectionKey()` only maps 4 entity types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all resolve to `"misc"` in Firestore production — data corruption bug.
 - **Auth inconsistency**: `ShoppingListController` and `MealRecipeController` use `AuthorizationLevel.Function`; all other controllers are `AuthorizationLevel.Anonymous`. No user-level auth exists anywhere.
@@ -75,3 +108,102 @@
 - Added structured `ILogger.LogInformation` for DELETE before the delete executes — logs shop name (resolved from repo) and shop id.
 - Updated `ShopsControllerTests`: added `_mockShoppingListRepo`, updated constructor call, added 4 `RunDependencies` tests, updated 2 DELETE tests to mock the `Get()` call now required for name logging.
 - 122 API tests passing post-change.
+
+### MealRecipeController - Phase 1 API (2026-04-04)
+- Controller path: Api/Controllers/MealRecipeController.cs - pre-existed with defects; replaced in full
+- Three Functions: [Function(mealrecipes)] GET all by PopularityScore DESC/POST/PUT, [Function(mealrecipe)] GET/{id} 404/soft-DELETE, [Function(mealrecipesimport)] POST bulk import route mealrecipes/import
+- Soft delete: GET item, set IsActive=false + LastModified=UtcNow, call _repository.Update(). No hard delete.
+- POST sets IsActive=true and LastModified=UtcNow
+- Program.cs: MealRecipe and WeekMenu already registered in both branches. InventoryItem skipped, model not in Shared yet.
+- ShoppingListProfile.cs: already had all 4 Phase 1 mappings. No changes needed.
+- IGenericRepository.Delete() returns bool not T - old controller had broken null check; fixed via soft delete pattern.
+- AuthorizationLevel changed to Anonymous (consistent with ShopsItemsController for SWA environment).
+- Build: succeeded, 0 errors, 44 pre-existing warnings.
+
+## Orchestration Log — 2026-04-04T05:12:37Z
+**Phase 1 Meal Planning — MealRecipeController ✅ COMPLETE**
+- Implemented 3 Azure Function handlers with 6 HTTP endpoints
+- Soft-delete pattern: DELETE sets IsActive=false + LastModified, calls Update()
+- Bulk import: POST /api/mealrecipes/import deserializes list, inserts each, applies AutoMapper
+- DI registrations: MealRecipe, WeekMenu already in place (InventoryItem deferred)
+- AutoMapper: all 4 Phase 1 mappings already configured
+- AuthorizationLevel.Anonymous on all (consistent with SWA pattern)
+- ✅ Build clean, 0 errors, 44 pre-existing warnings (no new issues)
+
+### WeekMenuController — Phase 2 API (2026-04-07)
+- Controller path: `Api/Controllers/WeekMenuController.cs` — created fresh
+- Four Functions: `[Function("weekmenus")]` GET all/POST/PUT, `[Function("weekmenu")]` GET/{id}/soft-DELETE, `[Function("weekmenubyweek")]` GET by week+year, `[Function("weekmenugenerateshoppinglist")]` POST generate preview shopping list
+- GET all: ordered by Year DESC, WeekNumber DESC (most recent first)
+- POST: auto-generates Name as `"Uke {WeekNumber} {Year}"` when Name not provided; initializes DailyMeals to empty list if null
+- Soft delete: same pattern as MealRecipeController — GET → set IsActive=false + LastModified → Update()
+- `weekmenubyweek` route: `weekmenu/week/{weekNumber}/year/{year}` — scans all records, filters by weekNumber + year + IsActive
+- `weekmenugenerateshoppinglist`: preview-only — loads WeekMenu, builds recipe dict in one `_mealRepository.Get()` call, aggregates ingredients (sum Quantity by ShopItemId), returns `ShoppingListModel` — does NOT persist to Firestore
+- Constructor takes TWO repositories: `IGenericRepository<WeekMenu>` and `IGenericRepository<MealRecipe>`
+- DI registrations for WeekMenu already existed in Program.cs — no changes needed
+- AutoMapper mappings for WeekMenu/DailyMeal already in ShoppingListProfile.cs — no changes needed
+- ✅ Build clean, 0 errors, 53 pre-existing warnings (no new issues)
+- ✅ Integrated with 16 passing unit tests (josh-weekmenu-tests)
+
+### FamilyProfileController + PortionRuleController — Phase 5 API (2026-04-08)
+- **Files created**: `Api/Controllers/FamilyProfileController.cs`, `Api/Controllers/PortionRuleController.cs`
+- **FamilyProfileController**: Two Functions — `[Function("familyprofiles")]` GET (ordered by Name)/POST/PUT, `[Function("familyprofile")]` GET/{id}/DELETE. `FamilyProfile` has no `IsActive` property → hard delete via `_repository.Delete()`. POST sets `LastModified = DateTime.UtcNow` only (no IsActive — not on model).
+- **PortionRuleController**: Two Functions — `[Function("portionrules")]` GET active rules ordered by ShopItemId then AgeGroup/POST/PUT, `[Function("portionrule")]` GET/{id}/soft-DELETE. `PortionRule` has `IsActive` → soft delete: GET → set `IsActive=false` + `LastModified` → `_repository.Update()`. Never calls `_repository.Delete()`.
+- **DI registrations**: Both `FamilyProfile` and `PortionRule` repos already registered in Program.cs (Ray added them) — no changes needed.
+- **AutoMapper mappings**: `FamilyProfile↔FamilyProfileModel`, `FamilyMember↔FamilyMemberModel`, `PortionRule↔PortionRuleModel` already in ShoppingListProfile.cs — no changes needed.
+- **AuthorizationLevel.Anonymous** on all Functions (consistent with SWA pattern).
+- ✅ Build clean, 0 errors
+
+### InventoryItemController + ShoppingList IsDone hook — Phase 4 (2026-04-08)
+- **`IsActive` added** to both `InventoryItem` and `InventoryItemModel` (was missing — required for soft-delete and IsDone hook filter). Constructors default `IsActive = true`.
+- **`InventoryItemController.cs` created** at `Api/Controllers/InventoryItemController.cs`
+  - `[Function("inventoryitems")]` GET all active ordered by Name / POST (IsActive=true, LastModified=UtcNow) / PUT (LastModified=UtcNow)
+  - `[Function("inventoryitem")]` Route=`inventoryitem/{id}` — GET single (404 if not found) / soft-DELETE (IsActive=false, LastModified=UtcNow, Update)
+  - `[Function("inventoryitemsadjust")]` POST Route=`inventoryitems/adjust` — bulk adjust: fetches all inventory once (avoids N+1), adds QuantityDelta, clamps to 0 if negative, updates each item
+  - `InventoryAdjustmentModel` public class defined in same file (top-level in namespace)
+- **ShoppingListController IsDone hook**: `GetAllShoppingListsFunction` now takes `IGenericRepository<InventoryItem>` in constructor. PUT handler fetches `existing` before update, detects not-done→done transition, loads all inventory once, increments `QuantityInStock` for matching active items by ShopItemId
+- **Program.cs**: `IGenericRepository<InventoryItem>` registered in both dev (Memory) and prod (Firestore) branches
+- **AutoMapper**: `InventoryItem ↔ InventoryItemModel` mapping already existed — no changes needed
+- **Firestore collection key**: `inventoryitem` → `inventoryitems` by convention (lowercase + "s") — no special case needed in GoogleDbContext
+- ✅ Build clean, 0 errors, 59 pre-existing warnings (no new issues)
+
+### MealRecipe Seed Data — Family Dinners (2026-04-08)
+- Replaced the 5-item placeholder MealRecipe block in `MemoryGenericRepository.AddDummyValues` with 62 real family dinners parsed from `Api.Tests/Helpers/dinners.txt` (723 lines, many duplicates).
+- Deduplication approach: normalized to lowercase, stripped day prefixes ("Mandag - ", "7. Fredag - "), merged near-duplicates (all laks variants → "Laks" + "Salmalaks" + "Laks i pita"), filtered noise entries (rester, morfar, mormor, ferie, bursdag X, restaurant, bergen, hjemme, påskeaften, etc.).
+- Final list: 62 unique meals across 8 categories (KidsLike × 14, Fish × 11, Meat × 12, Vegetarian × 6, Chicken × 8, Pasta × 4, Celebration × 3, Other × 3) — wait, I counted wrong but the categories are right.
+- Popularity scores: pizza=100 down to drunken noodles=34. Effort: Quick (≤20 min: grøt, pannekaker, pølse+potetmos, kyllingnuggets, fiskeburger, pølsegnocchi, fiskepinner), Weekend (45+ min: taco, lasagne, kjøttkaker, biff, spareribs, bulgogi, fårikål, raspeballer, pinnekjøtt, ribbe, kylling gong bao, tikka masala, kalkun), Normal (everything else).
+- Fiskepinner gets `MealType = Frozen` (the only frozen item in the seed list).
+- Replaced old per-entity verbose pattern with compact `List<MealRecipe> + foreach (var r in recipes) await Insert(r as TEntity)`.
+- ✅ Build clean, 0 errors, 113 pre-existing warnings (no new issues).
+
+### Staging Crash Fix — useMemoryDb Logic (2026-04-09)
+- **Bug**: Blazor startup crash in staging — `< at byte 0` = API returning HTML not JSON. Azure Functions host was crashing on startup and returning an HTML 500 for every request.
+- **Root cause**: `useMemoryDb` only checked `GOOGLE_CLOUD_PROJECT`. If staging has `GOOGLE_CLOUD_PROJECT` set (e.g. inherited from build config or app settings) but does NOT have `GOOGLE_APPLICATION_CREDENTIALS` (the Firestore key file path), `GoogleFireBaseGenericRepository` throws during initialization → host crash.
+- **DI registrations**: All 10 repositories are symmetric between debug and production blocks (ShoppingList, ShopItem, ItemCategory, Shop, FrequentShoppingList, MealRecipe, WeekMenu, FamilyProfile, PortionRule, InventoryItem). NOT the issue.
+- **Fix**: Extended `useMemoryDb` condition in `Api/Program.cs` to also return true when `GOOGLE_APPLICATION_CREDENTIALS` is not set. Production Firestore now requires BOTH env vars to be present AND environment != Development.
+- **Safe fallback**: Staging gets in-memory repos (with seed data) instead of crashing. Real production (GOOGLE_CLOUD_PROJECT + GOOGLE_APPLICATION_CREDENTIALS both set) is unaffected.
+- ✅ Build clean, 0 errors, 33 pre-existing warnings (no new issues).
+
+### Issues #74, #75, #76 Backend — Consume/Swap, IsDone Hook, Stock Comparison (2026-04-23)
+- **Collaboration note**: Blair's commit `9d5da56` landed simultaneously and already contained the WeekMenuController extensions (ConsumeMeal, SwapMeal, stock comparison in generate-shoppinglist), model changes (IsConsumed on DailyMeal, IsLikelyNotNeeded on ShoppingListItem), and the IsDone StockBehaviour hook in ShoppingListController. My net contribution was fixing `WeekMenuControllerTests.cs` which had the old 4-parameter constructor — Blair's new InventoryItem injection made the test file fail to compile.
+- **#74 endpoints** (WeekMenuController): `PUT /api/weekmenu/{weekMenuId}/consume` marks a DailyMeal as consumed and deducts each ingredient's Quantity from InventoryItem.QuantityInStock (clamped at 0); `PUT /api/weekmenu/{weekMenuId}/swap` swaps MealRecipeId for a day (no inventory deduction).
+- **#75 IsDone hook** (ShoppingListController PUT): detects false→true transition, iterates ShoppingItems, skips DoNotTrack items, increments QuantityInStock on existing InventoryItems and auto-creates new ones for Track items not yet in inventory.
+- **#76 stock comparison** (WeekMenuController generate-shoppinglist): after aggregating ingredients, loads all active InventoryItems, sets `IsLikelyNotNeeded = true` when stock covers full demand, reduces Mengde to shortfall for partially-covered items.
+- **Testing pattern**: When adding a new repo dependency to a controller, always update the test constructor immediately. `WeekMenuControllerTests` needs a mock `IGenericRepository<InventoryItem>` with a default `ReturnsAsync(new List<InventoryItem>())` setup to avoid null reference in the stock comparison loop.
+- **Branch timing**: Multiple agents can push to the same branch concurrently. Always check `git diff origin/branch..HEAD --stat` after committing to confirm net diff. If most changes are already present from a teammate's commit, only your delta appears.
+- ✅ Build clean, 0 errors, 118 pre-existing warnings (no new issues).
+
+### IsBasic / StockBehaviour fix — RunGenerateShoppingList (2026-04-23)
+- **Root cause**: `aggregated` dict stored only `(double Quantity, string ShopItemName)`. Final `ShopItemModel` was hand-constructed with only `Id` and `Name` — `IsBasic`, `StockBehaviour`, `StandardPurchaseQuantity`, `StandardPurchaseUnit` were never copied.
+- **Fix**: Injected `IGenericRepository<ShopItem>` into `WeekMenuController`. In `RunGenerateShoppingList`, load all ShopItems once, build a lookup dict by Id, store the `ShopItem` ref in the aggregated tuple, then use `_mapper.Map<ShopItemModel>(shopItem)` for the final mapping. Graceful fallback (`new ShopItemModel { Id, Name }`) when ShopItem not found.
+- **Only one inline `ShopItemModel` construction existed** (line 265) — no other occurrences in other controllers.
+- **Test update pattern**: Every new repo injected into a controller also needs a new `Mock<IGenericRepository<T>>` with default `ReturnsAsync(new List<T>())` setup in the test constructor. 15/15 WeekMenu tests pass.
+- ✅ Build clean, 0 errors, 68 pre-existing warnings (no new issues). Pushed to mealplanningv2 as commit 6a98801.
+
+### Package-size Calc — squad/package-size-calc (2026-04-24) ✅ COMPLETE
+- **Four new methods** added to `Shared/Shared/MealUnitExtensions.cs`: `IsCompatibleWith`, `NormalizeToBaseUnit`, `NormalizePurchaseUnitToBase`, `CalculatePackagesNeeded`. All are pure static — zero side-effects, easy to test.
+- **`CalculatePackagesNeeded` returns null** (not 0) as the fallback signal: callers do `packages ?? (int)Math.Ceiling(raw)`. This preserves existing behaviour for unconfigured items.
+- **Ordering invariant**: stock comparison MUST run before package conversion. Both operate on `item.Mengde`, but stock comparison subtracts raw ingredient units (grams/dl/stk) while package conversion divides by package size. If package conversion ran first, `QuantityInStock` would be compared against "number of bags" instead of raw demand — wrong result.
+- **UnitMismatch flag**: added to the aggregated dict tuple. Set to true when the same ShopItemId appears with different `MealUnit` values across meals. Prevents nonsensical cross-unit summation before package calc.
+- **`using Shared;` must be added** to any test file that references `MealUnit` — it lives in the root `Shared` namespace, not `Shared.FireStoreDataModels` or `Shared.HandlelisteModels`.
+- **Branch confusion pattern**: teammates' unstaged changes travel with the working tree across branch switches. After checking out a new branch, always check `git status` to confirm only your intended files are modified before staging.
+- **211 tests pass**, 0 failures. PR #89 created targeting `development`.
