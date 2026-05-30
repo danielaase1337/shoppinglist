@@ -42,6 +42,8 @@ namespace Api.Tests.Controllers
     {
         private readonly Mock<IGenericRepository<WeekMenu>> _mockWeekMenuRepository;
         private readonly Mock<IGenericRepository<MealRecipe>> _mockMealRecipeRepository;
+        private readonly Mock<IGenericRepository<InventoryItem>> _mockInventoryRepository;
+        private readonly Mock<IGenericRepository<ShopItem>> _mockShopItemRepository;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IMapper _mapper;
         private readonly WeekMenuController _controller;
@@ -53,6 +55,8 @@ namespace Api.Tests.Controllers
         {
             _mockWeekMenuRepository = new Mock<IGenericRepository<WeekMenu>>();
             _mockMealRecipeRepository = new Mock<IGenericRepository<MealRecipe>>();
+            _mockInventoryRepository = new Mock<IGenericRepository<InventoryItem>>();
+            _mockShopItemRepository = new Mock<IGenericRepository<ShopItem>>();
             _loggerFactory = NullLoggerFactory.Instance;
 
             var config = new MapperConfiguration(cfg =>
@@ -70,6 +74,8 @@ namespace Api.Tests.Controllers
                 _loggerFactory,
                 _mockWeekMenuRepository.Object,
                 _mockMealRecipeRepository.Object,
+                _mockInventoryRepository.Object,
+                _mockShopItemRepository.Object,
                 _mapper);
         }
 
