@@ -229,12 +229,14 @@ namespace Api.Controllers
                 // Build recipe lookup dictionary in a single repository call
                 var allRecipes = await _mealRepository.Get();
                 var recipeDict = allRecipes?
-                    .Where(r => r.IsActive)
+                    .Where(r => r.IsActive && r.Id != null)
                     .ToDictionary(r => r.Id, r => r) ?? new Dictionary<string, MealRecipe>();
 
                 // Build ShopItem lookup so IsBasic/StockBehaviour/StandardPurchase fields survive into the result
                 var allShopItems = await _shopItemRepository.Get();
-                var shopItemDict = allShopItems?.ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
+                var shopItemDict = allShopItems?
+                    .Where(s => s.Id != null)
+                    .ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
 
                 // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem, isBasic, unit, unitMismatch)
                 // UnitMismatch=true when the same ShopItem appears with different MealUnits across meals — in that case
@@ -312,7 +314,7 @@ namespace Api.Controllers
                 // the package conversion below so the subtraction stays in the same unit dimension.
                 var allInventory = await _inventoryRepository.Get();
                 var inventoryDict = allInventory?
-                    .Where(i => i.IsActive)
+                    .Where(i => i.IsActive && i.ShopItemId != null)
                     .GroupBy(i => i.ShopItemId)
                     .ToDictionary(g => g.Key, g => g.First())
                     ?? new Dictionary<string, InventoryItem>();

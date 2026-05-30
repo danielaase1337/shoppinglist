@@ -8,6 +8,9 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **ToDictionary null-key guard pattern**: `GoogleFireBaseGenericRepository` can return documents whose `Id` field is null (e.g., legacy data without the `[FirestoreProperty] Id` field stored). Always add `.Where(x => x.Id != null)` before `.ToDictionary(x => x.Id, x => x)` in generate/aggregate flows. Same applies to foreign-key fields like `ShopItemId` in `InventoryItem` — filter with `i.ShopItemId != null` before `GroupBy`. Without these guards, `ArgumentNullException` from `Dictionary` is caught by the controller's outer `try/catch` and returned as 500.
+- **Unit tests do not surface Firestore data-quality bugs**: Mocked repositories always return clean, non-null Id data. The null-key crash only manifests in production with real Firestore documents. Tests that exercise the generate flow must explicitly include a null-Id scenario to catch this.
+- `Api/Program.cs` uses environment variable `GOOGLE_CREDENTIALS` (not `#if DEBUG`) to switch between MemoryGenericRepository (development / no credentials) and GoogleFireBaseGenericRepository (production).
 - Controllers follow a function-per-endpoint pattern: `[Function("shopitems")]` (collection) and `[Function("shopitem")]` (single, `Route = "shopitem/{id}"`).
 - `Api/Program.cs` has `#if DEBUG` blocks — MemoryGenericRepository in debug, GoogleFireBaseGenericRepository in production.
 - `LastModified = DateTime.UtcNow` must be set on all POST and PUT operations. GET operations do lazy migration for null values.
