@@ -47,6 +47,12 @@
 - Verified no additional inline mappings in other controllers.
 - **Decision D34 merged** to `decisions.md`.
 
+### Issue #77 — Generated shopping lists keep ShopItem metadata (2026-05-29) ✅ COMPLETE
+- `WeekMenuController.RunGenerateShoppingList()` must not drop `IsBasic` items during aggregation; the frontend expects them in the collapsed “Basisvarer / Trolig ikke nødvendig” section.
+- When a `ShopItem` lookup exists, map the full entity with AutoMapper so `IsBasic`, `ItemCategory`, `Unit`, `StockBehaviour`, and purchase-size fields stay intact.
+- When the catalogue lookup misses, fallback `ShopItemModel` creation must still preserve `MealIngredient.IsBasic` so generated lists do not silently flatten basic items into ordinary items.
+- Added regression tests covering both mapped and fallback `IsBasic` scenarios.
+
 ### Security Audit — 2025-01-29
 - **CRITICAL BUG**: `GoogleDbContext.GetCollectionKey()` only maps 4 entity types. `FrequentShoppingList`, `MealRecipe`, `MealIngredient`, `WeekMenu`, and `DailyMeal` all resolve to `"misc"` in Firestore production — data corruption bug.
 - **Auth inconsistency**: `ShoppingListController` and `MealRecipeController` use `AuthorizationLevel.Function`; all other controllers are `AuthorizationLevel.Anonymous`. No user-level auth exists anywhere.

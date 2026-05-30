@@ -1,7 +1,5 @@
 # Squad Decisions
 
-**Last Updated:** 2026-04-03  
-**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 + Sprint 2 completion
 **Last Updated:** 2026-04-24  
 **Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback + Phase 5 completion review
 
@@ -102,50 +100,33 @@
 
 ## High-Priority Decisions (P1 — Required for Feature Completion)
 
-### D5 — Toast/Notification System
-**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
-**Issue:** #25 — Zero user feedback on async operations
-**Choice:** Option A — Custom `INotificationService` + `ToastContainer` component
+### D5 — Toast/Notification System Requirement
+**Status:** ⏸️ PENDING DECISION (needs design choice)  
+**Issue:** Zero user feedback on async operations. No toasts, spinners, or error messages.
 
-**Implementation:**
-- `Client/Services/INotificationService.cs` — Interface, `ToastMessage` model, `ToastType` enum
-- `Client/Services/NotificationService.cs` — Scoped service, fires `OnToast` event
-- `Client/Shared/ToastContainer.razor` — Renders/dismisses toasts, auto-dismiss 3-5s per type
-- CSS animations — Slide-in/out, fixed bottom-right, mobile responsive (responsive width on ≤480px)
+**Constraint:** Must implement before building meal planning UI or auth UI (both have async operations)
 
-**API:**
-```csharp
-@inject INotificationService Notifications
-Notifications.Success("Item saved");       // 3s auto-dismiss
-Notifications.Error("Failed to save");     // 5s auto-dismiss
-```
+**Options:**
+- A) Implement custom `INotificationService` + `ToastContainer` component
+- B) Integrate third-party library (e.g., CxListen, MudBlazor notifications)
 
-**Architecture:** Event-driven, no polling, scoped DI, `IDisposable` for cleanup, stacking support.
+**Recommendation (Blair):** Option A (custom). Simpler, faster, avoids dependency. Takes ~1 day.
 
-**Proof of Concept:** Integrated in `OneShoppingListPage.razor` (`AddVare()`, `DeleteVare()` operations).
-
-**Unblocked:** #28 (shop deletion UX), meal planning UI + toast feedback.
+**Decision Needed By:** Before Sprint 1 UI/UX work
 
 ---
 
 ### D6 — Mobile Drag-and-Drop Replacement
-**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
-**Issue:** #27 — HTML5 drag-and-drop broken on iOS Safari
-**Choice:** Option B — Up/down button controls as primary, drag as desktop enhancement
+**Status:** ⏸️ PENDING DECISION (needs design choice)  
+**Issue:** HTML5 drag-and-drop broken on iOS Safari. ShopConfigurationPage and CategoryManagementPage unusable on iPhone/iPad.
 
-**Implementation:**
-- `ShopConfigurationPage` — Added `▲ Flytt opp` / `▼ Flytt ned` buttons per shelf (disabled on first/last)
-- `MoveShelfUp(shelf)` / `MoveShelfDown(shelf)` maintain SortIndex invariant (same as `HandleDrop`)
-- Grip icon (`fas fa-grip-vertical`) hidden on touch devices via `@media (pointer: coarse)`
-- `CategoryManagementPage` — Added `+` button to assign categories to shelves (touch-friendly alternative to drag)
-- Category chip has `<select>` dropdown for mobile item-to-category assignment
+**Options:**
+- A) Add JS polyfill for touch drag events
+- B) Provide up/down button controls as primary interaction; drag as desktop enhancement
 
-**Architectural Notes:**
-- `@media (pointer: coarse)` must be written `@@media` in Blazor `<style>` blocks
-- Syncfusion `ChangeEventArgs` disambiguation — always use `Microsoft.AspNetCore.Components.ChangeEventArgs`
-- SortIndex invariant preserved across both button + drag interaction paths
+**Recommendation (Blair):** Option B. Simpler, accessible, reliable cross-platform. Button controls work everywhere.
 
-**Result:** Mobile-friendly primary interaction, desktop power-user drag preserved as enhancement.
+**Decision Needed By:** Before mobile redesign sprint
 
 ---
 
@@ -278,27 +259,16 @@ Notifications.Error("Failed to save");     // 5s auto-dismiss
 ---
 
 ### D10 — LastModified Migration Strategy
-**Status:** ✅ IMPLEMENTED (Ray + Glenn, Sprint 2)  
-**Issue:** #31 — N+1 inline migration in ShoppingListController fires writes on every GET
-**Choice:** Option A — Extract to one-time `/api/admin/migrate-lastmodified` endpoint
+**Status:** ⏸️ PENDING DECISION  
+**Issue:** Current N+1 inline migration in ShoppingListController fires writes on every GET for un-migrated docs
 
-**Implementation:**
-- Created `Api/Controllers/AdminController.cs`
-- Endpoint `GET /api/admin/migrate-lastmodified`:
-  - Gated by `"admin"` role (from SWA `x-ms-client-principal` header)
-  - Iterates all `ShoppingList` documents with null `LastModified`
-  - Sets `LastModified = DateTime.UtcNow` and persists each
-  - Returns `{ "migratedCount": N }`
-  - Idempotent — safe to re-run
-- Removed inline lazy migration from `ShoppingListController.RunAll()` and `RunOne()`
+**Options:**
+- A) Extract to one-time `GET /api/admin/migrate` endpoint, run once, disable
+- B) Accept self-correction over time (all lists migrated as users visit them)
 
-**Trade-offs:**
-- ✅ GET endpoints now fully read-only — no write side-effects
-- ✅ Migration idempotent — documents already having `LastModified` are skipped
-- ✅ Follows precedent of `MigrateFrequentListsController`
-- ⚠️ Legacy documents won't self-heal via GET; run endpoint once after deployment
+**Recommendation (Ray):** Option A. Reduces wasted write operations and improves GET response time.
 
-**Follow-up:** Assign "admin" role to Daniel in Azure SWA roles management before running against production.
+**Decision Needed By:** Before launch (low urgency)
 
 ---
 
@@ -409,121 +379,6 @@ Notifications.Error("Failed to save");     // 5s auto-dismiss
 
 ---
 
-## Sprint Closure — Auth Chain Verification (2026-03-30)
-
-**Lead:** Peter (General-Purpose Agent)  
-**Request:** Daniel Aase — Close GitHub issues completed by auth work  
-**Result:** ✅ All three auth chain issues (#22, #23, #24) verified as shipped and closed
-
-### Closed Issues
-
-#### ✅ #22 — Auth: Configure staticwebapp.config.json for Microsoft provider only
-**Status:** CLOSED  
-**Completed:** 2026-03-28  
-**Commit:** b2e32fe  
-
-**What was shipped:**
-- `Client/wwwroot/staticwebapp.config.json` — Microsoft (AAD) provider configured
-  - All routes protected by `"authenticated"` role (except static assets, `/api/*`, auth endpoints)
-  - 401 responses redirect to `/welcome` (landing page for signed-out users)
-  - Static resources (/_framework/*, /css/*, /js/*, /img/*, etc.) remain public
-  - SPA fallback routing preserved for Blazor navigation
-- `/api/*` intentionally left anonymous — per D2 v1 scope, no per-user enforcement yet
-- `Api/local.settings.example.json` — Added `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` placeholders
-
----
-
-#### ✅ #23 — Auth: Parse x-ms-client-principal header in ControllerBase
-**Status:** CLOSED  
-**Completed:** 2026-03-28  
-**Commit:** 0c91d2e  
-
-**What was shipped:**
-- `Api/Auth/ClientPrincipal.cs` — Parses `x-ms-client-principal` header (base64-encoded JSON)
-  - Safe: handles null/malformed headers, never throws
-  - Exposes `IdentityProvider`, `UserId`, `UserDetails`, `UserRoles` properties
-  - `IsAuthenticated` property checks for `"authenticated"` role membership
-  
-- `Api/Auth/AuthExtensions.cs` — HttpRequest extension helpers
-  - `GetClientPrincipal()` — parses and returns principal
-  - `IsAuthenticated()` — shorthand auth status check
-  - `GetUserId()`, `GetUserName()` — user detail accessors
-  
-- `Api/Controllers/ControllerBase.cs` — Protected helper methods
-  - `GetCurrentUser(req)` — returns `ClientPrincipal` or null
-  - `GetCurrentUserId(req)`, `GetCurrentUserName(req)` — shorthand accessors
-  
-- `Api.Tests/Helpers/AuthTestHelpers.cs` — Test fixtures
-  - `CreateAuthenticatedRequest()` — builds mock request with x-ms-client-principal
-  - `CreateUnauthenticatedRequest()` — request without header
-  - `CreateRequestWithRoles()` — request with custom role list
-
-**Per D2 (v1 scope):** API reads principal for logging; future v2 will enforce per-user data access via FamilyId.
-
----
-
-#### ✅ #24 — Auth: LoginPage.razor + AuthorizeRouteView in App.razor
-**Status:** CLOSED  
-**Completed:** 2026-03-28 (UI committed), 2026-03-30 (auth policy refined)  
-**Commits:** 40ecc0f, 5984891  
-
-**What was shipped:**
-- `App.razor` — AuthorizeRouteView with fallback
-  - Wraps all routes with `<AuthorizeRouteView>`
-  - `<NotAuthorized>` block: Login prompt card with "Logg inn med Microsoft" link
-  - Authenticated users see `MainLayout`; unauthenticated see NotAuthorized UI
-  
-- `Client/Auth/SwaAuthenticationStateProvider.cs` — Implements `AuthenticationStateProvider`
-  - Reads `/.auth/me` endpoint (SWA built-in auth metadata)
-  - Constructs `ClaimsPrincipal` with Name, NameIdentifier, Role claims
-  - Gracefully returns unauthenticated principal on error (no exception leaks)
-  
-- `Client/Shared/LoginDisplay.razor` — Authenticated user display in nav
-  - Shows user name (from `UserDetails`)
-  - Logout link redirects to `/welcome` before calling SWA logout
-  - Integrated into nav-auth slot in `NewNavComponent.razor`
-  
-- `Client/Program.cs` — Auth registration
-  - `AddAuthorizationCore(options => options.FallbackPolicy = options.DefaultPolicy)` — **all routes require auth by default**
-  - `AddCascadingAuthenticationState()` — auth state cascade to child components
-  - `SwaAuthenticationStateProvider` scoped registration
-  
-- `_Imports.razor` — Added `@using Microsoft.AspNetCore.Authorization` directive
-
-**Auth fallback policy refinement (2026-03-30, commit 5984891):**
-- Set `FallbackPolicy = DefaultPolicy` so all routes require authentication by default
-- Public pages must use `[AllowAnonymous]` attribute explicitly
-- Enables `/welcome` landing page for signed-out users (exempted in SWA config)
-
----
-
-### Open Backlog (Deferred to Sprint 3+)
-
-**#25–#33:** Feature issues remain open (not auth work, require separate implementation sprints)
-- #25 (toast system) — Not verified as shipped
-- #26 (nav accessibility) — Marked complete in history (D7), but not verified in this session
-- #27 (mobile drag) — Not verified
-- #28 (shop deletion) — Depends on #25 (toast), not verified
-- #29 (meal scoping) — Scoping issue, no implementation shipped
-- #30 (i18n architecture) — Not verified
-- #31 (LastModified migration) — Not verified
-- #32 (ManageMyShopsPage) — Not verified
-- #33 (controller test rewrite) — Not verified
-
----
-
-### Unblocking Status
-
-**Auth chain complete ✅**
-- #22 → #23 → #24 all verified done
-- Downstream features now unblocked:
-  - **#25** (toast system) — can now integrate with auth-required pages
-  - **#26** (nav accessibility) — can now add meal planning nav entries
-  - **#28** (shop deletion) — depends on #25, can proceed once toast ready
-
-**Blocking dependencies remain:**
-- #29 (meal scoping) — must be completed before meal implementation (#30+)
-- #18 + #19 (CI tests) — should be completed before #33 (test rewrite)
 ## Phase 4: Inventory Management (P1 — Feature Implementation)
 
 ### D-Phase4-Inventory-1: InventoryItem IsActive Property
@@ -987,113 +842,6 @@ SWA's built-in authentication handles the post-login redirect automatically when
 
 ---
 
-### D30 — Staging Auth Fix — 401 Redirect + ClaimsIdentity + Authorizing Template
-**Status:** ✅ IMPLEMENTED (Blair, 2026-03-28)  
-**Branch:** sprint/2
-
-**Context:** After adding `FallbackPolicy = DefaultPolicy` to `Client/Program.cs`, the staging app became stuck on the index.html loading spinner and never transitioned to the Blazor app.
-
-Three root causes were identified and fixed.
-
-#### 1. ClaimsIdentity must always have a non-null authenticationType
-
-**File:** `Client/Auth/SwaAuthenticationStateProvider.cs`  
-**Change:** `principal.IdentityProvider ?? "aad"` instead of bare `principal.IdentityProvider`  
-**Rationale:** `ClaimsIdentity.IsAuthenticated` returns `false` when `authenticationType` is null or empty — regardless of whether claims are populated. SWA's `/.auth/me` can return a null `IdentityProvider` field. The fallback `"aad"` is always safe for our Microsoft-only auth config (D1).
-
-#### 2. `<Authorizing>` template is required in App.razor
-
-**File:** `Client/App.razor`  
-**Change:** Added `<Authorizing>` spinner template inside `<AuthorizeRouteView>`  
-**Rationale:** While `GetAuthenticationStateAsync()` is in-flight (real network call to `/.auth/me` on SWA), `AuthorizeRouteView` renders nothing without an `<Authorizing>` template. Blazor has replaced the index.html spinner, leaving a blank/white screen that appears as "stuck loading". The spinner gives users correct feedback.
-
-#### 3. 401 redirect must point to `/.auth/login/aad`, not `/welcome`
-
-**File:** `Client/wwwroot/staticwebapp.config.json`  
-**Change:** `responseOverrides["401"].redirect` changed from `/welcome` to `/.auth/login/aad`. Removed dead `/welcome` anonymous route entry.  
-**Rationale:** No `Welcome.razor` page exists. Redirecting to `/welcome` served `index.html` (via navigationFallback), Blazor loaded, found no matching route, and produced confusing behaviour. Using `/.auth/login/aad` directly is cleaner — SWA handles the post-login redirect automatically. This also aligns with the existing learning in D27 that `{request.path}` doesn't work in `responseOverrides`.
-
-**Constraints Respected:**
-- FallbackPolicy (`DefaultPolicy`) is NOT removed — auth enforcement stays.
-- `<NotAuthorized>` template is preserved in `App.razor`.
-- No `Welcome.razor` page was created — the redirect no longer needs it.
-- D1 (Microsoft provider only) respected — `"aad"` fallback aligns with AAD-only config.
-
----
-
-### D31 — Sprint 2 Scope — UI/UX Foundation + Testing
-**Status:** 🟡 PENDING APPROVAL (awaiting Daniel review)  
-**Owner:** Peter (Lead/Architect)  
-**Date:** 2026-XX-XX
-
-**Problem:** Sprint 0 (P0 bugs) is complete. Auth chain is verified and merged. We need a clear, realistic scope for Sprint 2 that:
-1. Unblocks downstream feature work (meal planning, shop management)
-2. Addresses P1 technical debt (#33 test rewriting is BLOCKING)
-3. Closes high-value P2 issues without overloading the team
-4. Respects existing architectural decisions (D1-D30)
-
-**Decision:** Sprint 2 will tackle 8 issues: 2 P1 (blocking), 6 P2 (high-value).
-
-#### P1 (Blocking — Must Complete)
-1. **#33 — Testing: Rewrite API controller tests** (Josh)
-   - Currently: 65 tests mock everything, zero controller code executed
-   - Action: Refactor to test actual controller methods
-   - Unblocks: Sprint 7 (full test audit) and catches auth regressions early
-   - Effort: Medium
-
-2. **#25 — UI: Toast/notification system** (Blair)
-   - Implements decision D5 (Option A: custom INotificationService)
-   - Blocks: #28 (shop deletion UX) and future meal planning UI
-   - Effort: Low (estimated 1 day per D5 recommendation)
-
-#### P2 (High-Value Feature Work)
-3. **#27 — UI: Mobile drag-and-drop buttons** (Blair)
-   - Replaces broken iOS drag-and-drop with up/down buttons
-   - Used by: #32 (ManageMyShopsPage reorder controls)
-   - Effort: Medium
-
-4. **#28 — Feature: Shop deletion safeguards** (Blair+Glenn)
-   - Multi-step confirm + cascade check
-   - **Dependency:** Requires #25 (toast) code-complete
-   - Effort: Medium
-
-5. **#29 — Scoping: Meal Planning v1** (Peter)
-   - **SCOPING ONLY — NO IMPLEMENTATION**
-   - Capture v1 requirements + architecture decisions
-   - Aligns with D18 (v1 = text history + suggestions, NOT recipe CRUD)
-   - Effort: Low (1-2 days for scope doc + Daniel alignment)
-
-6. **#30 — Feature: i18n resource architecture** (Blair)
-   - Creates `.resx` file structure + LocalizationService
-   - No UI language switch yet (architecture only)
-   - Effort: Low-Medium
-
-7. **#31 — Feature: LastModified migration endpoint** (Ray+Glenn)
-   - Extract inline lazy migration from ShoppingListController
-   - Create one-time `GET /api/admin/migrate-lastmodified` endpoint
-   - Improves GET response time
-   - Effort: Medium
-
-8. **#32 — Feature: Complete ManageMyShopsPage** (Blair)
-   - Shelf/category list + reorder controls (using #27 buttons)
-   - Currently: stub with only title placeholder
-   - Effort: Medium-High
-
-**Team Capacity:** 30–37 team-days estimated; fits 80 team-days available in 2-week sprint
-
-**Critical Path Dependencies:**
-- #25 (Toast) → #28 (Shop deletion) depends on toast
-- #27 (Buttons) → #32 (ManageMyShopsPage) uses buttons
-- #33 (Tests) unblocks Sprint 7 + catches regressions
-
-**Success Criteria:**
-1. All 8 issues closed
-2. All PRs merged to `development`
-3. `development` branch builds + tests pass (90 API + 61 Client + E2E)
-4. Staging deployment successful
-5. No regressions in shopping list functionality
-6. Code review completed by Peter + team leads
-7. Mobile testing completed for #27
 ## Phase 6: Staging Bug Fix (P0 — Critical Production Issue)
 
 ### D-Phase6-SWA-Auth-1: ShoppingListController AuthorizationLevel
@@ -1169,6 +917,74 @@ Small muted `pk: 400g` label below the unit badge when pakkestørrelse is set.
 Guarded by `StandardPurchaseQuantity > 0 && !string.IsNullOrEmpty(StandardPurchaseUnit)` — shows nothing for items without package info.
 
 **Rationale:**
+- Three equal columns (IsBasic / Spor lager / Pakkestørrelse) are cleaner than four unequal ones
+- EditClicked pattern enables consistent styling across inventory edit UI
+- Package-hint reduces cognitive load when scanning inventory for purchase orders
+
+---
+
+### D34 — Issue #70 Meal Ingredient Inline Edit Pattern
+**Status:** ✅ IMPLEMENTED (Blair, 2026-05-29, PR #91)  
+**Component:** Client/Pages/Meals/OneMealRecipePage.razor  
+**Decision:** Use `MealIngredientModel.EditClicked` + `CssComleteEditClassName` pattern for ingredient inline-edit state, and render the editor in an expanded row below the read-only ingredient row.
+
+**Why:** 
+- The shared `edit` CSS class is designed for block containers, not `<tr>` elements
+- An expanded editor row keeps table layout stable
+- Preserves existing ingredient list readability
+- Avoids mutating checkbox values outside explicit save/cancel flow
+
+**Implementation Details:**
+- Editable fields: Quantity, Unit, Optional flag
+- Scoped CSS styling for edit state highlight (OneMealRecipePage.razor.css)
+- Save ingredient edits with `PUT` to `MealRecipes` endpoint via ISettings
+- Meal ingredients are embedded within recipe model → no dedicated ingredient endpoint
+
+**Rationale for Shared Pattern:**
+- `EditClicked` property on model enables consistent toggle across page
+- `CssComleteEditClassName` computed property (`edit` class) applies styling
+- Reduces duplication from manually tracking edit state per ingredient
+
+---
+
+### D35 — Triage Summary: Issues #84–#77 (2026-04-24)
+**Status:** ✅ TRIAGED (Peter, 2026-05-29)  
+**Context:** Daniel's ongoing UX feedback on PR #67 sprint + follow-up issues from sprint review  
+
+**Summary:** All 8 issues triaged. **3 assigned to Blair (frontend UX)**, **4 assigned to Glenn (backend API)**, **1 assigned to Ray (Firestore)**. Priority split: **1 P1 bug**, **6 P2 features**, **1 P2 technical debt**.
+
+**Issues Assigned:**
+
+| Issue | Title | Owner | Priority | Rationale |
+|-------|-------|-------|----------|-----------|
+| #84 | Fjern Bytt-knappen fra ukemeny — dropdown alltid redigerbar til spist | **Blair** | P2 | Frontend UX simplification: merge swap-dropdown into main dropdown, remove swap button. Edit disabled only when IsConsumed=true. |
+| #83 | UI: Mobile responsiveness — pages need wrapping and priority-based layout | **Blair** | P2 | Mobile-first family app: meal pages, inventory, profiles need CSS media queries and priority-based content stacking. |
+| #82 | UI: Improve ShopItem admin — unit as dropdown + better field display | **Blair** | P2 | UI consistency: ShopItem unit field should be SfDropDownList (not free text), matching OneMealRecipePage pattern. |
+| #81 | Feature: Undo consume (angre 'spist') on week menu with deferred stock deduction | **Glenn** | P2 | Backend feature: new PUT `/api/weekmenu/{id}/unconsume` endpoint. Re-adds ingredients to inventory. UI hook from Blair. |
+| #80 | Tech debt: Unused WeekMenuConsume/WeekMenuSwap enum values in ShoppingListKeysEnum | **Glenn** | P2 | Housekeeping: dead enum values (never wired up). Address during next refactor or wire up properly in ISettings. |
+| #79 | Tech debt: N+1 Firestore write pattern in IsDone stock hook | **Ray** | P2 | Firestore optimization: per-item writes acceptable for v1 (5–15 items typical). Future work: batch write refactor. Monitor. |
+| #78 | Tech debt: No transaction guarantee in consume-meal endpoint | **Glenn** | P2 | Low risk for v1 (stock is approximate). Future: compensating transaction or Firestore batch write with Ray. |
+| #77 | **BUG: Varen.IsBasic not populated in generated shopping lists** | **Glenn** | **P1** | **BUG (P1)**: GenerateShoppingList constructs ShopItemModel with only Id/Name; IsBasic=false. Frontend grouping logic dead for generated lists. Fix: populate IsBasic during aggregation or fetch full ShopItem. |
+
+**Assignment Rationale:**
+- **Blair (Frontend / UI):** #84, #82, #83 — pure frontend improvements, consistent UI patterns, mobile responsiveness
+- **Glenn (Backend / API):** #81 (feature endpoint), #80 (enum cleanup), #78 (consume transaction), #77 (P1 bug data population)
+- **Ray (Firestore / Firebase):** #79 (write patterns optimization); #78 will involve Ray for batch write design
+
+**Cross-Cutting Concerns:**
+1. **#78 + #79 interaction:** Both point to future Firestore batch write refactor. Ray should design batch pattern; Glenn implements `/consume` and `/unconsume` to use it.
+2. **#81 requires #84 coordination:** If #84 removes swap logic, #81's consume/unconsume flow must be clear in UI.
+3. **#77 is P1 blocker:** Must fix before PR #67 merge. Glenn should prioritize.
+
+**Key Decision: N+1 Writes Acceptable for v1**
+- Small list sizes (5–15 items typical) make individual Firestore updates acceptable
+- Batch pattern is future optimization, not v1 blocker
+- Stock is explicitly approximate ("Estimert lager"); partial state acceptable for v1
+
+**Key Decision: Stock Isolation Strategy**
+- UI simplification unblocks better UX (remove swap button complexity)
+- Aligns with "smallest correct solution" principle
+- Prioritizes user experience over feature completeness
 - UX simplifcation: fewer, clearer controls reduce cognitive load
 - Consistency: reuses existing patterns (input-group, SfComboBox, unit options)
 - Space efficiency: 3 columns vs. 4, icon buttons for quick actions
@@ -1187,541 +1003,3 @@ Guarded by `StandardPurchaseQuantity > 0 && !string.IsNullOrEmpty(StandardPurcha
 - Archive resolved decisions to history.md when next session completes
 
 ---
-
-## Sprint 2 Completion — New Decisions (2026-04-03)
-
-### D31 — Shop Deletion Safeguards (Dependency Check)
-**Status:** ✅ IMPLEMENTED (Blair + Glenn, Sprint 2)  
-**Issue:** #28 — Shop deletion requires multi-step confirmation + cascade check
-**Ownership:** Blair (frontend UI), Glenn (API endpoint)
-
-**Implementation:**
-
-**API Backend (Glenn):**
-- Endpoint: `GET /api/shop/{id}/dependencies`
-- Returns: List of `ShoppingList` documents referencing this shop's sort config
-- Response: `{ "shopId": "...", "dependentLists": [ { "id": "...", "name": "..." } ], "isDeletable": bool }`
-- If no dependencies: `isDeletable = true`
-
-**Frontend UI (Blair):**
-- `ManageMyShopsPage.razor` — Two-step deletion flow
-  1. User clicks delete icon → inline prompt "Slett?" (single click shows confirmation)
-  2. Confirm button triggers `CheckDependencies()` → calls API endpoint
-  3. If dependencies exist:
-     - Modal shows "Liste(r) bruker denne butikken:" + list of dependent lists
-     - User must remove shop from those lists first OR cancel
-  4. If no dependencies:
-     - Proceed to deletion
-     - Success toast: "Butikk slettet"
-  5. On failure: Error toast with reason
-
-**Integration with #25 (Toast System):** Toast provides user feedback for all three outcomes (checking, success, error).
-
----
-
-### D32 — i18n Resource File Architecture
-**Status:** ✅ IMPLEMENTED (Blair, Sprint 2)  
-**Issue:** #30 — Add i18n resource file infrastructure for future English localization
-
-**Implementation:**
-
-**Resource Files:**
-```
-Client/Resources/
-├── SharedResources.cs                 (marker class, empty)
-├── SharedResources.nb-NO.resx         (Norwegian strings — v1 default)
-└── SharedResources.en.resx            (English template for v2+)
-```
-
-**Key Naming Convention:** `{PageOrScope}_{DescriptiveName}`
-
-**Page-Scoped Prefixes:**
-- `ShoppingLists_` → `ShoppingListMainPage.razor`
-- `OneShoppingList_` → `OneShoppingListPage.razor`
-- `FrequentLists_` → `FrequentListsPage.razor`
-- `Shops_` → `ManageMyShopsPage.razor`
-- `ShopItems_` → Item admin pages
-- `Categories_` → `CategoryManagementPage.razor`
-- `Common_` → Shared across 3+ pages
-
-**Service Registration:**
-```csharp
-builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
-```
-
-**Usage Pattern in Razor:**
-```csharp
-@using BlazorApp.Client.Resources
-@using Microsoft.Extensions.Localization
-@inject IStringLocalizer<SharedResources> L
-
-<h2>@L["ShoppingLists_PageTitle"]</h2>
-```
-
-**Proof-of-Concept:** `ShoppingListMainPage.razor` fully converted to use `@L[]` pattern.
-
-**Future Activation:** Set `System.Globalization.CultureInfo.DefaultThreadCurrentUICulture` in `Program.cs` to enable English (no UI switcher for v1 — config flag only).
-
-**What NOT to Localize:**
-- Firestore property names (`Varen`, `Mengde`, `ItemCateogries`) — permanent data constraint
-- Internal enum values + code identifiers
-- Debug console messages
-
----
-
-### D33 — API Controller Test Pattern (Real Controller Methods)
-**Status:** ✅ IMPLEMENTED (Josh, Sprint 2)  
-**Issue:** #33 — Rewrite 65+ API tests to exercise actual controller code paths
-
-**Problem:** Previous tests called mocks directly, bypassing controllers entirely. Zero controller code coverage.
-
-**Solution:** All controller test classes instantiate real controller + call methods directly.
-
-**Pattern:**
-```csharp
-public class ShopsControllerTests
-{
-    private readonly Mock<IGenericRepository<Shop>> _mockRepo;
-    private readonly IMapper _mapper;
-    private readonly ShopsController _controller;
-
-    public ShopsControllerTests()
-    {
-        _mockRepo = new Mock<IGenericRepository<Shop>>();
-        var config = new MapperConfiguration(cfg =>
-            cfg.AddProfile<Api.ShoppingListProfile>()
-        );
-        _mapper = config.CreateMapper();
-        _controller = new ShopsController(NullLoggerFactory.Instance, _mockRepo.Object, _mapper);
-    }
-
-    [Fact]
-    public async Task Run_GET_ReturnsOk_WhenShopsExist()
-    {
-        _mockRepo.Setup(r => r.Get()).ReturnsAsync(new List<Shop> { /* data */ });
-        var request = TestHttpFactory.CreateGetRequest();
-        var response = await _controller.Run(request);  // Real controller method
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-}
-```
-
-**Key Rules:**
-1. Always use `TestHttpFactory` for `HttpRequestData` — never raw mock (breaks `WriteAsJsonAsync`)
-2. Use `cfg.AddProfile<Api.ShoppingListProfile>()` — never manual map config
-3. Call real controller methods: `Run()`, `RunAll()`, `RunOne()`
-4. Assert on HTTP status codes + response bodies (not mock return values)
-5. Test all error paths (null, exception, validation failures)
-6. Use ASCII-safe test data names (JSON escaping complicates Norwegian assertions)
-7. Every controller needs explicit `using Xunit;`
-
-**Coverage:**
-- `ShoppingListControllerRealTests.cs` — 18 tests (original sprint 0 work)
-- `ShopsControllerTests.cs` — 15 tests (new #33)
-- `ShopsItemsControllerTests.cs` — 14 tests (new #33)
-- `ShopItemCategoryControllerTests.cs` — 13 tests (new #33, includes security assertions)
-- `FrequentShoppingListControllerTests.cs` — 14 tests (new #33)
-- **Total: 122 passing tests**
-
-**Additional Helper File:**
-- `Api.Tests/Helpers/TestHttpHelpers.cs` — `TestHttpFactory`, `TestHttpRequestData`, `TestHttpResponseData`
-
-**Test Infrastructure Quality:**
-- ✅ Real AutoMapper profile used (production-identical)
-- ✅ Actual controller instantiation (not proxy)
-- ✅ All error cases tested (null, exception, validation)
-- ✅ Auth integration validated
-- ✅ No regressions in existing 90 API tests
-
----
-
-### D34 — Meal Planning v1 Scope Document Finalized
-**Status:** ✅ DECIDED (Peter, Sprint 2)  
-**Issue:** #29 — Scoping-only ticket, no implementation
-**Ownership:** Peter (architect/lead)
-
-**v1 Definition (FINAL):**
-- **NOT recipe CRUD** — text-based meal history viewer with frequency-based suggestions
-- **Data Model:** `WeekMenuText` entity with `Dictionary<string, string> DailyMeals` (one key per day, free text values)
-- **Collection:** `weekmenutexts` (follows D4 convention)
-- **Suggestion Engine:** Simple frequency-based random picker from historical entries (no ML)
-- **UI:** 2 pages (`WeekMenuTextListPage`, `WeekMenuTextPage`)
-- **API Endpoints:** 6 total (GET all, GET one, POST create, PUT update, DELETE, POST suggest)
-
-**Implementation Tickets Ready (6 total, 13-16 team-days):**
-1. Backend data model + controller (Ray + Glenn, 3-4 days)
-2. Suggestion algorithm (Glenn, 2-3 days)
-3. Frontend list page (Blair, 2-3 days)
-4. Frontend editor page (Blair, 3-4 days, blocked on #25 toast)
-5. Navigation integration (Blair, 0.5 days)
-6. E2E tests (Josh, 1-2 days)
-
-**v1 vs v2 Boundary (CLEAR):**
-- v1: Text entries + frequency suggestions only
-- v2: Recipe CRUD + ingredients + shopping list generation
-- Separate entities, separate collections, zero data migration path
-
-**All 6 Scope Questions Answered:**
-1. ✅ Data format: Flat Dictionary with one key per day
-2. ✅ Storage: Single entity per week with text dictionary
-3. ✅ Suggestion: Frequency-based random picker from history
-4. ✅ UI: 2 pages (list overview + week editor)
-5. ✅ Import: Manual text entry only (file upload v2+)
-6. ✅ Integration: Standalone (shopping list v2+)
-
-**Detailed Decision Document:** `.squad/agents/peter/meal-planning-v1-scope.md` (12-section comprehensive scoping)
-
-**Next Step (Blocked on Daniel):** Daniel reviews scope → approves 6 implementation tickets → Peter creates GitHub issues → Team begins Sprint 3 implementation.
-
----
-
-### D35 — Data Layer Analysis for Migration Endpoint (Ray's Audit)
-**Status:** ✅ ANALYSIS COMPLETE (Ray, Sprint 2)  
-**Issue:** #31 (part of LastModified migration)
-**Ownership:** Ray (Firebase expert)
-
-**Finding:** All data layer primitives Glenn needs for the migration endpoint already exist. No interface changes required.
-
-**Key Findings:**
-1. `IGenericRepository<T>.Get()` returns all documents — exactly what migration needs
-2. `IGenericRepository<T>.Update(T)` persists single entity — correct for backfilling
-3. `GoogleFireBaseGenericRepository<T>` implements full-scan `Get()` via `Collection.GetSnapshotAsync()`
-4. `MemoryGenericRepository<T>` has feature parity for DEBUG mode
-5. `EntityBase` includes `LastModified` property (part of base class)
-
-**Trade-offs Noted:**
-- No write batching (uses `SetAsync()` per document) — acceptable for expected list volume (<500 documents)
-- Idempotent design (guard: `if (!LastModified.HasValue)`) prevents re-writing already-migrated docs
-- Partial failure risk (transient errors) — acceptable, endpoint re-runnable
-
-**Verdict:** ✅ No changes to repository interfaces or implementations needed.
-
-**No Commit:** Analysis-only task; Glenn receives handoff for endpoint implementation.
-
----
-
-## Issues Closed This Sprint — Final Summary
-
-| # | Issue | Owner(s) | Component | Status |
-|---|-------|----------|-----------|--------|
-| 25 | Toast/Notification System | Blair | Frontend | ✅ INotificationService + ToastContainer |
-| 27 | Mobile Drag-and-Drop Replacement | Blair | Frontend | ✅ Up/down buttons + category `+` button |
-| 28 | Shop Deletion Safeguards | Blair + Glenn | Frontend + API | ✅ Dependency check endpoint + 2-step UI |
-| 31 | LastModified Migration Endpoint | Ray + Glenn | Data + API | ✅ Admin endpoint, removed inline migration |
-| 29 | Meal Planning v1 Scoping | Peter | Architecture | ✅ Scope finalized, 6 implementation tickets ready |
-| 32 | ManageMyShopsPage Completion | Blair | Frontend | ✅ Shelf/category list + reorder + delete |
-| 30 | i18n Resource Architecture | Blair | Frontend | ✅ Resource files + IStringLocalizer pattern |
-| 33 | API Controller Test Rewrite | Josh | Testing | ✅ 122 tests, real controller methods |
-
-**Sprint 2 Metrics:**
-- ✅ 8 issues closed
-- ✅ 46 story points delivered
-- ✅ 122 API + 61 Client tests passing (183 total)
-- ✅ 7 decision documents merged
-- ✅ 0 regressions
-- ✅ Ready for Sprint 3 (meal planning v1 implementation)
-**Last Updated:** 2026-05-29  
-**Source:** Phase 6+ onwards (active decisions). Archived entries moved to decisions-archive.md.  
-**Note:** Archived decisions (Phases 1–6, older than 30 days) preserved in decisions-archive.md for reference.
-
----
-## Phase 6+: Recent Decisions (Issues #81–#84) — 2026-04-24
-
-### D30 — Issue #81 Unconsume Endpoint (Backend)
-**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
-**Component:** Azure Functions `PUT /api/weekmenu/{id}/unconsume`
-
-**Decision:**
-- Reuse `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no separate request type needed
-- **No upper-bound clamp** on inventory restore: `stock += quantity` (allows out-of-order operation tolerance)
-- Skip inventory update if `InventoryItem` missing (opt-in pattern)
-- Set `IsConsumed = false` and `LastModified = DateTime.UtcNow`
-
-**Rationale:**
-- Mirror `ConsumeMeal` logic exactly in reverse
-- No clamp prevents data loss if operations called out of sequence
-- Opt-in inventory keeps transaction minimal
-
-**Tests:**
-- ✅ `Unconsume_SetsIsConsumedFalse_ReturnsOk`
-- ✅ `Unconsume_ReversesInventoryDeduction`
-- ✅ `Unconsume_Returns404_WhenMenuNotFound`
-- ✅ 162 API tests passing (0 failures)
-
-**Configuration:**
-- `ShoppingListKeysEnum.WeekMenuUnconsume = 23`
-- `ISettings: "weekmenuunconsume" → "api/weekmenu"`
-
----
-
-### D30.1 — Issue #81 Unconsume UI (Frontend)
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** OneWeekMenuPage.razor — "↩ Angre" button
-
-**Decision:**
-- No confirmation dialog (per Daniel: "keep it simple")
-- Button appears only when `IsConsumed == true`
-- Calls backend `PUT /api/weekmenu/{id}/unconsume` endpoint
-- Silently logs errors if endpoint unavailable (graceful degradation)
-
-**Rationale:**
-- Single-action reversal unlikely to trigger accidentally
-- Reduces UI clutter
-- Consistent with Daniel's simplicity direction
-
----
-
-### D31 — Issue #82 Unit Field UI Component
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** ItemManagementPage.razor — Unit input
-
-**Decision:**
-- Use `SfComboBox` (not `SfDropDownList`) with `AllowCustom="true"`
-- Predefined unit list: Stk, kg, g, L, dl, ml, pk, boks, pose (hardcoded, no API call)
-- Applied to both add-new-item form AND inline edit row
-
-**Rationale:**
-- `SfComboBox` allows both list selection and custom input (e.g., "flaske", "glass")
-- `SfDropDownList` enforces strict selection only (too rigid)
-- Units stable; no need for server data source
-- Reduces typos while allowing exceptions
-
----
-
-### D32 — Issue #83 Mobile Responsiveness
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** OneWeekMenuPage.razor, FamilyProfilePage.razor, InventoryPage.razor
-
-**Decision:**
-- Use Bootstrap responsive breakpoints (`col-12 col-md-N`, `col-12 col-sm-N`)
-- Add single `@media (max-width: 576px)` block **only** for week-planner table (icon column hidden)
-- Apply `table-responsive` wrapper to both tables in FamilyProfilePage (horizontal scroll)
-- Prioritize content > buttons on small screens
-
-**Rationale:**
-- Minimal custom CSS; Bootstrap handles 80% of cases
-- Week planner needs surgical control for icon column (mobile: icon visible in dropdown name, so no loss)
-- Content accessibility critical for shopping use case (on-phone while shopping)
-
-**Breakpoints Tested:** 576px (mobile), 768px (tablet), 992px (desktop)
-
----
-
-### D33 — Issue #84 Meal Selection UX Unification
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** OneWeekMenuPage.razor — merged dropdown handler
-
-**Decision:**
-- Remove "🔄 Bytt" button entirely
-- Merge `OnSwapMealSelected` logic into single `OnMealSelected` handler
-- Regular dropdown stays editable until `IsConsumed == true`
-- Handler flow: update local state → call `PUT /weekmenu/{id}/swap` if menu saved (not new)
-
-**Rationale:**
-- Two-button flow was redundant (selection intent already clear from dropdown)
-- Single handler reduces state management complexity (`_swappingDay` field removed)
-- Consumed days locked via plain text display (no explicit `disabled` needed)
-- `WeekMenuSwap = 22` enum kept (endpoint still used, just no dedicated button)
-
-**Code Reduction:** ~30 lines removed (swap dropdown, state field, old handler)
-
----
-
-### D34 — IsBasic Population Bug Audit
-**Status:** ✅ COMPLETED (Glenn, 2026-04-24)  
-**Component:** WeekMenuController.RunGenerateShoppingList (Issue #77 fix verification)
-
-**Finding:**
-- Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper
-- **One bug found:** `WeekMenuController` line 265 — `Varen = new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName }`
-- **Fix applied:** Replaced with `_mapper.Map<ShopItemModel>(shopItem)` + graceful fallback
-- **Result:** IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit now populate correctly
-
-**Other Controllers Audited — No Issues:**
-- ShoppingListController, MealRecipeController, ShopsItemsController, ShopItemCategoryController, InventoryItemController — all use AutoMapper correctly
-
-**Recommendation:**
-- Add linting rule: "Never construct `ShopItemModel` inline — always use `_mapper.Map<ShopItemModel>()`"
-- Fallback pattern acceptable only when source may be unavailable
-
----
-
-### D35 — StockBehaviour on ShopItem (Issue #75)
-**Status:** ✅ DECIDED (Peter, 2026-04-24)  
-**Component:** ShopItem + ShopItemModel + IsDone hook
-
-**Decision:**
-- Add `StockBehaviour` enum on `ShopItem`, not on `ShoppingListItem`
-- Enum values: `Track` (default), `DoNotTrack`
-- When `ShoppingList.IsDone → true`: iterate items where `Varen.StockBehaviour == Track`, upsert InventoryItem, increment `QuantityInStock`
-
-**Rationale:**
-- Item-level, not row-level: "Don't track bread" is about bread itself, not a shopping trip
-- Simplest change: 1 enum file + 1 property + 1 filter
-- No per-list decision fatigue for users
-- Inventory explicitly approximate ("Estimert lager"); auto-stock is additive, auto-deduct is subtractive, drift expected
-
-**Impact:**
-| Team | Action |
-|------|--------|
-| Ray | Add `StockBehaviour` enum + property to ShopItem/ShopItemModel, update AutoMapper |
-| Glenn | Implement IsDone hook filter |
-| Blair | Add toggle to item admin page; label inventory "Estimert lager" |
-| Josh | Tests: Track items stocked, DoNotTrack skipped |
-
-**Alternatives Rejected:**
-1. `IsMealSourced` on ShoppingListItem + `ExcludeFromStock` on ShopItem — overlapping concerns
-2. `StockBehaviour` on ShoppingListItem — per-row flexibility adds decision fatigue
-
----
-
-| Decision | Status | Owner | Target Date |
-|----------|--------|-------|-------------|
-| D30: Unconsume Backend | ✅ Implemented | Glenn | 2026-04-24 ✅ |
-| D30.1: Unconsume Frontend | ✅ Implemented | Blair | 2026-04-24 ✅ |
-| D31: Unit Dropdown | ✅ Implemented | Blair | 2026-04-24 ✅ |
-| D32: Mobile CSS | ✅ Implemented | Blair | 2026-04-24 ✅ |
-| D33: UX Unification | ✅ Implemented | Blair | 2026-04-24 ✅ |
-| D34: IsBasic Audit | ✅ Completed | Glenn | 2026-04-24 ✅ |
-| D35: StockBehaviour | ✅ Decided | Peter | Next Sprint |
-
----
-
-## Phase 7: Package Size Feature Sprint (Issues #76–#88–#89) — 2026-04-26
-
-### D36 — Package Size Feature Design (Architecture)
-**Status:** ✅ DESIGNED (Peter, 2026-04-24)  
-**Related:** Issue #76 (purchase unit sizes already implemented)
-
-**Context:**
-`ShopItem` already has `StandardPurchaseQuantity` (double) and `StandardPurchaseUnit` (string) from sprint #76. The feature enables package-aware shopping list generation: recipe needs 400g chicken → chicken comes in 500g packages → buy 1 package.
-
-**Components (3-part solution):**
-1. **Unit Bridge (Glenn):** `MealUnitExtensions` — compatibility check between `MealUnit` enum and `StandardPurchaseUnit` string
-2. **Backend Calculation (Glenn):** `WeekMenuController.RunGenerateShoppingList()` — package conversion with stock comparison
-3. **Display Layer (Blair):** Format `{Mengde} × {qty}{unit}` in shopping list UI
-
-**Architecture Decisions:**
-- Package size lives on `ShopItem` (item master), not `ShoppingListItem`
-- Fallback: Math.Ceiling when package data unavailable or units incompatible
-- No new entities or API endpoints needed
-
----
-
-### D36.1 — Package Unit Compatibility & Normalization
-**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
-**Component:** `Shared/MealUnitExtensions.cs` — 4 new public methods
-
-**Methods:**
-
-| Method | Purpose |
-|--------|---------|
-| `IsCompatibleWith(MealUnit, string)` | Check if ingredient unit and purchase unit are same dimension |
-| `NormalizeToBaseUnit(MealUnit, double)` | Convert ingredient quantity to base unit (gram, dl, stk) |
-| `NormalizePurchaseUnitToBase(string, double)` | Convert purchase unit to base unit |
-| `CalculatePackagesNeeded(...)` | Final package count; returns null on incompatibility |
-
-**Supported Units:**
-- Weight: `g`, `gram`, `kg`, `kilogram` → base: grams
-- Volume: `dl`, `deciliter`, `l`, `liter` → base: deciliters
-- Count: `stk`, `pcs`, `pakke`, `pk` → base: count
-
-**Fallback Conditions (null returned):**
-- `StandardPurchaseQuantity <= 0`
-- `StandardPurchaseUnit` null/empty/unknown
-- Demand unit and package unit incompatible (e.g., grams vs. stk)
-- `UnitMismatch = true` (same ShopItemId used with different MealUnit across meals)
-
----
-
-### D36.2 — Package Conversion in RunGenerateShoppingList
-**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
-**Component:** `Api/Controllers/WeekMenuController.cs` — shopping list generation
-
-**Decision: Pipeline Order (CRITICAL)**
-Stock comparison (raw-unit subtraction of `QuantityInStock`) **must run before** package conversion. Both mutate `item.Mengde`.
-
-**Canonical Pipeline:**
-1. Aggregate raw ingredient quantities per `ShopItemId`
-2. Apply stock comparison → subtract `QuantityInStock`, set `IsLikelyNotNeeded`
-3. Apply package conversion → update `Mengde` to package count
-
-**Aggregation Tuple (extended):**
-```csharp
-var aggregated = new Dictionary<string, (double Quantity, MealUnit Unit, string ShopItemName, ShopItem ShopItem)>();
-```
-
-**Impact:**
-- `item.Mengde` becomes a **package count** when StandardPurchaseQuantity is configured and units compatible
-- Falls back to raw quantity (existing behavior) when package data unavailable or incompatible
-- No per-trip configuration — fully automatic
-
-**Tests:** 3 new integration tests + 26 unit extension tests (211 total, 0 failures)
-
----
-
-### D36.3 — Package Size Display Format
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** `OneShoppingListItemComponent` + `OneWeekMenuPage` preview
-
-**Decision:**
-- Format: `{Mengde} × {StandardPurchaseQuantity}{StandardPurchaseUnit}` (e.g., "2 × 500g")
-- G29 number format avoids trailing zeros (500 not 500.0)
-- Applied in: live shopping list + week menu preview
-- Fallback: plain `Mengde.ToString()` when package info not set
-- Style: `pkg-size-label` muted to keep numeric focus
-
-**Rationale:**
-- Compact, mobile-friendly — fits on one line
-- User sees both editable (Mengde) and informational (package size) data simultaneously
-- No modal/separate view needed
-
-**Related:** `FormatQuantity()` helper for consistency across components
-
----
-
-### D31 — SfComboBox Pattern (UX Consistency Update)
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** Multiple Blazor components
-
-**Update to D31 (existing pattern):**
-
-**1. Meal Selection in OneWeekMenuPage**
-- Replaced plain `<select>` with `SfComboBox` + `AllowFiltering="true"`
-- Built-in name search (no `FilteringEventArgs` wiring needed)
-- DataSource as stable `List<T>` field (avoid re-render churn)
-- Note: `ComboBoxTemplates` does not support `ValueTemplate` — use `ItemTemplate` only
-
-**2. StandardPurchaseUnit in ItemManagementPage**
-- Replaced plain `<input type="text">` with `SfComboBox TValue="string" TItem="string"`
-- Uses existing `_unitOptions` static list + `AllowCustom="true"`
-- Identical to pattern used for `Unit` field above
-- Enforces D31 consistency, prevents unit value typos
-
-**Rationale:** Consistency (D31), discoverability, prevents typos breaking inventory matching
-
----
-
-### D31.1 — "Er alltid hjemme" Label Clarification
-**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
-**Component:** ItemManagementPage.razor — IsBasic checkbox
-
-**Change:** Sub-label updated from "Basisvare" to "Er alltid hjemme" for clarity.
-
-**Context:** `IsBasic` enum means item is always-in-stock and should appear collapsed in generated shopping lists. Previous label was not self-explanatory.
-
-**Implementation:** Display-only, no model changes.
-
----
-
-## Implementation Status (Phase 7 — Updated)
-
-| Decision | Status | Owner | Target Date |
-|----------|--------|-------|-------------|
-| D36: Package Size Design | ✅ Designed | Peter | 2026-04-24 ✅ |
-| D36.1: Unit Compatibility | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
-| D36.2: RunGenerateShoppingList | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
-| D36.3: Display Format | ✅ Implemented | Blair | PR #88 ✅ (2026-04-24) |
-| D31 Update: SfComboBox | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
-| D31.1 Label Clarification | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
-
