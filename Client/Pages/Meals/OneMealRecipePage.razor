@@ -102,76 +102,34 @@
                             <th>Enhet</th>
                             <th>Valgfri</th>
                             <th>Fersk</th>
-                            <th title="Basisvarer ekskluderes fra generert handleliste">Basis</th>
+                            <th>Basis</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var ing in Recipe.Ingredients)
                         {
-                            @if (_editingIngredient == ing)
-                            {
-                                <tr class="table-warning">
-                                    <td>@ing.ShopItemName</td>
-                                    <td>
-                                        <input type="number" step="0.5" min="0"
-                                               class="form-control form-control-sm" style="width:80px"
-                                               @bind="_editIngQty" />
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" style="width:90px"
-                                                @bind="_editIngUnitStr">
-                                            @foreach (var u in Enum.GetValues<MealUnit>())
-                                            {
-                                                <option value="@u">@GetUnitLabel(u)</option>
-                                            }
-                                        </select>
-                                    </td>
-                                    <td><input type="checkbox" @bind="_editIngOptional" /></td>
-                                    <td><input type="checkbox" @bind="_editIngFresh" /></td>
-                                    <td><input type="checkbox" @bind="_editIngBasic" /></td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-primary me-1"
-                                                @onclick="SaveEditIngredient" disabled="@_saving">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                @onclick="CancelEditIngredient">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                            else
-                            {
-                                <tr>
-                                    <td>@ing.ShopItemName</td>
-                                    <td>@ing.Quantity</td>
-                                    <td><small>@GetUnitLabel(ing.Unit)</small></td>
-                                    <td>
-                                        <input type="checkbox" @bind="ing.IsOptional" />
-                                    </td>
-                                    <td>
-                                        <input type="checkbox" @bind="ing.IsFresh" />
-                                    </td>
-                                    <td>
-                                        <input type="checkbox" @bind="ing.IsBasic" />
-                                    </td>
-                                    <td>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-secondary me-1"
-                                                @onclick="@(() => StartEditIngredient(ing))"
-                                                title="Rediger">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger"
-                                                @onclick="@(() => RemoveIngredient(ing))">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
+                            <tr>
+                                <td>@ing.ShopItemName</td>
+                                <td>@ing.Quantity</td>
+                                <td><small>@GetUnitLabel(ing.Unit)</small></td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsOptional" />
+                                </td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsFresh" />
+                                </td>
+                                <td>
+                                    <input type="checkbox" @bind="ing.IsBasic" />
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            @onclick="@(() => RemoveIngredient(ing))">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
                         }
                     </tbody>
                 </table>
@@ -238,7 +196,7 @@
                     <div class="col-auto">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="ingBasic" @bind="_newIngBasic" />
-                            <label class="form-check-label" for="ingBasic">Basis <small class="text-muted">(ekskluderes fra handleliste)</small></label>
+                            <label class="form-check-label" for="ingBasic">Basis</label>
                         </div>
                     </div>
                     <div class="col-auto">
@@ -308,14 +266,6 @@
     private bool   _newIngOptional   = false;
     private bool   _newIngFresh      = false;
     private bool   _newIngBasic      = false;
-
-    // Edit ingredient state
-    private MealIngredientModel? _editingIngredient = null;
-    private double _editIngQty     = 1;
-    private string _editIngUnitStr = nameof(MealUnit.Piece);
-    private bool   _editIngOptional = false;
-    private bool   _editIngFresh    = false;
-    private bool   _editIngBasic    = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -413,59 +363,6 @@
         var list = Recipe!.Ingredients?.ToList() ?? new List<MealIngredientModel>();
         list.Remove(ing);
         Recipe.Ingredients = list;
-    }
-
-    private void StartEditIngredient(MealIngredientModel ing)
-    {
-        _editingIngredient = ing;
-        _editIngQty      = ing.Quantity;
-        _editIngUnitStr  = ing.Unit.ToString();
-        _editIngOptional = ing.IsOptional;
-        _editIngFresh    = ing.IsFresh;
-        _editIngBasic    = ing.IsBasic;
-    }
-
-    private void CancelEditIngredient()
-    {
-        _editingIngredient = null;
-    }
-
-    private async Task SaveEditIngredient()
-    {
-        if (_editingIngredient == null) return;
-
-        _editingIngredient.Quantity   = _editIngQty;
-        _editingIngredient.Unit       = Enum.TryParse<MealUnit>(_editIngUnitStr, out var u) ? u : MealUnit.Piece;
-        _editingIngredient.IsOptional = _editIngOptional;
-        _editingIngredient.IsFresh    = _editIngFresh;
-        _editingIngredient.IsBasic    = _editIngBasic;
-        _editingIngredient = null;
-
-        // Persist immediately if editing an existing recipe
-        if (!IsNew && Recipe != null)
-        {
-            _saving = true;
-            try
-            {
-                if (Enum.TryParse<MealCategory>(_categoryStr, out var cat)) Recipe.Category = cat;
-                if (Enum.TryParse<MealType>(_mealTypeStr, out var mt))      Recipe.MealType = mt;
-                if (Enum.TryParse<MealEffort>(_effortStr, out var ef))      Recipe.Effort   = ef;
-                Recipe.LastModified = DateTime.UtcNow;
-
-                var response = await Http.PutAsJsonAsync(
-                    Settings.GetApiUrl(ShoppingListKeysEnum.MealRecipes), Recipe);
-                if (!response.IsSuccessStatusCode)
-                    Console.WriteLine($"❌ Save ingredient failed: {response.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Error saving ingredient: {ex.Message}");
-            }
-            finally
-            {
-                _saving = false;
-            }
-        }
     }
 
     private async Task Save()

@@ -10,9 +10,6 @@ namespace Shared.FireStoreDataModels
         public string ShopItemId { get; set; }
 
         [FirestoreProperty]
-        public string ShopItemName { get; set; }
-
-        [FirestoreProperty]
         public AgeGroup AgeGroup { get; set; }
 
         [FirestoreProperty]

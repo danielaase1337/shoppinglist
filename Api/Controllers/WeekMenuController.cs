@@ -2,7 +2,6 @@ using AutoMapper;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Shared;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
@@ -14,42 +13,22 @@ using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
-    // Request body for ConsumeMeal endpoint (#74)
-    public class ConsumeMealRequest
-    {
-        public int DayOfWeek { get; set; }
-        public string MealRecipeId { get; set; }
-    }
-
-    // Request body for SwapMeal endpoint (#74)
-    public class SwapMealRequest
-    {
-        public int DayOfWeek { get; set; }
-        public string NewMealRecipeId { get; set; }
-    }
-
     public class WeekMenuController : ControllerBase
     {
         private readonly ILogger _logger;
         private readonly IGenericRepository<WeekMenu> _repository;
         private readonly IGenericRepository<MealRecipe> _mealRepository;
-        private readonly IGenericRepository<InventoryItem> _inventoryRepository;
-        private readonly IGenericRepository<ShopItem> _shopItemRepository;
         private readonly IMapper _mapper;
 
         public WeekMenuController(
             ILoggerFactory loggerFactory,
             IGenericRepository<WeekMenu> repository,
             IGenericRepository<MealRecipe> mealRepository,
-            IGenericRepository<InventoryItem> inventoryRepository,
-            IGenericRepository<ShopItem> shopItemRepository,
             IMapper mapper)
         {
             _logger = loggerFactory.CreateLogger<WeekMenuController>();
             _repository = repository;
             _mealRepository = mealRepository;
-            _inventoryRepository = inventoryRepository;
-            _shopItemRepository = shopItemRepository;
             _mapper = mapper;
         }
 
@@ -232,14 +211,8 @@ namespace Api.Controllers
                     .Where(r => r.IsActive)
                     .ToDictionary(r => r.Id, r => r) ?? new Dictionary<string, MealRecipe>();
 
-                // Build ShopItem lookup so IsBasic/StockBehaviour/StandardPurchase fields survive into the result
-                var allShopItems = await _shopItemRepository.Get();
-                var shopItemDict = allShopItems?.ToDictionary(s => s.Id, s => s) ?? new Dictionary<string, ShopItem>();
-
-                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName, shopItem, unit, unitMismatch)
-                // UnitMismatch=true when the same ShopItem appears with different MealUnits across meals — in that case
-                // we cannot safely convert to packages and fall back to Math.Ceiling.
-                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName, ShopItem ShopItem, MealUnit Unit, bool UnitMismatch)>();
+                // Aggregate ingredients: key = ShopItemId, value = (totalQuantity, shopItemName)
+                var aggregated = new Dictionary<string, (double Quantity, string ShopItemName)>();
 
                 foreach (var daily in weekMenu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
                 {
@@ -261,78 +234,20 @@ namespace Api.Controllers
                     foreach (var ingredient in ingredients)
                     {
                         if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
-                        if (ingredient.IsBasic) continue;  // Basic/pantry items are assumed in stock — exclude from shopping list
 
-                        shopItemDict.TryGetValue(ingredient.ShopItemId, out var shopItem);
                         if (aggregated.TryGetValue(ingredient.ShopItemId, out var existing))
-                        {
-                            var mismatch = existing.UnitMismatch || existing.Unit != ingredient.Unit;
-                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName, existing.ShopItem ?? shopItem, existing.Unit, mismatch);
-                        }
+                            aggregated[ingredient.ShopItemId] = (existing.Quantity + ingredient.Quantity, existing.ShopItemName);
                         else
-                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty, shopItem, ingredient.Unit, false);
+                            aggregated[ingredient.ShopItemId] = (ingredient.Quantity, ingredient.ShopItemName ?? string.Empty);
                     }
                 }
 
-                var shoppingItems = aggregated.Select(kvp =>
+                var shoppingItems = aggregated.Select(kvp => new ShoppingListItemModel
                 {
-                    // Use AutoMapper to carry all ShopItem fields (IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit)
-                    var varen = kvp.Value.ShopItem != null
-                        ? _mapper.Map<ShopItemModel>(kvp.Value.ShopItem)
-                        : new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName };
-
-                    return new ShoppingListItemModel
-                    {
-                        Varen = varen,
-                        Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                        IsDone = false
-                    };
+                    Varen = new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName },
+                    Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
+                    IsDone = false
                 }).ToList();
-
-                // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand.
-                // Operates on raw ingredient quantities (same units as QuantityInStock) — must run BEFORE
-                // the package conversion below so the subtraction stays in the same unit dimension.
-                var allInventory = await _inventoryRepository.Get();
-                var inventoryDict = allInventory?
-                    .Where(i => i.IsActive)
-                    .GroupBy(i => i.ShopItemId)
-                    .ToDictionary(g => g.Key, g => g.First())
-                    ?? new Dictionary<string, InventoryItem>();
-
-                foreach (var item in shoppingItems)
-                {
-                    if (item.Varen?.Id == null) continue;
-                    if (!inventoryDict.TryGetValue(item.Varen.Id, out var inv)) continue;
-
-                    var stock = inv.QuantityInStock;
-                    if (stock >= item.Mengde)
-                    {
-                        item.IsLikelyNotNeeded = true;
-                    }
-                    else if (stock > 0)
-                    {
-                        // Partially covered — reduce demand by available stock
-                        item.Mengde = (int)Math.Ceiling((double)item.Mengde - stock);
-                    }
-                }
-
-                // #76 Package-size calculation: convert stock-adjusted raw demand into package count.
-                // Only applies when StandardPurchaseQuantity is set and units are compatible.
-                // Falls back to the raw Math.Ceiling value already in Mengde for unknown/incompatible units.
-                foreach (var item in shoppingItems)
-                {
-                    if (item.Varen?.Id == null) continue;
-                    if (!aggregated.TryGetValue(item.Varen.Id, out var agg)) continue;
-                    if (agg.UnitMismatch) continue;  // mixed units across meals — cannot reliably convert
-                    if (item.Varen.StandardPurchaseQuantity <= 0 || string.IsNullOrEmpty(item.Varen.StandardPurchaseUnit)) continue;
-
-                    var packages = MealUnitExtensions.CalculatePackagesNeeded(
-                        item.Mengde, agg.Unit,
-                        item.Varen.StandardPurchaseQuantity, item.Varen.StandardPurchaseUnit);
-
-                    if (packages.HasValue)
-                        item.Mengde = packages.Value;
-                }
 
                 var shoppingList = new ShoppingListModel
                 {
@@ -348,182 +263,6 @@ namespace Api.Controllers
             catch (Exception e)
             {
                 var msg = $"Something went wrong generating shopping list for week menu {id}";
-                _logger.LogError(e, msg);
-                return await GetErroRespons(msg, req);
-            }
-        }
-
-        // #74 — Mark a daily meal as consumed and deduct ingredients from inventory
-        [Function("weekmenuconsume")]
-        public async Task<HttpResponseData> ConsumeMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/consume")] HttpRequestData req, string weekMenuId)
-        {
-            try
-            {
-                var requestBody = await req.ReadFromJsonAsync<ConsumeMealRequest>();
-                if (requestBody == null)
-                    return await GetNoContentRespons("No consume request body", req);
-
-                var weekMenu = await _repository.Get(weekMenuId);
-                if (weekMenu == null)
-                {
-                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for consume");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
-                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
-                if (dailyMeal == null)
-                {
-                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId}");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                dailyMeal.IsConsumed = true;
-                weekMenu.LastModified = DateTime.UtcNow;
-
-                var updatedMenu = await _repository.Update(weekMenu);
-                if (updatedMenu == null)
-                    return await GetErroRespons($"Could not update week menu {weekMenuId} after consume", req);
-
-                // Deduct ingredients from inventory
-                if (!string.IsNullOrEmpty(requestBody.MealRecipeId))
-                {
-                    var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
-                    if (recipe != null && recipe.Ingredients != null)
-                    {
-                        var allInventory = await _inventoryRepository.Get();
-
-                        foreach (var ingredient in recipe.Ingredients)
-                        {
-                            if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
-
-                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
-                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
-
-                            inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
-                            inventoryItem.LastModified = DateTime.UtcNow;
-                            await _inventoryRepository.Update(inventoryItem);
-                        }
-                    }
-                }
-
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
-                return response;
-            }
-            catch (Exception e)
-            {
-                var msg = $"Something went wrong consuming meal in week menu {weekMenuId}";
-                _logger.LogError(e, msg);
-                return await GetErroRespons(msg, req);
-            }
-        }
-
-        // #81 — Undo consume: mark meal unconsumed and restore ingredient quantities to inventory
-        [Function("weekmenuunconsume")]
-        public async Task<HttpResponseData> UnConsumeMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/unconsume")] HttpRequestData req, string weekMenuId)
-        {
-            try
-            {
-                var requestBody = await req.ReadFromJsonAsync<ConsumeMealRequest>();
-                if (requestBody == null)
-                    return await GetNoContentRespons("No unconsume request body", req);
-
-                var weekMenu = await _repository.Get(weekMenuId);
-                if (weekMenu == null)
-                {
-                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for unconsume");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
-                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
-                if (dailyMeal == null)
-                {
-                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId}");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                dailyMeal.IsConsumed = false;
-                weekMenu.LastModified = DateTime.UtcNow;
-
-                var updatedMenu = await _repository.Update(weekMenu);
-                if (updatedMenu == null)
-                    return await GetErroRespons($"Could not update week menu {weekMenuId} after unconsume", req);
-
-                // Restore ingredients to inventory (reverse the deduction)
-                if (!string.IsNullOrEmpty(requestBody.MealRecipeId))
-                {
-                    var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
-                    if (recipe != null && recipe.Ingredients != null)
-                    {
-                        var allInventory = await _inventoryRepository.Get();
-
-                        foreach (var ingredient in recipe.Ingredients)
-                        {
-                            if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
-
-                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
-                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
-
-                            inventoryItem.QuantityInStock += ingredient.Quantity;
-                            inventoryItem.LastModified = DateTime.UtcNow;
-                            await _inventoryRepository.Update(inventoryItem);
-                        }
-                    }
-                }
-
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
-                return response;
-            }
-            catch (Exception e)
-            {
-                var msg = $"Something went wrong unconsuming meal in week menu {weekMenuId}";
-                _logger.LogError(e, msg);
-                return await GetErroRespons(msg, req);
-            }
-        }
-
-        // #74 — Swap the meal for a specific day without affecting inventory
-        [Function("weekmenuswap")]
-        public async Task<HttpResponseData> SwapMeal([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "weekmenu/{weekMenuId}/swap")] HttpRequestData req, string weekMenuId)
-        {
-            try
-            {
-                var requestBody = await req.ReadFromJsonAsync<SwapMealRequest>();
-                if (requestBody == null)
-                    return await GetNoContentRespons("No swap request body", req);
-
-                var weekMenu = await _repository.Get(weekMenuId);
-                if (weekMenu == null)
-                {
-                    _logger.LogInformation($"Could not find week menu with id {weekMenuId} for swap");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                var targetDay = (System.DayOfWeek)requestBody.DayOfWeek;
-                var dailyMeal = weekMenu.DailyMeals?.FirstOrDefault(d => d.Day == targetDay);
-                if (dailyMeal == null)
-                {
-                    _logger.LogInformation($"No daily meal found for day {targetDay} in week menu {weekMenuId} — cannot swap");
-                    return req.CreateResponse(HttpStatusCode.NotFound);
-                }
-
-                dailyMeal.MealRecipeId = requestBody.NewMealRecipeId;
-                weekMenu.LastModified = DateTime.UtcNow;
-
-                var updatedMenu = await _repository.Update(weekMenu);
-                if (updatedMenu == null)
-                    return await GetErroRespons($"Could not update week menu {weekMenuId} after swap", req);
-
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                await response.WriteAsJsonAsync(_mapper.Map<WeekMenuModel>(updatedMenu));
-                return response;
-            }
-            catch (Exception e)
-            {
-                var msg = $"Something went wrong swapping meal in week menu {weekMenuId}";
                 _logger.LogError(e, msg);
                 return await GetErroRespons(msg, req);
             }

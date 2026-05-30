@@ -358,18 +358,14 @@
         _saving = true;
         try
         {
-            var request = new List<InventoryAdjustmentRequest>
-            {
-                new() { Id = item.Id, QuantityDelta = delta }
-            };
+            var request = new { Id = item.Id, Delta = delta };
             var response = await Http.PostAsJsonAsync(
-                Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItemsAdjust), request);
+                $"{Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems)}/adjust", request);
 
             if (response.IsSuccessStatusCode)
             {
                 item.QuantityInStock = Math.Max(0, item.QuantityInStock + delta);
                 item.LastUpdated = DateTime.UtcNow;
-                StateHasChanged();
             }
             else
             {
@@ -447,11 +443,19 @@
         _newThreshold  = 0;
         _newUnitStr    = nameof(MealUnit.Piece);
     }
-
-    private sealed class InventoryAdjustmentRequest
-    {
-        public string Id { get; set; } = string.Empty;
-        public double QuantityDelta { get; set; }
-    }
 }
 
+<style>
+    .inventory-table td {
+        vertical-align: middle;
+    }
+
+    .clickable-row {
+        cursor: pointer;
+        text-decoration: underline dotted;
+    }
+
+    .clickable-row:hover {
+        color: #0d6efd;
+    }
+</style>
