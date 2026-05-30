@@ -98,6 +98,11 @@
             </div>
         </div>
 
+        @if (_generateError != null)
+        {
+            <div class="alert alert-danger">@_generateError</div>
+        }
+
         @* Phase 3: Use-up suggestion panel *@
         @if (_useUpSuggestions.Any())
         {
@@ -182,6 +187,10 @@
                         </button>
                     </div>
                 </div>
+                @if (_saveListError != null)
+                {
+                    <div class="alert alert-danger mt-2">@_saveListError</div>
+                }
             </div>
         }
     }
@@ -202,6 +211,8 @@
     private bool _generating = false;
     private bool _savingList = false;
     private ShoppingListModel? _generatedList;
+    private string? _generateError;
+    private string? _saveListError;
 
     // Phase 5 — portion scaling
     private FamilyProfileModel? _familyProfile;
@@ -457,6 +468,7 @@
 
         _generating = true;
         _generatedList = null;
+        _generateError = null;
         try
         {
             var url = $"{Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id)}/generate-shoppinglist";
@@ -469,10 +481,14 @@
                 ApplyPortionScaling();
             }
             else
+            {
+                _generateError = $"Kunne ikke generere handleliste ({(int)response.StatusCode} {response.StatusCode}).";
                 Console.WriteLine($"❌ Generate failed: {response.StatusCode}");
+            }
         }
         catch (Exception ex)
         {
+            _generateError = "En feil oppstod under generering av handleliste.";
             Console.WriteLine($"❌ Error generating shopping list: {ex.Message}");
         }
         finally
@@ -486,6 +502,7 @@
         if (_generatedList == null || _menu == null) return;
 
         _savingList = true;
+        _saveListError = null;
         try
         {
             _generatedList.Name ??= $"Uke {_menu.WeekNumber} {_menu.Year}";
@@ -503,11 +520,13 @@
             }
             else
             {
+                _saveListError = $"Kunne ikke lagre handleliste ({(int)response.StatusCode} {response.StatusCode}).";
                 Console.WriteLine($"❌ Save shopping list failed: {response.StatusCode}");
             }
         }
         catch (Exception ex)
         {
+            _saveListError = "En feil oppstod under lagring av handleliste.";
             Console.WriteLine($"❌ Error saving shopping list: {ex.Message}");
         }
         finally

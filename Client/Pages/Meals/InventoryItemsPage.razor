@@ -358,7 +358,7 @@
         _saving = true;
         try
         {
-            var request = new { Id = item.Id, Delta = delta };
+            var request = new List<object> { new { Id = item.Id, QuantityDelta = delta } };
             var response = await Http.PostAsJsonAsync(
                 $"{Settings.GetApiUrl(ShoppingListKeysEnum.InventoryItems)}/adjust", request);
 
