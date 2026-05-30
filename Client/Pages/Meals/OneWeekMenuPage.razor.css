@@ -17,6 +17,12 @@
     color: #6c757d;
 }
 
+/* SfComboBox suggested meal — style the inner input */
+.week-planner-table .suggested-meal .e-input-group input.e-input {
+    font-style: italic;
+    color: #6c757d;
+}
+
 .suggested-badge {
     display: block;
     font-size: 0.7rem;
@@ -77,6 +83,11 @@
     .week-planner-table .form-select {
         font-size: 0.8rem;
         padding: 0.2rem 0.4rem;
+    }
+
+    .week-planner-table .e-combobox,
+    .week-planner-table .e-input-group input.e-input {
+        font-size: 0.8rem;
     }
 
     .week-planner-table .btn-sm {

@@ -39,15 +39,21 @@
                                 }
                                 else
                                 {
-                                    <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
-                                            value="@meal.MealRecipeId"
-                                            @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))">
-                                        <option value="">-- Velg middag --</option>
-                                        @foreach (var recipe in GetSortedRecipes())
-                                        {
-                                            <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
-                                        }
-                                    </select>
+                                    <SfComboBox TValue="string" TItem="MealRecipeModel"
+                                                DataSource="@_sortedRecipes"
+                                                AllowFiltering="true"
+                                                Value="@meal.MealRecipeId"
+                                                Placeholder="-- Velg middag --"
+                                                CssClass="@(meal.IsSuggested ? "e-small suggested-meal" : "e-small")">
+                                        <ComboBoxEvents TValue="string" TItem="MealRecipeModel"
+                                                        ValueChange="@(async e => await OnMealSelected(meal, e.Value))" />
+                                        <ComboBoxFieldSettings Value="Id" Text="Name" />
+                                        <ComboBoxTemplates TItem="MealRecipeModel">
+                                            <ItemTemplate>
+                                                @GetCategoryIcon(context.Category) @context.Name
+                                            </ItemTemplate>
+                                        </ComboBoxTemplates>
+                                    </SfComboBox>
                                     @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
                                     {
                                         <small class="suggested-badge">forslag</small>
@@ -269,6 +275,7 @@
 
     private WeekMenuModel? _menu;
     private List<MealRecipeModel>? _recipes;
+    private List<MealRecipeModel> _sortedRecipes = new();
     private bool _recipesLoaded = false;
     private bool _saving = false;
     private bool _generating = false;
@@ -368,6 +375,10 @@
         }
 
         _recipesLoaded = true;
+        _sortedRecipes = _recipes?.Where(r => r.IsActive)
+            .OrderByDescending(r => r.PopularityScore)
+            .ThenBy(r => r.Name)
+            .ToList() ?? new List<MealRecipeModel>();
         ApplyFridaySuggestion();
     }
 
