@@ -250,3 +250,9 @@
 - **Rationale**: Matches frontend contract in `OneWeekMenuPage.razor`, fixes issue #77 without adding new Firestore queries, keeps generated shopping lists resilient when meal data references stale/missing catalogue entries.
 - **Decision D-BUGFIX-2 merged** to `decisions.md`.
 
+### Inventory-Covered Flag — Generated Shopping Lists (2026-05-31) ✅ COMPLETE
+- Added `ShoppingListItemModel.IsInventoryCovered` so generated week-menu shopping lists can distinguish confirmed inventory coverage from generic `IsBasic` pantry guesses.
+- Updated `WeekMenuController.RunGenerateShoppingList()` to set `IsInventoryCovered = true` only when `QuantityInStock >= item.Mengde`; the later `IsBasic` pass still sets only `IsLikelyNotNeeded`.
+- Result: frontend can now split group 2 ("kanskje i skapet") from group 3 ("har du i skapet") without changing existing `IsLikelyNotNeeded` behaviour.
+- Validation: `dotnet build` passed with 0 errors; `dotnet test Api.Tests/Api.Tests.csproj` passed 221/221 tests.
+

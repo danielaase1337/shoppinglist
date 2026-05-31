@@ -142,54 +142,63 @@
 
                 @{
                     var buyItems = _generatedList.ShoppingItems?.Where(i => !i.IsLikelyNotNeeded).ToList() ?? new List<ShoppingListItemModel>();
-                    var pantryItems = _generatedList.ShoppingItems?.Where(i => i.IsLikelyNotNeeded).ToList() ?? new List<ShoppingListItemModel>();
+                    var maybeItems = _generatedList.ShoppingItems?.Where(i => i.IsLikelyNotNeeded && !i.IsInventoryCovered).ToList() ?? new List<ShoppingListItemModel>();
+                    var haveItems = _generatedList.ShoppingItems?.Where(i => i.IsInventoryCovered).ToList() ?? new List<ShoppingListItemModel>();
                 }
 
                 <h6>🛒 Handleliste</h6>
                 @if (buyItems.Any())
                 {
                     <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Vare</th>
-                                <th>Mengde</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Vare</th><th>Mengde</th></tr></thead>
                         <tbody>
                             @foreach (var item in buyItems)
                             {
-                                <tr>
-                                    <td>@item.Varen?.Name</td>
-                                    <td>@item.Mengde</td>
-                                </tr>
+                                <tr><td>@item.Varen?.Name</td><td>@item.Mengde</td></tr>
                             }
                         </tbody>
                     </table>
                 }
                 else
                 {
-                    <p class="text-muted">
-                        <small>Ingen varer generert. Har du lagt til ingredienser på middagsrettene?</small>
-                    </p>
+                    <p class="text-muted"><small>Ingen varer å kjøpe. Har du lagt til ingredienser på middagsrettene?</small></p>
                 }
 
-                @if (pantryItems.Any())
+                @if (maybeItems.Any())
                 {
-                    <h6 class="mt-3 text-muted">🗄️ Dette har du kanskje i skapet</h6>
+                    <h6 class="mt-3 text-muted">🤔 Dette har du kanskje i skapet</h6>
+                    <p class="text-muted"><small>Klikk Fjern på varer du vet du allerede har.</small></p>
                     <table class="table table-sm text-muted">
-                        <thead>
-                            <tr>
-                                <th>Vare</th>
-                                <th>Mengde</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Vare</th><th>Mengde</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var item in pantryItems)
+                            @foreach (var item in maybeItems)
                             {
                                 <tr>
                                     <td>@item.Varen?.Name</td>
                                     <td>@item.Mengde</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="@(() => RemovePantryItem(item))"
+                                                title="Fjern fra listen">
+                                            Fjern
+                                        </button>
+                                    </td>
                                 </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                @if (haveItems.Any())
+                {
+                    <h6 class="mt-3 text-success">✅ Dette har du i skapet</h6>
+                    <p class="text-muted"><small>Dekket av lager — legges ikke til i handlelisten.</small></p>
+                    <table class="table table-sm text-muted">
+                        <thead><tr><th>Vare</th><th>Mengde</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in haveItems)
+                            {
+                                <tr><td>@item.Varen?.Name</td><td>@item.Mengde</td></tr>
                             }
                         </tbody>
                     </table>
@@ -523,6 +532,14 @@
         {
             _generating = false;
         }
+    }
+
+    private void RemovePantryItem(ShoppingListItemModel item)
+    {
+        if (_generatedList?.ShoppingItems == null) return;
+        _generatedList.ShoppingItems = _generatedList.ShoppingItems
+            .Where(i => i != item)
+            .ToList();
     }
 
     private async Task SaveShoppingList()

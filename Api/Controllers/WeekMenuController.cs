@@ -328,6 +328,7 @@ namespace Api.Controllers
                     if (stock >= item.Mengde)
                     {
                         item.IsLikelyNotNeeded = true;
+                        item.IsInventoryCovered = true;
                     }
                     else if (stock > 0)
                     {

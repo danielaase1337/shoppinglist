@@ -13,5 +13,8 @@ namespace Shared.HandlelisteModels
 
         // #76 — Set by generate-shoppinglist when inventory fully covers this item's demand
         public bool IsLikelyNotNeeded { get; set; }
+
+        // Set by generate-shoppinglist when inventory quantity fully covers this item's demand
+        public bool IsInventoryCovered { get; set; }
     }
 }

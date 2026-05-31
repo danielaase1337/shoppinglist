@@ -681,4 +681,12 @@ All 5 individual PRs closed with reference to PR #94.
 - Keep the primary heading/table first (`🛒 Handleliste`); when no buy-items exist, reuse the existing muted empty-state copy before optionally rendering pantry items below.
 - Pantry/staple/inventory-covered rows render in a separate de-emphasised section: `🗄️ Dette har du kanskje i skapet` with `text-muted` on heading + table.
 - Saving from the preview must filter `_generatedList.ShoppingItems` to buy-items only before `PostAsJsonAsync`, so pantry suggestions never become real shopping-list rows.
+
+### 2026-05-31 — Week menu preview three-group split ✅ COMPLETE
+
+**Generated shopping list preview grouping in `OneWeekMenuPage.razor`**
+- Replaced the pantry-only split with three Razor-local collections: `buyItems` (`!IsLikelyNotNeeded`), `maybeItems` (`IsLikelyNotNeeded && !IsInventoryCovered`), and `haveItems` (`IsInventoryCovered`).
+- Added a per-row `Fjern` action for the “🤔 Dette har du kanskje i skapet” table via `RemovePantryItem(ShoppingListItemModel)` so users can drop probable pantry items before saving.
+- Kept `_scalingApplied` notice above the groups and retained the explicit save filter `_generatedList.ShoppingItems = _generatedList.ShoppingItems.Where(i => !i.IsLikelyNotNeeded).ToList();` so both maybe-items and inventory-covered items stay out of the persisted shopping list.
+- Group 3 (`✅ Dette har du i skapet`) is informational only, rendered with success/muted styling and never saved.
  
