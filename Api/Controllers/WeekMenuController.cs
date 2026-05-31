@@ -647,7 +647,19 @@ namespace Api.Controllers
                             if (!inventoryByShopItemId.TryGetValue(ingredient.ShopItemId, out var inventoryItem))
                                 continue; // No inventory entry — skip, no crash
  
-                            inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
+                            var ingredientBase = ingredient.Unit.NormalizeToBaseUnit(ingredient.Quantity);
+                            var inventoryBase = inventoryItem.Unit.NormalizeToBaseUnit(inventoryItem.QuantityInStock);
+
+                            if (double.IsNaN(ingredientBase) || double.IsNaN(inventoryBase))
+                            {
+                                inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
+                            }
+                            else
+                            {
+                                var newBase = Math.Max(0, inventoryBase - ingredientBase);
+                                inventoryItem.QuantityInStock = inventoryItem.Unit.FromBaseUnit(newBase);
+                            }
+
                             inventoryItem.LastModified = DateTime.UtcNow;
                             inventoryChanges[inventoryItem.Id] = inventoryItem;
                         }
@@ -716,7 +728,19 @@ namespace Api.Controllers
                             var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
                             if (inventoryItem == null) continue; // No inventory entry — skip, no crash
 
-                            inventoryItem.QuantityInStock += ingredient.Quantity;
+                            var ingredientBase = ingredient.Unit.NormalizeToBaseUnit(ingredient.Quantity);
+                            var inventoryBase = inventoryItem.Unit.NormalizeToBaseUnit(inventoryItem.QuantityInStock);
+
+                            if (double.IsNaN(ingredientBase) || double.IsNaN(inventoryBase))
+                            {
+                                inventoryItem.QuantityInStock += ingredient.Quantity;
+                            }
+                            else
+                            {
+                                var restoredBase = inventoryBase + ingredientBase;
+                                inventoryItem.QuantityInStock = inventoryItem.Unit.FromBaseUnit(restoredBase);
+                            }
+
                             inventoryItem.LastModified = DateTime.UtcNow;
                             await _inventoryRepository.Update(inventoryItem);
                         }

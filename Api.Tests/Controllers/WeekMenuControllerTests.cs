@@ -850,6 +850,80 @@ namespace Api.Tests.Controllers
             Assert.Equal(1, item.Mengde);
         }
 
+        [Fact]
+        public async Task ConsumeMeal_ConvertsUnitsBeforeDeductingInventory()
+        {
+            // Arrange: 4 kg in stock minus 540 g should leave 3.46 kg.
+            const string shopItemId = "item-flour";
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-flour",
+                Name = "Brød",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient
+                    {
+                        ShopItemId = shopItemId,
+                        ShopItemName = "Mel",
+                        Quantity = 540,
+                        Unit = MealUnit.Gram
+                    }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-consume",
+                WeekNumber = 52,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal
+                    {
+                        Day = DayOfWeek.Monday,
+                        MealRecipeId = recipe.Id,
+                        IsConsumed = false,
+                        CustomIngredients = new List<MealIngredient>()
+                    }
+                }
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-flour",
+                ShopItemId = shopItemId,
+                QuantityInStock = 4,
+                Unit = MealUnit.Kilogram,
+                IsActive = true
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockWeekMenuRepository.Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu weekMenu) => weekMenu);
+            _mockMealRecipeRepository.Setup(r => r.Get(recipe.Id)).ReturnsAsync(recipe);
+            _mockInventoryRepository.Setup(r => r.Get()).ReturnsAsync(new List<InventoryItem> { inventoryItem });
+            _mockInventoryRepository.Setup(r => r.BatchUpdate(It.IsAny<IEnumerable<InventoryItem>>())).ReturnsAsync(true);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest
+            {
+                DayOfWeek = (int)DayOfWeek.Monday,
+                MealRecipeId = recipe.Id
+            });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, $"http://localhost/api/weekmenu/{menu.Id}/consume");
+
+            // Act
+            var response = await _controller.ConsumeMeal(req, menu.Id);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(menu.DailyMeals.Single().IsConsumed);
+            Assert.Equal(3.46, inventoryItem.QuantityInStock, 2);
+            _mockInventoryRepository.Verify(r => r.BatchUpdate(It.Is<IEnumerable<InventoryItem>>(items =>
+                items.Single().Id == inventoryItem.Id && Math.Abs(items.Single().QuantityInStock - 3.46) < 0.01)), Times.Once);
+        }
+
         // ── Test 15: Generate returns 404 when WeekMenu not found ─────────────────
 
         [Fact]

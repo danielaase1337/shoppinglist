@@ -48,6 +48,27 @@ namespace Shared
         }
 
         /// <summary>
+        /// Converts a quantity expressed in the canonical base unit back to the given MealUnit.
+        /// Weight base = grams, Volume base = deciliters, Count base = pieces.
+        /// Returns double.NaN for unmappable units (Tablespoon, Teaspoon, Pinch, …).
+        /// </summary>
+        public static double FromBaseUnit(this MealUnit unit, double baseQuantity)
+        {
+            return unit switch
+            {
+                MealUnit.Gram             => baseQuantity,
+                MealUnit.Kilogram         => baseQuantity / 1000.0,
+                MealUnit.Deciliter        => baseQuantity,
+                MealUnit.Liter            => baseQuantity / 10.0,
+                MealUnit.Piece            => baseQuantity,
+                MealUnit.PieceHalf        => baseQuantity / 0.5,
+                MealUnit.PieceQuarter     => baseQuantity / 0.25,
+                MealUnit.Package          => baseQuantity,
+                _                         => double.NaN
+            };
+        }
+ 
+        /// <summary>
         /// Converts a purchase quantity expressed in a string purchase unit to the canonical base:
         /// g/gram → grams, kg → grams, dl → deciliters, l/liter → deciliters, stk/pcs/pakke/pk → count.
         /// Returns double.NaN for unknown units.
