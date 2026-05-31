@@ -3,6 +3,7 @@
 @inject HttpClient Http
 @inject ISettings Settings
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="card-maincontainer container-sm">
 
@@ -36,26 +37,40 @@
                 <ul class="todo-list">
                     @foreach (var menu in GetSortedMenus())
                     {
-                        <li @onclick="@(() => Navigation.NavigateTo($"/weekmenus/{menu.Id}"))" style="cursor:pointer;">
+                        <li>
                             <div class="parent-horizontal-stack align-items-center">
-                                <div class="col">
-                                    <strong>Uke @menu.WeekNumber, @menu.Year</strong>
-                                    <div class="text-muted">
-                                        <small>@CountPlannedDays(menu) av 7 dager planlagt</small>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    @if (menu.IsActive)
+                                <div class="col clickable-name" style="cursor:pointer;" @onclick="@(() => Navigation.NavigateTo($"/weekmenus/{menu.Id}"))">
+                                    @if (_editingId == menu.Id)
                                     {
-                                        <span class="badge bg-success">Aktiv</span>
+                                        <input class="form-control form-control-sm" style="max-width:240px"
+                                               @bind="_editName" @onclick:stopPropagation="true" />
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">Inaktiv</span>
+                                        <strong>@(menu.Name ?? $"Uke {menu.WeekNumber}, {menu.Year}")</strong>
+                                        <div class="text-muted"><small>@CountPlannedDays(menu) av 7 dager planlagt</small></div>
                                     }
                                 </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-chevron-right text-muted"></i>
+                                <div class="col-auto d-flex gap-1 align-items-center">
+                                    @if (_editingId == menu.Id)
+                                    {
+                                        <button class="btn btn-sm btn-primary" @onclick="@(() => SaveRename(menu))" @onclick:stopPropagation="true" disabled="@_saving">✓</button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="CancelRename" @onclick:stopPropagation="true">✕</button>
+                                    }
+                                    else
+                                    {
+                                        @if (menu.IsActive)
+                                        {
+                                            <span class="badge bg-success">Aktiv</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inaktiv</span>
+                                        }
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => StartRename(menu))" @onclick:stopPropagation="true" title="Endre navn">✏️</button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteMenu(menu))" @onclick:stopPropagation="true" title="Slett" disabled="@_saving">🗑️</button>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    }
                                 </div>
                             </div>
                         </li>
@@ -82,6 +97,9 @@
 @code {
     private IList<WeekMenuModel>? _menus;
     private bool _creating = false;
+    private string? _editingId;
+    private string _editName = "";
+    private bool _saving = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -108,6 +126,86 @@
 
     private static int CountPlannedDays(WeekMenuModel menu)
         => menu.DailyMeals?.Count(d => !string.IsNullOrEmpty(d.MealRecipeId)) ?? 0;
+
+    private void StartRename(WeekMenuModel menu)
+    {
+        _editingId = menu.Id;
+        _editName = menu.Name ?? "";
+    }
+
+    private void CancelRename()
+    {
+        _editingId = null;
+        _editName = "";
+    }
+
+    private async Task SaveRename(WeekMenuModel menu)
+    {
+        if (string.IsNullOrWhiteSpace(_editName)) return;
+
+        _saving = true;
+        var originalName = menu.Name;
+        var originalLastModified = menu.LastModified;
+        try
+        {
+            menu.Name = _editName.Trim();
+            menu.LastModified = DateTime.UtcNow;
+            var response = await Http.PutAsJsonAsync(
+                Settings.GetApiUrl(ShoppingListKeysEnum.WeekMenus), menu);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _editingId = null;
+            }
+            else
+            {
+                menu.Name = originalName;
+                menu.LastModified = originalLastModified;
+                Console.WriteLine($"❌ Rename failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            menu.Name = originalName;
+            menu.LastModified = originalLastModified;
+            Console.WriteLine($"❌ Rename error: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteMenu(WeekMenuModel menu)
+    {
+        var menuName = menu.Name ?? $"Uke {menu.WeekNumber}, {menu.Year}";
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Slette '{menuName}'?");
+        if (!confirmed) return;
+
+        _saving = true;
+        try
+        {
+            var response = await Http.DeleteAsync(
+                Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, menu.Id));
+
+            if (response.IsSuccessStatusCode)
+            {
+                _menus?.Remove(menu);
+            }
+            else
+            {
+                Console.WriteLine($"❌ Delete failed: {response.StatusCode}");
+            }
+        }
+         catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Delete error: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
 
     private async Task CreateNewMenu()
     {
