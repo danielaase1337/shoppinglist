@@ -86,6 +86,17 @@
 
 ## Learnings & Tech Details
 
+### 2026-05-31 — Consume/Unconsume Meal UI (#74) ✅ COMPLETE
+
+**Wiring consume/unconsume to existing backend endpoints from `OneWeekMenuPage.razor`**
+- `IsConsumed` already existed on both `DailyMeal` (Firestore) and `DailyMealModel` (DTO) — no shared model changes needed.
+- No new `ShoppingListKeysEnum` values needed: consume/unconsume URLs are constructed by appending `/consume` and `/unconsume` to `Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, id)` — this follows the existing `generate-shoppinglist` precedent in the same file.
+- Per-day loading state tracked as `Dictionary<DayOfWeek, bool> _consumingDay` — avoids multiple simultaneous calls across days while keeping state granular.
+- Dropdown disabled (not hidden) when `IsConsumed = true` — preserves the displayed recipe name without layout shift.
+- CSS approach: `tr.meal-consumed td` gets `opacity: 0.55` globally, but `td.day-consume` is explicitly excluded (`opacity: 1`) so the Angre button stays clearly clickable.
+- `WeekMenuController.cs` had pre-existing `MealCategory` ambiguity errors (not introduced by this PR) — Client project builds clean independently.
+- Git worktree conflict: the `git checkout -b` succeeded but commit landed on the wrong worktree branch (`squad/26-nav-dropdown-onclick`). Used `cherry-pick` to move it to the correct branch before pushing.
+
 ### 2026-05-29 — Meal Ingredient Inline Edit (#70) ✅ COMPLETE
 
 **Inline edit pattern for meal ingredients on `OneMealRecipePage.razor`**
