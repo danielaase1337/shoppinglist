@@ -448,8 +448,9 @@ namespace Api.Controllers
                 }).ToList();
 
                 // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand.
-                // Operates on raw ingredient quantities (same units as QuantityInStock) — must run BEFORE
-                // the package conversion below so the subtraction stays in the same unit dimension.
+                // Runs BEFORE package-size conversion so demand subtraction stays in the same unit dimension.
+                // Cross-dimension case (e.g. inventory in Package, recipe in Gram): converts inventory
+                // to recipe base units via StandardPurchaseQuantity before comparing.
                 var allInventory = await _inventoryRepository.Get();
                 var inventoryDict = allInventory?
                     .Where(i => i.IsActive && i.ShopItemId != null)
@@ -462,6 +463,48 @@ namespace Api.Controllers
                     if (item.Varen?.Id == null) continue;
                     if (!inventoryDict.TryGetValue(item.Varen.Id, out var inv)) continue;
 
+                    bool hasAgg = aggregated.TryGetValue(item.Varen.Id, out var agg);
+
+                    // Cross-dimension smart comparison:
+                    // When inventory is stored in packages/units but the recipe demands weight or volume,
+                    // multiply inventory count by StandardPurchaseQuantity to obtain recipe-compatible units.
+                    // Example: inv=1 bag (Package), StandardPurchaseQuantity=1000, StandardPurchaseUnit="g",
+                    //          recipe needs 400 g → effectiveStock = 1×1000 = 1000 g ≥ 400 g → covered.
+                    if (hasAgg
+                        && !agg.UnitMismatch
+                        && item.Varen.StandardPurchaseQuantity > 0
+                        && !string.IsNullOrEmpty(item.Varen.StandardPurchaseUnit)
+                        && !agg.Unit.IsCompatibleWith(inv.Unit.ToNorwegian()))
+                    {
+                        double invCountBase = inv.Unit.NormalizeToBaseUnit(inv.QuantityInStock);
+                        double packageInRecipeBase = MealUnitExtensions.NormalizePurchaseUnitToBase(
+                            item.Varen.StandardPurchaseQuantity, item.Varen.StandardPurchaseUnit);
+
+                        if (!double.IsNaN(invCountBase) && !double.IsNaN(packageInRecipeBase) && packageInRecipeBase > 0)
+                        {
+                            double stockInRecipeBase = invCountBase * packageInRecipeBase;
+                            double demandInBase = agg.Unit.NormalizeToBaseUnit(agg.Quantity);
+
+                            if (!double.IsNaN(demandInBase))
+                            {
+                                if (stockInRecipeBase >= demandInBase)
+                                {
+                                    item.IsLikelyNotNeeded = true;
+                                    item.IsInventoryCovered = true;
+                                }
+                                else if (stockInRecipeBase > 0)
+                                {
+                                    // Partial: convert remaining demand back from base to agg.Unit
+                                    double unitFactor = agg.Unit.NormalizeToBaseUnit(1);
+                                    if (!double.IsNaN(unitFactor) && unitFactor > 0)
+                                        item.Mengde = (int)Math.Ceiling((demandInBase - stockInRecipeBase) / unitFactor);
+                                }
+                                continue; // handled — skip same-dimension fallback
+                            }
+                        }
+                    }
+
+                    // Same-dimension (or unknown-unit) fallback: compare raw quantities directly.
                     var stock = inv.QuantityInStock;
                     if (stock >= item.Mengde)
                     {
