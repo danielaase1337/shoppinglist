@@ -157,7 +157,7 @@
                             else
                             {
                                 <tr class="@(item.QuantityInStock <= item.LowerThreshold && item.LowerThreshold > 0 ? "table-danger" : "")">
-                                    <td class="clickable-row" @onclick="@(() => StartEdit(item.Id))">@item.Name</td>
+                                    <td class="clickable-row" @onclick="@(() => StartEdit(item.Id))">@(string.IsNullOrEmpty(item.Name) ? item.ShopItemName : item.Name)</td>
                                     <td>@item.QuantityInStock</td>
                                     <td><small>@item.Unit.ToNorwegian()</small></td>
                                     <td><small class="text-muted">@item.LowerThreshold</small></td>
@@ -306,6 +306,15 @@
 
         var recipe = _recipes?.FirstOrDefault(r => r.Id == _freezeRecipeId);
         if (recipe == null) return;
+
+        // If this recipe already exists in inventory, increment quantity instead of creating a duplicate
+        var existing = _items?.FirstOrDefault(i => i.SourceMealRecipeId == _freezeRecipeId);
+        if (existing != null)
+        {
+            await Adjust(existing, 1);
+            _freezeRecipeId = "";
+            return;
+        }
 
         var item = new InventoryItemModel
         {
