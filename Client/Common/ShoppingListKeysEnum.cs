@@ -35,6 +35,8 @@ namespace BlazorApp.Client.Common
         WeekMenuConsume = 22,
         WeekMenuSwap = 23,
         // #81 — Undo consume
-        WeekMenuUnconsume = 24
+        WeekMenuUnconsume = 24,
+        // #72c — Smart menu suggestion
+        WeekMenuSuggest = 25
     }
 }
