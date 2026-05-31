@@ -673,4 +673,12 @@ All 5 individual PRs closed with reference to PR #94.
 - **Lesson**: Always check `git status` after branch switches to detect teammate's unstaged changes. Add `.worktrees/` to `.gitignore` to prevent future embed issues.
 - **All 5 individual PRs closed** with reference to PR #94.
 - **Decision D-BUGFIX-4 merged** to `decisions.md`.
+ 
+### 2026-05-31 — Week menu preview pantry split ✅ COMPLETE
 
+**Generated shopping list preview grouping in `OneWeekMenuPage.razor`**
+- Split preview rows into two Razor-local collections: `buyItems` (`!IsLikelyNotNeeded`) and `pantryItems` (`IsLikelyNotNeeded`).
+- Keep the primary heading/table first (`🛒 Handleliste`); when no buy-items exist, reuse the existing muted empty-state copy before optionally rendering pantry items below.
+- Pantry/staple/inventory-covered rows render in a separate de-emphasised section: `🗄️ Dette har du kanskje i skapet` with `text-muted` on heading + table.
+- Saving from the preview must filter `_generatedList.ShoppingItems` to buy-items only before `PostAsJsonAsync`, so pantry suggestions never become real shopping-list rows.
+ 

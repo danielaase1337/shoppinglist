@@ -336,6 +336,13 @@ namespace Api.Controllers
                     }
                 }
 
+                // Mark IsBasic items as likely not needed — staples/spices user probably has in the cupboard
+                foreach (var item in shoppingItems)
+                {
+                    if (item.Varen?.IsBasic == true)
+                        item.IsLikelyNotNeeded = true;
+                }
+
                 // #76 Package-size calculation: convert stock-adjusted raw demand into package count.
                 // Only applies when StandardPurchaseQuantity is set and units are compatible.
                 // Falls back to the raw Math.Ceiling value already in Mengde for unknown/incompatible units.

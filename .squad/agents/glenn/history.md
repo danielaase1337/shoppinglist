@@ -8,6 +8,7 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **RunGenerateShoppingList pantry flag order matters**: keep the inventory stock pass first so partial pantry coverage can reduce `Mengde`, then do a separate `IsBasic` pass that sets `IsLikelyNotNeeded = true`, and only after that run package-size conversion. This preserves shortfall math for basic staples while still surfacing them as cupboard-likely items.
 - **ToDictionary null-key guard pattern**: `GoogleFireBaseGenericRepository` can return documents whose `Id` field is null (e.g., legacy data without the `[FirestoreProperty] Id` field stored). Always add `.Where(x => x.Id != null)` before `.ToDictionary(x => x.Id, x => x)` in generate/aggregate flows. Same applies to foreign-key fields like `ShopItemId` in `InventoryItem` — filter with `i.ShopItemId != null` before `GroupBy`. Without these guards, `ArgumentNullException` from `Dictionary` is caught by the controller's outer `try/catch` and returned as 500.
 - **Unit tests do not surface Firestore data-quality bugs**: Mocked repositories always return clean, non-null Id data. The null-key crash only manifests in production with real Firestore documents. Tests that exercise the generate flow must explicitly include a null-Id scenario to catch this.
 - `Api/Program.cs` uses environment variable `GOOGLE_CREDENTIALS` (not `#if DEBUG`) to switch between MemoryGenericRepository (development / no credentials) and GoogleFireBaseGenericRepository (production).
