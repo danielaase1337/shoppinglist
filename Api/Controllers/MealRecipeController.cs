@@ -49,6 +49,14 @@ namespace Api.Controllers
                         return response;
                     }
 
+                    // Lazy migration: set IsActive=true for legacy meals that predate the field
+                    foreach (var meal in result.Where(m => !m.IsActive))
+                    {
+                        meal.IsActive = true;
+                        await _repository.Update(meal);
+                        _logger.LogInformation($"Migrated IsActive for meal: {meal.Name}");
+                    }
+
                     var sortedResult = result.OrderByDescending(r => r.PopularityScore).ToArray();
                     var mealRecipeModels = _mapper.Map<MealRecipeModel[]>(sortedResult);
                     await response.WriteAsJsonAsync(mealRecipeModels);

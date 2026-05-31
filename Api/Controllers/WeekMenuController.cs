@@ -252,10 +252,13 @@ namespace Api.Controllers
                     }
                 }
 
-                // Fetch all active meals; guard against null Id (legacy Firestore documents)
+                // Fetch all meals; guard against null Id (legacy Firestore documents)
                 var allMeals = await _mealRepository.Get() ?? new List<MealRecipe>();
+                // IsActive filter omitted — no meal deactivation UI exists yet.
+                // Legacy Firestore docs without this field deserialise IsActive=false (C# default).
+                // Re-add this filter when a deactivation workflow is implemented.
                 var activeMeals = allMeals
-                    .Where(m => m.IsActive && m.Id != null)
+                    .Where(m => m.Id != null)
                     .ToList();
 
                 if (!activeMeals.Any())

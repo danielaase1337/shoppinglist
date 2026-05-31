@@ -17,6 +17,7 @@
 - `Api/Program.cs` has `#if DEBUG` blocks — MemoryGenericRepository in debug, GoogleFireBaseGenericRepository in production.
 - `LastModified = DateTime.UtcNow` must be set on all POST and PUT operations. GET operations do lazy migration for null values.
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
+- **Legacy bool fields need migration-safe reads**: Firestore documents created before a new `bool` field exists deserialize as `false`. Until there is real UI/workflow support for toggling that field, do not gate critical read paths on it; omit the filter and add lazy migration in GET-all to heal old documents over time.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
 ### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE
