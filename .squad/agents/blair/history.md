@@ -709,3 +709,15 @@ All 5 individual PRs closed with reference to PR #94.
 **Files**: `Client/Shared/NewNavComponent.razor`, `Client/wwwroot/css/app.css`
 **PR**: #95 → `integration/sprint-2-fixes`
 
+
+## Learnings
+
+### Branch collision: feature-on-feature conflicts in integration branches (2025-01)
+
+**Pattern observed:** Two PRs (#98 / #72a backend, #100 / #72c suggestion UI) both touched OneWeekMenuPage.razor, ShoppingListKeysEnum.cs, and ISettings.cs. Blair's branch was cut before the enum cleanup (PR #95/#80) landed, so it carried stale enum values (WeekMenuConsume = 22, WeekMenuSwap = 23, WeekMenuUnconsume = 24) that HEAD had already removed.
+
+**Resolution approach:**
+- For enum + ISettings: git checkout --ours (take integration HEAD) — dead values intentionally removed.
+- For the razor: manual keep-both merge — @code block needs ALL state variables from both features; CSS needs ALL styles from both features. Never discard either side when they implement orthogonal features on the same file.
+- **Gotcha:** Integration HEAD may not yet contain a PR's additions even if the task description says so. Always verify with Select-String after --ours. Here, WeekMenuSuggest = 22 and its ISettings mapping were described as "already in HEAD" but were actually absent — required manual addition post-resolution.
+- **Build check is mandatory** before committing the merge: dotnet build --no-restore catches missing enum values or ISettings keys that the razor references.
