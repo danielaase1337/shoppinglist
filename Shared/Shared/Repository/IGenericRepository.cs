@@ -15,5 +15,6 @@ namespace Shared.Repository
         Task<T> Get(object id);
         Task<T> Insert(T entity);
         Task<T> Update(T entityToUpdate);
+        Task<bool> BatchUpdate(IEnumerable<T> entities);
     }
 }

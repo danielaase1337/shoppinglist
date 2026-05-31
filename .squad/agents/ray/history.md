@@ -197,6 +197,12 @@ Other: Kebab, Sprø thaiboller
 **Lesson:** `StockBehaviour` enum belongs in root `Shared` namespace (not `Shared.FireStoreDataModels`) so both model hierarchies can use it without cross-namespace coupling or duplication. Follow the `MealUnit`/`AgeGroup` pattern for any new enum that needs to be shared across Firestore and DTO models.
 
 
+### 2026-05-31 — BatchUpdate for Inventory Consistency ✅ COMPLETE
+- Added `BatchUpdate(IEnumerable<T>)` to `IGenericRepository<T>` and implemented it with Firestore `WriteBatch` plus DEBUG-memory parity.
+- `WeekMenuController.ConsumeMeal()` now accumulates inventory deductions and flushes them in one repository batch, removing partial per-ingredient inventory writes inside the loop.
+- `ShoppingListController` now accumulates tracked stock changes by `ShopItemId`, assigns IDs for newly created inventory records before batching, and commits all inventory mutations with one `BatchUpdate` call.
+- `GoogleFireBaseGenericRepository.Update()` semantics are effectively upsert via `SetAsync`; `MemoryGenericRepository.Update()` must mirror that behavior so batch-created inventory records persist in DEBUG mode.
+
 ## Orchestration Log — 2026-04-04T05:12:37Z
 **Phase 1 Meal Planning — Data Models ✅ COMPLETE**
 - Created MealUnit enum (root Shared namespace) + MealUnitExtensions

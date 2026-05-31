@@ -624,19 +624,27 @@ namespace Api.Controllers
                     var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
                     if (recipe != null && recipe.Ingredients != null)
                     {
-                        var allInventory = await _inventoryRepository.Get();
-
+                        var allInventory = (await _inventoryRepository.Get()) ?? new List<InventoryItem>();
+                        var inventoryByShopItemId = allInventory
+                            .Where(i => i.IsActive && !string.IsNullOrEmpty(i.ShopItemId))
+                            .GroupBy(i => i.ShopItemId)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                        var inventoryChanges = new Dictionary<string, InventoryItem>(StringComparer.OrdinalIgnoreCase);
+ 
                         foreach (var ingredient in recipe.Ingredients)
                         {
                             if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
-
-                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
-                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
-
+ 
+                            if (!inventoryByShopItemId.TryGetValue(ingredient.ShopItemId, out var inventoryItem))
+                                continue; // No inventory entry — skip, no crash
+ 
                             inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
                             inventoryItem.LastModified = DateTime.UtcNow;
-                            await _inventoryRepository.Update(inventoryItem);
+                            inventoryChanges[inventoryItem.Id] = inventoryItem;
                         }
+
+                        if (inventoryChanges.Any() && !await _inventoryRepository.BatchUpdate(inventoryChanges.Values))
+                            return await GetErroRespons($"Could not update inventory for week menu {weekMenuId} after consume", req);
                     }
                 }
 

@@ -97,37 +97,40 @@ namespace Api.Controllers
                     // When a shopping list transitions from not-done to done, add items to inventory
                     if (existing != null && !existing.IsDone && updatedList.IsDone)
                     {
-                        var allInventory = await _inventoryRepository.Get();
-
+                        var allInventory = (await _inventoryRepository.Get()) ?? new List<InventoryItem>();
+                        var inventoryByShopItemId = allInventory
+                            .Where(i => i.IsActive && !string.IsNullOrEmpty(i.ShopItemId))
+                            .GroupBy(i => i.ShopItemId)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                        var inventoryChanges = new Dictionary<string, InventoryItem>(StringComparer.OrdinalIgnoreCase);
+ 
                         foreach (var item in updatedList.ShoppingItems ?? Enumerable.Empty<ShoppingListItem>())
                         {
                             if (item?.Varen == null) continue;
-
+ 
                             // Only track items with StockBehaviour.Track (#75)
                             if (item.Varen.StockBehaviour != StockBehaviour.Track) continue;
-
-                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == item.Varen.Id && i.IsActive);
-
-                            if (inventoryItem != null)
+ 
+                            if (!inventoryByShopItemId.TryGetValue(item.Varen.Id, out var inventoryItem))
                             {
-                                inventoryItem.QuantityInStock += item.Mengde;
-                                inventoryItem.LastModified = DateTime.UtcNow;
-                                await _inventoryRepository.Update(inventoryItem);
-                            }
-                            else
-                            {
-                                // Auto-create inventory entry for tracked items not yet in inventory
-                                var newInventoryItem = new InventoryItem
+                                inventoryItem = new InventoryItem
                                 {
+                                    Id = Guid.NewGuid().ToString(),
                                     ShopItemId = item.Varen.Id,
                                     ShopItemName = item.Varen.Name,
-                                    QuantityInStock = item.Mengde,
-                                    IsActive = true,
-                                    LastModified = DateTime.UtcNow
+                                    QuantityInStock = 0,
+                                    IsActive = true
                                 };
-                                await _inventoryRepository.Insert(newInventoryItem);
+                                inventoryByShopItemId[item.Varen.Id] = inventoryItem;
                             }
+ 
+                            inventoryItem.QuantityInStock += item.Mengde;
+                            inventoryItem.LastModified = DateTime.UtcNow;
+                            inventoryChanges[inventoryItem.Id] = inventoryItem;
                         }
+
+                        if (inventoryChanges.Any() && !await _inventoryRepository.BatchUpdate(inventoryChanges.Values))
+                            return await GetErroRespons("Could not update inventory", req);
                     }
 
                     await response.WriteAsJsonAsync(mapper.Map<ShoppingListModel>(addRes));

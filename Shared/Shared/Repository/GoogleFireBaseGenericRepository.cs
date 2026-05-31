@@ -122,5 +122,25 @@ namespace Shared.Repository
             await updateRef.SetAsync(entityToUpdate);
             return entityToUpdate;
         }
+
+        public async Task<bool> BatchUpdate(IEnumerable<TEntity> entities)
+        {
+            try
+            {
+                var batch = dbContext.DB.StartBatch();
+                foreach (var entity in entities)
+                {
+                    var docRef = dbContext.Collection.Document(entity.Id);
+                    batch.Set(docRef, entity);
+                }
+                await batch.CommitAsync();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.Write(e);
+                return false;
+            }
+        }
     }
 }
