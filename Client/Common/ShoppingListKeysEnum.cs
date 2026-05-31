@@ -30,6 +30,7 @@ namespace BlazorApp.Client.Common
         FamilyProfiles = 18,
         FamilyProfile = 19,
         PortionRules = 20,
-        PortionRule = 21
+        PortionRule = 21,
+        WeekMenuSuggest = 22
     }
 }
