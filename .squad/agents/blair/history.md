@@ -689,4 +689,23 @@ All 5 individual PRs closed with reference to PR #94.
 - Added a per-row `Fjern` action for the “🤔 Dette har du kanskje i skapet” table via `RemovePantryItem(ShoppingListItemModel)` so users can drop probable pantry items before saving.
 - Kept `_scalingApplied` notice above the groups and retained the explicit save filter `_generatedList.ShoppingItems = _generatedList.ShoppingItems.Where(i => !i.IsLikelyNotNeeded).ToList();` so both maybe-items and inventory-covered items stay out of the persisted shopping list.
 - Group 3 (`✅ Dette har du i skapet`) is informational only, rendered with success/muted styling and never saved.
- 
+
+### 2025-01-01 — Issue #26: Nav Dropdown CSS :hover → @onclick ✅ COMPLETE
+
+**What changed**:
+- `NewNavComponent.razor`: Added `tabindex="0"` to trigger span for keyboard focusability
+- Fixed `aria-expanded` to emit lowercase `true`/`false` via `.ToString().ToLower()`
+- Added `@onkeydown="HandleAdminKeyDown"` — Enter/Space toggles, Escape closes
+- Added transparent `.dropdown-backdrop` overlay div (`@if (_adminOpen)`) for click-away close
+- Added `CloseAdminMenu()` and `HandleAdminKeyDown(KeyboardEventArgs)` C# methods
+- `app.css`: Removed `:hover` from dropdown visibility selectors; visibility now controlled exclusively by `.open` class
+- Added `.dropdown-backdrop` CSS rule (`position:fixed; inset:0; z-index:999`)
+
+**Key decisions**:
+- Used conditional `@if (_adminOpen)` backdrop div instead of JS interop — keeps everything in Blazor, no IJSRuntime dependency
+- Arrow rotation kept on `.open` class only (removed `:hover` rotation for consistency with onclick-only model)
+- `@onclick:stopPropagation="true"` on trigger prevents the nav div's `@onclick="ToggleNavMenu"` from firing unexpectedly
+
+**Files**: `Client/Shared/NewNavComponent.razor`, `Client/wwwroot/css/app.css`
+**PR**: #95 → `integration/sprint-2-fixes`
+
