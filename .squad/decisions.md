@@ -2,6 +2,8 @@
 
 **Last Updated:** 2026-04-03  
 **Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 + Sprint 2 completion
+**Last Updated:** 2026-04-24  
+**Source:** Team audits + PRD synthesis (issue #15) + Sprint 0 completion + Daniel feedback + Phase 5 completion review
 
 ---
 
@@ -522,6 +524,328 @@ Notifications.Error("Failed to save");     // 5s auto-dismiss
 **Blocking dependencies remain:**
 - #29 (meal scoping) — must be completed before meal implementation (#30+)
 - #18 + #19 (CI tests) — should be completed before #33 (test rewrite)
+## Phase 4: Inventory Management (P1 — Feature Implementation)
+
+### D-Phase4-Inventory-1: InventoryItem IsActive Property
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-08)  
+**Component:** Shared models (Firestore + DTO), soft-delete pattern
+
+**Decision:**
+- Add `IsActive: bool` property to both `InventoryItem` and `InventoryItemModel`
+- Default to `true` in constructors; inherited from `EntityBase` precedent
+- Enables soft-delete filtering and inactive inventory display
+
+**Rationale:**
+- Mirrors PortionRule pattern (Phase 5)
+- Allows historical tracking without hard delete
+- GET endpoints filter `IsActive == true` automatically
+
+---
+
+### D-Phase4-Inventory-2: InventoryItemController Endpoints
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-08)  
+**Component:** Azure Functions controller
+
+**Endpoints:**
+| Function | Methods | Route | Behavior |
+|----------|---------|-------|----------|
+| `inventoryitems` | GET, POST, PUT | `/api/inventoryitems` | GET filters IsActive=true, orders by Name |
+| `inventoryitem` | GET, DELETE | `/api/inventoryitem/{id}` | DELETE soft-deletes (IsActive→false) |
+| `inventoryitemsadjust` | POST | `/api/inventoryitems/adjust` | Bulk delta adjustments, clamps to 0 |
+
+**Key Logic:**
+- **Soft delete:** GET existing → set `IsActive=false` → `LastModified=UtcNow` → `Update()`
+- **Bulk adjust:** Fetches all inventory **once** before loop (avoids N+1)
+- **Quantity clamping:** Delta will not reduce stock below 0
+- **InventoryAdjustmentModel:** Public nested class in controller for JSON deserialization
+
+---
+
+### D-Phase4-Inventory-3: ShoppingList IsDone→Inventory Hook
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-08)  
+**Component:** ShoppingListController.GetAllShoppingListsFunction
+
+**Behavior:**
+When a shopping list PUTs with `IsDone: false → true` transition:
+1. Fetch existing list state from repo **before** update
+2. Detect transition: `existing != null && !existing.IsDone && updatedList.IsDone`
+3. Load all active inventory items (once)
+4. For each `ShoppingListItem` where `Varen != null`:
+   - Find matching inventory by `ShopItemId + IsActive`
+   - Increment `QuantityInStock += Mengde`
+5. No auto-create: Missing inventory silently skipped
+
+**Rationale:**
+- Closes the loop: shopping → inventory tracking
+- User-managed inventory (no auto-creation)
+- One-shot operation on IsDone transition only
+
+---
+
+### D-Phase4-Inventory-4: InventoryItemsPage Frontend UI
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-08)  
+**Component:** New page at `/inventory`, SfAutoComplete + quick-adjust buttons
+
+**Features:**
+- Row-level name click → inline edit (no modal)
+- +1/−1 buttons → `POST /api/inventoryitems/adjust` (optimistic UI)
+- Frozen meal shortcut: creates inventory item with `Name = "{RecipeName} (frossen)"`, `SourceMealRecipeId = recipe.Id`
+- SfAutoComplete for ShopItem selection (parallel data loading)
+- Nav integration: "Lager" link in Admin dropdown
+
+**Design Decisions:**
+- **Optimistic adjust:** Update local `QuantityInStock` before API response (fast UX)
+- **Frozen meal ShopItemId:** Uses `recipe.Id` as proxy (no real ShopItem). Migration path clear for future real links.
+- **No IsActive badge:** IsActive filter handled server-side; UI shows active items only
+
+---
+
+### D-Phase4-Inventory-5: Phase 3 Ingredient Use-Up Matching
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-08)  
+**Component:** OneWeekMenuPage.razor suggestion panel
+
+**Algorithm:**
+- Runs on recipe selection; no new API calls (uses loaded `_recipes`)
+- Suggests fractional ingredients (`Quantity < 1.0`) only
+- Excludes recipes already in week plan (`selectedIds` set)
+- Dismissal: session-scoped `HashSet<string>` (no persistence)
+- "Add to next slot" finds first empty day in `WeekOrder`, silently ignores if full
+
+**UI:**
+- Amber left border panel (#ffc107, Bootstrap warning colour)
+- Between week planner table and generated list card
+- Dismissable per ingredient
+
+---
+
+### D-Phase4-Inventory-6: IsActive Patch Finding
+**Status:** ✅ DOCUMENTED (Josh, 2026-04-07)  
+**Component:** Cross-agent discovery
+
+**Finding:**
+InventoryItem model was missing `IsActive` property despite soft-delete requirement. Discovered during test seeding. Glenn added to both Firestore + DTO models.
+
+**Lesson:** Pre-check model completeness against controller implementation before writing tests.
+
+---
+
+## Phase 5: Family Profile & Portion Scaling (P1 — Feature Implementation)
+
+### D-Phase5-DataModels-1: AgeGroup Enum & Namespace
+**Status:** ✅ IMPLEMENTED (Ray, 2026-04-04)  
+**Component:** Shared/AgeGroup.cs, root Shared namespace
+
+**Enum Values:**
+- `Unknown = 0`
+- `Adult = 1`
+- `Child = 2`
+- `SmallChild = 3` (toddler)
+
+**Rationale:**
+- Enums shared between Firestore + DTO namespaces (no duplication needed)
+- Root Shared namespace mirrors MealUnit precedent
+- Simplifies cross-model references
+
+---
+
+### D-Phase5-DataModels-2: FamilyProfile & FamilyMember Structure
+**Status:** ✅ IMPLEMENTED (Ray, 2026-04-04)  
+**Component:** Firestore + DTO models, embedded FamilyMember
+
+**Decision:**
+- `FamilyMember` is **embedded** in `FamilyProfile`, not a root collection
+- No separate DI registration or Firestore collection for FamilyMember
+- Mirrors MealIngredient→MealRecipe pattern
+
+**Structure:**
+- `FamilyProfile: EntityBase` → `Members: ICollection<FamilyMember>`
+- `FamilyMember` (embedded): Name, AgeGroup, DietaryNotes
+- `FamilyProfileModel` and `FamilyMemberModel` in DTO namespace
+
+**Rationale:**
+- Single household assumption (v1) doesn't require separate collection
+- Embedding reduces Firestore round-trips
+- Clear path to multi-household in v2 (promote to root collection)
+
+---
+
+### D-Phase5-DataModels-3: PortionRule Model with Denormalisation
+**Status:** ✅ IMPLEMENTED (Ray, 2026-04-04)  
+**Component:** Firestore + DTO models
+
+**Structure:**
+- `ShopItemId: string` (required)
+- `AgeGroup: enum` (required)
+- `QuantityPerPerson: float` (e.g., 0.5 for half a can per person)
+- `IsActive: bool` (inherited from EntityBase)
+- `PortionRuleModel` also includes `ShopItemName: string` (denormalised)
+
+**Rationale:**
+- Denormalisation avoids UI fetch for item names
+- Mirrors `MealIngredientModel` pattern (existing precedent)
+- Server-side stores names at sync time; client cache responsibility
+
+---
+
+### D-Phase5-Controllers-1: FamilyProfileController Hard Delete
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-08)  
+**Component:** Azure Functions
+
+**Endpoints:**
+| Function | Methods | Route |
+|----------|---------|-------|
+| `familyprofiles` | GET, POST, PUT | `/api/familyprofiles` |
+| `familyprofile` | GET, DELETE | `/api/familyprofile/{id}` |
+
+**Behavior:**
+- **GET all:** Ordered by Name ascending (single-household assumption, but collection interface)
+- **POST:** Sets `LastModified = DateTime.UtcNow`
+- **DELETE:** Hard delete via `_repository.Delete(id)` (no IsActive property exists)
+
+**Rationale:** FamilyProfile has no IsActive field → hard delete is only option (no soft-delete path).
+
+---
+
+### D-Phase5-Controllers-2: PortionRuleController Soft Delete
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-08)  
+**Component:** Azure Functions
+
+**Endpoints:**
+| Function | Methods | Route |
+|----------|---------|-------|
+| `portionrules` | GET, POST, PUT | `/api/portionrules` |
+| `portionrule` | GET, DELETE | `/api/portionrule/{id}` |
+
+**Behavior:**
+- **GET all:** Filters `IsActive == true`, ordered by ShopItemId then AgeGroup (enum ordinal)
+- **POST:** Sets `LastModified = DateTime.UtcNow` AND `IsActive = true` (override client)
+- **DELETE:** Soft delete — Get → `IsActive=false` → `LastModified=UtcNow` → Update
+
+**Rationale:** PortionRule has IsActive → soft delete preserves history.
+
+---
+
+### D-Phase5-Frontend-1: FamilyProfilePage Structure
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-09)  
+**Component:** `/familyprofile` page, two sections
+
+**Section 1 — Family Members:**
+- Loads `GET /api/familyprofiles`, takes `FirstOrDefault()` (single-household)
+- "Create profile" button if none exists
+- List: Name, AgeGroup (Norwegian label), DietaryNotes
+- Add member form: Name, AgeGroup select, DietaryNotes textarea
+- Remove button → modify Members collection → PUT profile
+- All mutations immediately PUT profile back
+
+**Section 2 — Portion Rules:**
+- Loads `GET /api/portionrules` (shows active only)
+- Table: ShopItemName, AgeGroup (Norwegian), QuantityPerPerson, Unit
+- Add rule form: SfAutoComplete for ShopItem, AgeGroup select, qty input, MealUnit select
+- Delete button → `DELETE /api/portionrule/{id}`
+
+**Nav:** "Familieprofil" (oi-people icon) in Admin dropdown after "Lager"
+
+---
+
+### D-Phase5-Frontend-2: Portion Scaling in OneWeekMenuPage
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-09)  
+**Component:** Client-side scaling after generate-shoppinglist response
+
+**Flow:**
+1. `_familyProfile` and `_portionRules` loaded in parallel on init
+2. User generates shopping list via `generate-shoppinglist` endpoint
+3. `ApplyPortionScaling()` runs after response:
+   - For each ShoppingItem, find matching rules by ShopItemId
+   - For each AgeGroup in rules, multiply `rule.QuantityPerPerson × memberCount`
+   - Sum across all age groups
+   - Set `item.Mengde = (int)Math.Ceiling(scaledQty)`
+4. Generated list preview shows "📐 Mengder tilpasset familieprofil" if scaling applied
+5. Silently skipped if no profile or no rules
+
+**Rationale:**
+- Client-side only (no new API endpoint)
+- Consistent with existing client-side sorting pattern
+- `_scalingApplied` resets per generate call (prevents stale note)
+
+---
+
+### D-Phase5-Frontend-3: Enum URL Mappings Extension
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-09)  
+**Component:** ShoppingListKeysEnum + ISettings
+
+**New Enum Values:**
+- `FamilyProfiles = 17` → `api/familyprofiles`
+- `FamilyProfile = 18` → `api/familyprofile`
+- `PortionRules = 19` → `api/portionrules`
+- `PortionRule = 20` → `api/portionrule`
+
+---
+
+### D-Phase5-Testing-1: Hard vs Soft Delete Test Patterns
+**Status:** ✅ VERIFIED (Josh, 2026-04-08)  
+**Component:** FamilyProfileControllerTests + PortionRuleControllerTests
+
+**Hard Delete Pattern (FamilyProfile):**
+```csharp
+// Test: Delete_CallsRepositoryDelete
+_mockRepository.Verify(r => r.Delete(id), Times.Once);
+_mockRepository.Verify(r => r.Update(It.IsAny<FamilyProfile>()), Times.Never);
+```
+
+**Soft Delete Pattern (PortionRule):**
+```csharp
+// Test: Delete_SoftDeletes_SetsIsActiveFalse
+_mockRepository.Verify(r => r.Delete(It.IsAny<PortionRule>()), Times.Never);
+_mockRepository.Verify(r => r.Update(It.IsAny<PortionRule>()), Times.Once);
+// Verify IsActive=false in Update call
+```
+
+**Rationale:** Explicit verification of delete path prevents accidental soft/hard mismatch.
+
+---
+
+### D-Phase5-Testing-2: Moq ICollection Return Type Fix
+**Status:** ✅ DOCUMENTED (Josh, 2026-04-08)  
+**Component:** Test fixture patterns
+
+**Pattern Requirement:**
+```csharp
+// CORRECT: Explicit type parameter required
+_mockRepository
+    .Setup(r => r.Get())
+    .Returns(Task.FromResult<ICollection<FamilyProfile>>(profiles));
+
+// WRONG: Silent null return without explicit type
+.Returns(Task.FromResult(profiles));  // May return null
+```
+
+**Lesson:** Applied to all Phase 5 tests; documented for future sprints.
+
+---
+
+## Cross-Sprint Findings & Best Practices
+
+### Finding 1: IsActive Patch Necessity
+Model fields required by controller logic sometimes lag behind. Recommend:
+- Pre-check all model fields against controller implementation
+- Write tests first; seed fixtures validate completeness
+
+### Finding 2: Soft vs Hard Delete Clarity
+Document delete strategy **at model level** to prevent implementation mistakes:
+- No IsActive → hard delete only
+- IsActive present → soft delete expected
+
+### Finding 3: Denormalisation Trade-off
+DTOs carrying denormalised fields (ShopItemName, RecipeName) are acceptable when:
+- Lookup field is stored at sync time (server-side responsibility)
+- Client-side cache is acceptable (not real-time critical)
+- Avoids N+1 lazy-load patterns in UI
+
+### Finding 4: Client-Side Scaling Pattern
+Operations like portion scaling belong **client-side** when:
+- No multi-user coordination needed
+- Fully deterministic (same inputs → same output)
+- Reduces API surface area
 
 ---
 
@@ -770,6 +1094,88 @@ Three root causes were identified and fixed.
 5. No regressions in shopping list functionality
 6. Code review completed by Peter + team leads
 7. Mobile testing completed for #27
+## Phase 6: Staging Bug Fix (P0 — Critical Production Issue)
+
+### D-Phase6-SWA-Auth-1: ShoppingListController AuthorizationLevel
+**Status:** ✅ IMPLEMENTED (Peter, 2026-04-04)  
+**Component:** Api/Controllers/ShoppingListController.cs
+
+**Bug:** ShoppingListController used `AuthorizationLevel.Function` instead of `AuthorizationLevel.Anonymous`. All other controllers use `Anonymous`. Azure Static Web Apps proxies to `/api/*` without injecting function keys → 401 → SWA redirects to `/welcome` HTML → client JSON parser crashes on startup.
+
+**Fix:**
+```csharp
+// Changed both functions from AuthorizationLevel.Function to AuthorizationLevel.Anonymous
+public async Task<HttpResponseData> RunAll([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "put")] HttpRequestData req)
+public async Task<HttpResponseData> RunOne([HttpTrigger(AuthorizationLevel.Anonymous, "get", "delete", Route = "shoppinglist/{id}")] HttpRequestData req, object id)
+```
+
+**Architecture Rule:** All Azure Functions in this project MUST use `AuthorizationLevel.Anonymous`. SWA's route rules in `staticwebapp.config.json` handle authorization; Function-level key auth is incompatible with the API proxy pattern.
+
+**Commit:** b314fde
+
+---
+
+### D-Phase6-SWA-DI-2: useMemoryDb Guard Logic (GOOGLE_APPLICATION_CREDENTIALS)
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-04)  
+**Component:** Api/Program.cs
+
+**Bug:** `useMemoryDb` only checked `GOOGLE_CLOUD_PROJECT`, not `GOOGLE_APPLICATION_CREDENTIALS`. In staging, project may be set but credentials file absent → Firestore SDK throws at DI resolution → Functions host crashes → all `/api/*` return HTML 500.
+
+**Fix:**
+```csharp
+// Added third OR-condition to check GOOGLE_APPLICATION_CREDENTIALS
+var useMemoryDb = environment == "Development" || 
+                string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT")) ||
+                string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS"));
+```
+
+**Behavior Matrix:**
+| Environment | GOOGLE_CLOUD_PROJECT | GOOGLE_APPLICATION_CREDENTIALS | Result |
+|---|---|---|---|
+| Development (local) | any | any | Memory repos ✅ |
+| Staging (SWA preview) | set | NOT set | Memory repos ✅ (was crashing) |
+| Staging (SWA preview) | NOT set | any | Memory repos ✅ |
+| Production | set | set | Firestore ✅ |
+
+**Commit:** b73c76e
+
+---
+
+### D-BLAIR-01 through D-BLAIR-05: Edit-Vare UX Simplification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-26)  
+**Component:** Client/Pages/Admin/ItemManagementPage.razor  
+**Branch:** mealplanningv2
+
+#### D-BLAIR-01: StockBehaviour → Single Checkbox "Spor lager"
+A dropdown for a binary enum (Track / DoNotTrack) is excessive. A labelled checkbox is immediately legible.
+Binding via `@onchange` inline lambda; no computed property needed.
+
+#### D-BLAIR-02: Pakkestørrelse as Input-Group (Number + SfComboBox)
+Showing purchase quantity and unit as two separate inputs gave no visual relationship between them.
+Merging into `<div class="input-group">` with the existing `_unitOptions` list (same as the Unit field above)
+makes the pairing obvious and consistent. `AllowCustom="true"` preserves free-text unit entry.
+
+#### D-BLAIR-03: 3×col-4 Layout
+Three equal columns (IsBasic / Spor lager / Pakkestørrelse) are cleaner than four unequal ones.
+Each column has a single, clear purpose.
+
+#### D-BLAIR-04: Bottom Lagre/Avbryt Row in Expanded Edit Section
+Top action buttons remain icon-only (space-efficient in the item row).
+A second row at the bottom of the expanded section adds text-labelled buttons for discoverability,
+following the pattern established in PR #87.
+
+#### D-BLAIR-05: Read-Mode pkg-Hint
+Small muted `pk: 400g` label below the unit badge when pakkestørrelse is set.
+Guarded by `StandardPurchaseQuantity > 0 && !string.IsNullOrEmpty(StandardPurchaseUnit)` — shows nothing for items without package info.
+
+**Rationale:**
+- UX simplifcation: fewer, clearer controls reduce cognitive load
+- Consistency: reuses existing patterns (input-group, SfComboBox, unit options)
+- Space efficiency: 3 columns vs. 4, icon buttons for quick actions
+- Discoverability: text labels on bottom buttons improve learnability
+- Non-intrusive: package hint only shows when relevant
+
+**Commit:** Awaiting team merge
 
 ---
 
@@ -1014,3 +1420,308 @@ public class ShopsControllerTests
 - ✅ 7 decision documents merged
 - ✅ 0 regressions
 - ✅ Ready for Sprint 3 (meal planning v1 implementation)
+**Last Updated:** 2026-05-29  
+**Source:** Phase 6+ onwards (active decisions). Archived entries moved to decisions-archive.md.  
+**Note:** Archived decisions (Phases 1–6, older than 30 days) preserved in decisions-archive.md for reference.
+
+---
+## Phase 6+: Recent Decisions (Issues #81–#84) — 2026-04-24
+
+### D30 — Issue #81 Unconsume Endpoint (Backend)
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** Azure Functions `PUT /api/weekmenu/{id}/unconsume`
+
+**Decision:**
+- Reuse `ConsumeMealRequest` shape (DayOfWeek + MealRecipeId) — no separate request type needed
+- **No upper-bound clamp** on inventory restore: `stock += quantity` (allows out-of-order operation tolerance)
+- Skip inventory update if `InventoryItem` missing (opt-in pattern)
+- Set `IsConsumed = false` and `LastModified = DateTime.UtcNow`
+
+**Rationale:**
+- Mirror `ConsumeMeal` logic exactly in reverse
+- No clamp prevents data loss if operations called out of sequence
+- Opt-in inventory keeps transaction minimal
+
+**Tests:**
+- ✅ `Unconsume_SetsIsConsumedFalse_ReturnsOk`
+- ✅ `Unconsume_ReversesInventoryDeduction`
+- ✅ `Unconsume_Returns404_WhenMenuNotFound`
+- ✅ 162 API tests passing (0 failures)
+
+**Configuration:**
+- `ShoppingListKeysEnum.WeekMenuUnconsume = 23`
+- `ISettings: "weekmenuunconsume" → "api/weekmenu"`
+
+---
+
+### D30.1 — Issue #81 Unconsume UI (Frontend)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor — "↩ Angre" button
+
+**Decision:**
+- No confirmation dialog (per Daniel: "keep it simple")
+- Button appears only when `IsConsumed == true`
+- Calls backend `PUT /api/weekmenu/{id}/unconsume` endpoint
+- Silently logs errors if endpoint unavailable (graceful degradation)
+
+**Rationale:**
+- Single-action reversal unlikely to trigger accidentally
+- Reduces UI clutter
+- Consistent with Daniel's simplicity direction
+
+---
+
+### D31 — Issue #82 Unit Field UI Component
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** ItemManagementPage.razor — Unit input
+
+**Decision:**
+- Use `SfComboBox` (not `SfDropDownList`) with `AllowCustom="true"`
+- Predefined unit list: Stk, kg, g, L, dl, ml, pk, boks, pose (hardcoded, no API call)
+- Applied to both add-new-item form AND inline edit row
+
+**Rationale:**
+- `SfComboBox` allows both list selection and custom input (e.g., "flaske", "glass")
+- `SfDropDownList` enforces strict selection only (too rigid)
+- Units stable; no need for server data source
+- Reduces typos while allowing exceptions
+
+---
+
+### D32 — Issue #83 Mobile Responsiveness
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor, FamilyProfilePage.razor, InventoryPage.razor
+
+**Decision:**
+- Use Bootstrap responsive breakpoints (`col-12 col-md-N`, `col-12 col-sm-N`)
+- Add single `@media (max-width: 576px)` block **only** for week-planner table (icon column hidden)
+- Apply `table-responsive` wrapper to both tables in FamilyProfilePage (horizontal scroll)
+- Prioritize content > buttons on small screens
+
+**Rationale:**
+- Minimal custom CSS; Bootstrap handles 80% of cases
+- Week planner needs surgical control for icon column (mobile: icon visible in dropdown name, so no loss)
+- Content accessibility critical for shopping use case (on-phone while shopping)
+
+**Breakpoints Tested:** 576px (mobile), 768px (tablet), 992px (desktop)
+
+---
+
+### D33 — Issue #84 Meal Selection UX Unification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** OneWeekMenuPage.razor — merged dropdown handler
+
+**Decision:**
+- Remove "🔄 Bytt" button entirely
+- Merge `OnSwapMealSelected` logic into single `OnMealSelected` handler
+- Regular dropdown stays editable until `IsConsumed == true`
+- Handler flow: update local state → call `PUT /weekmenu/{id}/swap` if menu saved (not new)
+
+**Rationale:**
+- Two-button flow was redundant (selection intent already clear from dropdown)
+- Single handler reduces state management complexity (`_swappingDay` field removed)
+- Consumed days locked via plain text display (no explicit `disabled` needed)
+- `WeekMenuSwap = 22` enum kept (endpoint still used, just no dedicated button)
+
+**Code Reduction:** ~30 lines removed (swap dropdown, state field, old handler)
+
+---
+
+### D34 — IsBasic Population Bug Audit
+**Status:** ✅ COMPLETED (Glenn, 2026-04-24)  
+**Component:** WeekMenuController.RunGenerateShoppingList (Issue #77 fix verification)
+
+**Finding:**
+- Scanned all `Api/Controllers/` for inline `new ShopItemModel` constructions bypassing AutoMapper
+- **One bug found:** `WeekMenuController` line 265 — `Varen = new ShopItemModel { Id = kvp.Key, Name = kvp.Value.ShopItemName }`
+- **Fix applied:** Replaced with `_mapper.Map<ShopItemModel>(shopItem)` + graceful fallback
+- **Result:** IsBasic, StockBehaviour, StandardPurchaseQuantity, StandardPurchaseUnit now populate correctly
+
+**Other Controllers Audited — No Issues:**
+- ShoppingListController, MealRecipeController, ShopsItemsController, ShopItemCategoryController, InventoryItemController — all use AutoMapper correctly
+
+**Recommendation:**
+- Add linting rule: "Never construct `ShopItemModel` inline — always use `_mapper.Map<ShopItemModel>()`"
+- Fallback pattern acceptable only when source may be unavailable
+
+---
+
+### D35 — StockBehaviour on ShopItem (Issue #75)
+**Status:** ✅ DECIDED (Peter, 2026-04-24)  
+**Component:** ShopItem + ShopItemModel + IsDone hook
+
+**Decision:**
+- Add `StockBehaviour` enum on `ShopItem`, not on `ShoppingListItem`
+- Enum values: `Track` (default), `DoNotTrack`
+- When `ShoppingList.IsDone → true`: iterate items where `Varen.StockBehaviour == Track`, upsert InventoryItem, increment `QuantityInStock`
+
+**Rationale:**
+- Item-level, not row-level: "Don't track bread" is about bread itself, not a shopping trip
+- Simplest change: 1 enum file + 1 property + 1 filter
+- No per-list decision fatigue for users
+- Inventory explicitly approximate ("Estimert lager"); auto-stock is additive, auto-deduct is subtractive, drift expected
+
+**Impact:**
+| Team | Action |
+|------|--------|
+| Ray | Add `StockBehaviour` enum + property to ShopItem/ShopItemModel, update AutoMapper |
+| Glenn | Implement IsDone hook filter |
+| Blair | Add toggle to item admin page; label inventory "Estimert lager" |
+| Josh | Tests: Track items stocked, DoNotTrack skipped |
+
+**Alternatives Rejected:**
+1. `IsMealSourced` on ShoppingListItem + `ExcludeFromStock` on ShopItem — overlapping concerns
+2. `StockBehaviour` on ShoppingListItem — per-row flexibility adds decision fatigue
+
+---
+
+| Decision | Status | Owner | Target Date |
+|----------|--------|-------|-------------|
+| D30: Unconsume Backend | ✅ Implemented | Glenn | 2026-04-24 ✅ |
+| D30.1: Unconsume Frontend | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D31: Unit Dropdown | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D32: Mobile CSS | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D33: UX Unification | ✅ Implemented | Blair | 2026-04-24 ✅ |
+| D34: IsBasic Audit | ✅ Completed | Glenn | 2026-04-24 ✅ |
+| D35: StockBehaviour | ✅ Decided | Peter | Next Sprint |
+
+---
+
+## Phase 7: Package Size Feature Sprint (Issues #76–#88–#89) — 2026-04-26
+
+### D36 — Package Size Feature Design (Architecture)
+**Status:** ✅ DESIGNED (Peter, 2026-04-24)  
+**Related:** Issue #76 (purchase unit sizes already implemented)
+
+**Context:**
+`ShopItem` already has `StandardPurchaseQuantity` (double) and `StandardPurchaseUnit` (string) from sprint #76. The feature enables package-aware shopping list generation: recipe needs 400g chicken → chicken comes in 500g packages → buy 1 package.
+
+**Components (3-part solution):**
+1. **Unit Bridge (Glenn):** `MealUnitExtensions` — compatibility check between `MealUnit` enum and `StandardPurchaseUnit` string
+2. **Backend Calculation (Glenn):** `WeekMenuController.RunGenerateShoppingList()` — package conversion with stock comparison
+3. **Display Layer (Blair):** Format `{Mengde} × {qty}{unit}` in shopping list UI
+
+**Architecture Decisions:**
+- Package size lives on `ShopItem` (item master), not `ShoppingListItem`
+- Fallback: Math.Ceiling when package data unavailable or units incompatible
+- No new entities or API endpoints needed
+
+---
+
+### D36.1 — Package Unit Compatibility & Normalization
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** `Shared/MealUnitExtensions.cs` — 4 new public methods
+
+**Methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `IsCompatibleWith(MealUnit, string)` | Check if ingredient unit and purchase unit are same dimension |
+| `NormalizeToBaseUnit(MealUnit, double)` | Convert ingredient quantity to base unit (gram, dl, stk) |
+| `NormalizePurchaseUnitToBase(string, double)` | Convert purchase unit to base unit |
+| `CalculatePackagesNeeded(...)` | Final package count; returns null on incompatibility |
+
+**Supported Units:**
+- Weight: `g`, `gram`, `kg`, `kilogram` → base: grams
+- Volume: `dl`, `deciliter`, `l`, `liter` → base: deciliters
+- Count: `stk`, `pcs`, `pakke`, `pk` → base: count
+
+**Fallback Conditions (null returned):**
+- `StandardPurchaseQuantity <= 0`
+- `StandardPurchaseUnit` null/empty/unknown
+- Demand unit and package unit incompatible (e.g., grams vs. stk)
+- `UnitMismatch = true` (same ShopItemId used with different MealUnit across meals)
+
+---
+
+### D36.2 — Package Conversion in RunGenerateShoppingList
+**Status:** ✅ IMPLEMENTED (Glenn, 2026-04-24)  
+**Component:** `Api/Controllers/WeekMenuController.cs` — shopping list generation
+
+**Decision: Pipeline Order (CRITICAL)**
+Stock comparison (raw-unit subtraction of `QuantityInStock`) **must run before** package conversion. Both mutate `item.Mengde`.
+
+**Canonical Pipeline:**
+1. Aggregate raw ingredient quantities per `ShopItemId`
+2. Apply stock comparison → subtract `QuantityInStock`, set `IsLikelyNotNeeded`
+3. Apply package conversion → update `Mengde` to package count
+
+**Aggregation Tuple (extended):**
+```csharp
+var aggregated = new Dictionary<string, (double Quantity, MealUnit Unit, string ShopItemName, ShopItem ShopItem)>();
+```
+
+**Impact:**
+- `item.Mengde` becomes a **package count** when StandardPurchaseQuantity is configured and units compatible
+- Falls back to raw quantity (existing behavior) when package data unavailable or incompatible
+- No per-trip configuration — fully automatic
+
+**Tests:** 3 new integration tests + 26 unit extension tests (211 total, 0 failures)
+
+---
+
+### D36.3 — Package Size Display Format
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** `OneShoppingListItemComponent` + `OneWeekMenuPage` preview
+
+**Decision:**
+- Format: `{Mengde} × {StandardPurchaseQuantity}{StandardPurchaseUnit}` (e.g., "2 × 500g")
+- G29 number format avoids trailing zeros (500 not 500.0)
+- Applied in: live shopping list + week menu preview
+- Fallback: plain `Mengde.ToString()` when package info not set
+- Style: `pkg-size-label` muted to keep numeric focus
+
+**Rationale:**
+- Compact, mobile-friendly — fits on one line
+- User sees both editable (Mengde) and informational (package size) data simultaneously
+- No modal/separate view needed
+
+**Related:** `FormatQuantity()` helper for consistency across components
+
+---
+
+### D31 — SfComboBox Pattern (UX Consistency Update)
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** Multiple Blazor components
+
+**Update to D31 (existing pattern):**
+
+**1. Meal Selection in OneWeekMenuPage**
+- Replaced plain `<select>` with `SfComboBox` + `AllowFiltering="true"`
+- Built-in name search (no `FilteringEventArgs` wiring needed)
+- DataSource as stable `List<T>` field (avoid re-render churn)
+- Note: `ComboBoxTemplates` does not support `ValueTemplate` — use `ItemTemplate` only
+
+**2. StandardPurchaseUnit in ItemManagementPage**
+- Replaced plain `<input type="text">` with `SfComboBox TValue="string" TItem="string"`
+- Uses existing `_unitOptions` static list + `AllowCustom="true"`
+- Identical to pattern used for `Unit` field above
+- Enforces D31 consistency, prevents unit value typos
+
+**Rationale:** Consistency (D31), discoverability, prevents typos breaking inventory matching
+
+---
+
+### D31.1 — "Er alltid hjemme" Label Clarification
+**Status:** ✅ IMPLEMENTED (Blair, 2026-04-24)  
+**Component:** ItemManagementPage.razor — IsBasic checkbox
+
+**Change:** Sub-label updated from "Basisvare" to "Er alltid hjemme" for clarity.
+
+**Context:** `IsBasic` enum means item is always-in-stock and should appear collapsed in generated shopping lists. Previous label was not self-explanatory.
+
+**Implementation:** Display-only, no model changes.
+
+---
+
+## Implementation Status (Phase 7 — Updated)
+
+| Decision | Status | Owner | Target Date |
+|----------|--------|-------|-------------|
+| D36: Package Size Design | ✅ Designed | Peter | 2026-04-24 ✅ |
+| D36.1: Unit Compatibility | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
+| D36.2: RunGenerateShoppingList | ✅ Implemented | Glenn | PR #89 ✅ (2026-04-24) |
+| D36.3: Display Format | ✅ Implemented | Blair | PR #88 ✅ (2026-04-24) |
+| D31 Update: SfComboBox | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
+| D31.1 Label Clarification | ✅ Implemented | Blair | PR #87 ✅ (2026-04-24) |
+
