@@ -33,7 +33,7 @@
                         <tr class="@(meal.IsConsumed ? "meal-consumed" : "")">
                             <td class="day-label">@DayLabel(day)</td>
                             <td>
-                                <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
+                                <select class="form-select form-select-sm"
                                         value="@meal.MealRecipeId"
                                         @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))"
                                         disabled="@meal.IsConsumed">
@@ -43,10 +43,6 @@
                                         <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
                                     }
                                 </select>
-                                @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
-                                {
-                                    <small class="suggested-badge">forslag</small>
-                                }
                             </td>
                             <td class="day-icon">
                                 @if (!string.IsNullOrEmpty(meal.MealRecipeId))
