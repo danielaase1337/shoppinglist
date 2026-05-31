@@ -133,47 +133,23 @@
                             Generer handleliste
                         </button>
                     </div>
-                }
-            </div>
-        </div>
-
-        @* #72c — Smart suggestion panel *@
-        <button class="btn btn-outline-secondary mt-2" @onclick="LoadSuggestions" disabled="@_loadingSuggestions">
-            @if (_loadingSuggestions)
-            {
-                <span class="spinner-border spinner-border-sm" role="status"></span>
-            }
-            else
-            {
-                <span>🤖</span>
-            }
-            Foreslå meny
-        </button>
-
-        @if (_showSuggestions)
-        {
-            <div class="card suggestion-panel mt-2">
-                @if (_loadingSuggestions)
-                {
-                    <p class="mb-0">Laster forslag...</p>
-                }
-                else
-                {
-                    <h5>Foreslått meny</h5>
-                    @foreach (var (suggestion, index) in _suggestions.Select((s, i) => (s, i)))
-                    {
-                        <div class="suggestion-row">
-                            <span class="day-label-sm">@GetDayName(index)</span>
-                            <span>@GetCategoryIcon(suggestion.Category) @suggestion.Name</span>
-                        </div>
-                    }
-                    <div class="suggestion-actions mt-3">
-                        <button class="btn btn-primary btn-sm me-2" @onclick="AcceptSuggestions">✓ Godta forslag</button>
-                        <button class="btn btn-secondary btn-sm" @onclick="@(() => _showSuggestions = false)">Avbryt</button>
+                    @* #72c — Suggest menu button, placed next to generate shopping list *@
+                    <div class="col-auto">
+                        <button class="btn btn-outline-secondary" @onclick="LoadSuggestions" disabled="@_loadingSuggestions">
+                            @if (_loadingSuggestions)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <span>🤖</span>
+                            }
+                            Foreslå meny
+                        </button>
                     </div>
                 }
             </div>
-        }
+        </div>
 
         @if (_generateError != null)
         {
@@ -345,7 +321,6 @@
         .ToDictionary(d => d, _ => false);
 
     // #72c — Smart suggestion state
-    private bool _showSuggestions = false;
     private bool _loadingSuggestions = false;
     private List<MealRecipeModel> _suggestions = new();
 
@@ -788,12 +763,21 @@
     private async Task LoadSuggestions()
     {
         _loadingSuggestions = true;
-        _showSuggestions = true;
         StateHasChanged();
         try
         {
             var url = Settings.GetApiUrl(ShoppingListKeysEnum.WeekMenuSuggest);
             _suggestions = await Http.GetFromJsonAsync<List<MealRecipeModel>>(url) ?? new();
+
+            // Apply suggestions directly to day dropdowns
+            var days = WeekOrder.Select(d => GetOrCreateDailyMeal(d)).ToList();
+            for (int i = 0; i < Math.Min(days.Count, _suggestions.Count); i++)
+            {
+                days[i].MealRecipeId = _suggestions[i].Id;
+                days[i].MealRecipeName = _suggestions[i].Name;
+                days[i].IsSuggested = true;
+            }
+            UpdateUseUpSuggestions();
         }
         catch (Exception ex)
         {
@@ -801,20 +785,6 @@
             _suggestions = new();
         }
         _loadingSuggestions = false;
-        StateHasChanged();
-    }
-
-    private void AcceptSuggestions()
-    {
-        var days = WeekOrder.Select(d => GetOrCreateDailyMeal(d)).ToList();
-        for (int i = 0; i < Math.Min(days.Count, _suggestions.Count); i++)
-        {
-            days[i].MealRecipeId = _suggestions[i].Id;
-            days[i].MealRecipeName = _suggestions[i].Name;
-            days[i].IsSuggested = true;
-        }
-        _showSuggestions = false;
-        UpdateUseUpSuggestions();
         StateHasChanged();
     }
 
