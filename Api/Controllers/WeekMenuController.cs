@@ -8,9 +8,11 @@ using Shared.HandlelisteModels;
 using Shared.Repository;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Api.Controllers
 {
@@ -305,7 +307,8 @@ namespace Api.Controllers
                     {
                         Varen = varen,
                         Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                        IsDone = false
+                        IsDone = false,
+                        IsMealSourced = true
                     };
                 }).ToList();
 

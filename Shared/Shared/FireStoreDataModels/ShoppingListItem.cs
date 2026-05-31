@@ -21,5 +21,9 @@ namespace Shared.FireStoreDataModels
         // #76 — Set by generate-shoppinglist when inventory fully covers this item's demand
         [FirestoreProperty]
         public bool IsLikelyNotNeeded { get; set; }
+
+        // #75 — True when this item was added via WeekMenu generate-shoppinglist
+        [FirestoreProperty]
+        public bool IsMealSourced { get; set; }
     }
 }
