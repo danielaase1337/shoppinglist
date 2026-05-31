@@ -1,18 +1,36 @@
 ﻿@page "/"
-@using BlazorApp.Client.Pages.Shopping
-@inject HttpClient http
 
 <AuthorizeView>
     <Authorized>
-        <div class="container-sm">
-            <ShoppingListMainPage></ShoppingListMainPage>
+        <div class="home-dashboard">
+            <section class="home-hero">
+                <span class="home-hero-eyebrow">Handleliste</span>
+                <h1>Familiens digitale verktøy</h1>
+                <p>Familiens digitale verktøy for mat og handel</p>
+            </section>
+
+            <section class="home-card-grid" aria-label="Hurtigtilgang">
+                <a class="home-quick-card" href="/shoppinglist">
+                    <span class="home-quick-card-icon" aria-hidden="true">🛒</span>
+                    <h2>Handlelister</h2>
+                    <p>Organiser handleturer etter butikkens hyller</p>
+                </a>
+
+                <a class="home-quick-card" href="/weekmenus">
+                    <span class="home-quick-card-icon" aria-hidden="true">📅</span>
+                    <h2>Ukesplan</h2>
+                    <p>Planlegg ukens middager</p>
+                </a>
+
+                <a class="home-quick-card" href="/inventory">
+                    <span class="home-quick-card-icon" aria-hidden="true">📦</span>
+                    <h2>Lager</h2>
+                    <p>Hold oversikt over hva du har hjemme</p>
+                </a>
+            </section>
         </div>
     </Authorized>
     <NotAuthorized>
         <RedirectToWelcome />
     </NotAuthorized>
 </AuthorizeView>
-
-@code
-{
-}
