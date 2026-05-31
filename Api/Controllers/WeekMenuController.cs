@@ -217,9 +217,10 @@ namespace Api.Controllers
         }
 
         // #72a — Suggest a balanced 7-day meal plan based on recent history and category targets
+        // Route uses plural "weekmenus/suggest" to avoid conflict with "weekmenu/{id}" parameterized route
         [Function("weekmenu-suggest")]
         public async Task<HttpResponseData> SuggestMenu(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "weekmenu/suggest")] HttpRequestData req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "weekmenus/suggest")] HttpRequestData req)
         {
             try
             {
