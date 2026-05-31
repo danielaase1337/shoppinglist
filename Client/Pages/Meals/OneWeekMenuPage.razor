@@ -30,22 +30,19 @@
                     @foreach (var day in WeekOrder)
                     {
                         var meal = GetOrCreateDailyMeal(day);
-                        <tr>
+                        <tr class="@(meal.IsConsumed ? "meal-consumed" : "")">
                             <td class="day-label">@DayLabel(day)</td>
                             <td>
-                                <select class="form-select form-select-sm @(meal.IsSuggested ? "suggested-meal" : "")"
+                                <select class="form-select form-select-sm"
                                         value="@meal.MealRecipeId"
-                                        @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))">
+                                        @onchange="@(e => OnMealSelected(meal, e.Value?.ToString()))"
+                                        disabled="@meal.IsConsumed">
                                     <option value="">-- Velg middag --</option>
                                     @foreach (var recipe in GetSortedRecipes())
                                     {
                                         <option value="@recipe.Id">@GetCategoryIcon(recipe.Category) @recipe.Name</option>
                                     }
                                 </select>
-                                @if (meal.IsSuggested && !string.IsNullOrEmpty(meal.MealRecipeId))
-                                {
-                                    <small class="suggested-badge">forslag</small>
-                                }
                             </td>
                             <td class="day-icon">
                                 @if (!string.IsNullOrEmpty(meal.MealRecipeId))
@@ -54,6 +51,44 @@
                                     if (recipe != null)
                                     {
                                         @GetCategoryIcon(recipe.Category)
+                                    }
+                                }
+                            </td>
+                            <td class="day-consume">
+                                @if (!string.IsNullOrEmpty(meal.MealRecipeId) && !IsNew)
+                                {
+                                    @if (!meal.IsConsumed)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success consume-btn"
+                                                @onclick="@(() => ConsumeMeal(meal))"
+                                                disabled="@_consumingDay[day]"
+                                                title="Merk som spist">
+                                            @if (_consumingDay[day])
+                                            {
+                                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <span>✓ Spist</span>
+                                            }
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="consumed-check" title="Spist">✅</span>
+                                        <button class="btn btn-sm btn-link angre-btn"
+                                                @onclick="@(() => UnconsumeMeal(meal))"
+                                                disabled="@_consumingDay[day]"
+                                                title="Angre">
+                                            @if (_consumingDay[day])
+                                            {
+                                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <span>Angre</span>
+                                            }
+                                        </button>
                                     }
                                 }
                             </td>
@@ -92,6 +127,20 @@
                                 <span>📝</span>
                             }
                             Generer handleliste
+                        </button>
+                    </div>
+                    @* #72c — Suggest menu button, placed next to generate shopping list *@
+                    <div class="col-auto">
+                        <button class="btn btn-outline-secondary" @onclick="LoadSuggestions" disabled="@_loadingSuggestions">
+                            @if (_loadingSuggestions)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <span>🤖</span>
+                            }
+                            Foreslå meny
                         </button>
                     </div>
                 }
@@ -263,6 +312,14 @@
     private List<UseUpSuggestion> _useUpSuggestions = new();
     private HashSet<string> _dismissedIngredientIds = new();
 
+    // Consume/unconsume loading state per day
+    private Dictionary<DayOfWeek, bool> _consumingDay = Enum.GetValues<DayOfWeek>()
+        .ToDictionary(d => d, _ => false);
+
+    // #72c — Smart suggestion state
+    private bool _loadingSuggestions = false;
+    private List<MealRecipeModel> _suggestions = new();
+
     private static readonly DayOfWeek[] WeekOrder =
     {
         DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
@@ -339,7 +396,6 @@
         }
 
         _recipesLoaded = true;
-        ApplyFridaySuggestion();
     }
 
     private DailyMealModel GetOrCreateDailyMeal(DayOfWeek day)
@@ -416,28 +472,6 @@
     {
         _dismissedIngredientIds.Add(shopItemId);
         _useUpSuggestions.RemoveAll(s => s.IngredientShopItemId == shopItemId);
-    }
-
-    private void ApplyFridaySuggestion()
-    {
-        if (_recipes == null || !_recipes.Any()) return;
-
-        var friday = GetOrCreateDailyMeal(DayOfWeek.Friday);
-        if (!string.IsNullOrEmpty(friday.MealRecipeId)) return;
-
-        var suggestion = _recipes
-            .Where(r => r.IsActive)
-            .OrderByDescending(r => r.PopularityScore)
-            .FirstOrDefault(r =>
-                r.Category == MealCategory.KidsLike ||
-                r.Name.Contains("pizza", StringComparison.OrdinalIgnoreCase));
-
-        if (suggestion != null)
-        {
-            friday.MealRecipeId = suggestion.Id;
-            friday.MealRecipeName = suggestion.Name;
-            friday.IsSuggested = true;
-        }
     }
 
     private IEnumerable<MealRecipeModel> GetSortedRecipes()
@@ -615,6 +649,64 @@
         }
     }
 
+    private async Task ConsumeMeal(DailyMealModel day)
+    {
+        if (_menu?.Id == null) return;
+        _consumingDay[day.Day] = true;
+        try
+        {
+            var request = new { DayOfWeek = day.Day, MealRecipeId = day.MealRecipeId };
+            var url = Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id) + "/consume";
+            var response = await Http.PutAsJsonAsync(url, request);
+            if (response.IsSuccessStatusCode)
+            {
+                day.IsConsumed = true;
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Consume failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error consuming meal: {ex.Message}");
+        }
+        finally
+        {
+            _consumingDay[day.Day] = false;
+        }
+    }
+
+    private async Task UnconsumeMeal(DailyMealModel day)
+    {
+        if (_menu?.Id == null) return;
+        _consumingDay[day.Day] = true;
+        try
+        {
+            var request = new { DayOfWeek = day.Day, MealRecipeId = day.MealRecipeId };
+            var url = Settings.GetApiUrlId(ShoppingListKeysEnum.WeekMenu, _menu.Id) + "/unconsume";
+            var response = await Http.PutAsJsonAsync(url, request);
+            if (response.IsSuccessStatusCode)
+            {
+                day.IsConsumed = false;
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"❌ Unconsume failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error unconsuming meal: {ex.Message}");
+        }
+        finally
+        {
+            _consumingDay[day.Day] = false;
+        }
+    }
+
     private static string DayLabel(DayOfWeek day) => day switch
     {
         DayOfWeek.Monday    => "Mandag",
@@ -638,6 +730,41 @@
         MealCategory.Celebration => "🎉",
         MealCategory.Other       => "❓",
         _                        => "🍽️"
+    };
+
+    // #72c — Smart suggestion methods
+    private async Task LoadSuggestions()
+    {
+        _loadingSuggestions = true;
+        StateHasChanged();
+        try
+        {
+            var url = Settings.GetApiUrl(ShoppingListKeysEnum.WeekMenuSuggest);
+            _suggestions = await Http.GetFromJsonAsync<List<MealRecipeModel>>(url) ?? new();
+
+            // Apply suggestions directly to day dropdowns
+            var days = WeekOrder.Select(d => GetOrCreateDailyMeal(d)).ToList();
+            for (int i = 0; i < Math.Min(days.Count, _suggestions.Count); i++)
+            {
+                days[i].MealRecipeId = _suggestions[i].Id;
+                days[i].MealRecipeName = _suggestions[i].Name;
+                days[i].IsSuggested = true;
+            }
+            UpdateUseUpSuggestions();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading suggestions: {ex.Message}");
+            _suggestions = new();
+        }
+        _loadingSuggestions = false;
+        StateHasChanged();
+    }
+
+    private static string GetDayName(int index) => index switch
+    {
+        0 => "Mandag", 1 => "Tirsdag", 2 => "Onsdag", 3 => "Torsdag",
+        4 => "Fredag", 5 => "Lørdag", 6 => "Søndag", _ => ""
     };
 }
 
@@ -676,5 +803,66 @@
         border-left: 4px solid #ffc107;
         background-color: #fffdf0;
         padding: 0.5rem 1rem;
+    }
+
+    .week-planner-table td.day-consume {
+        width: 110px;
+        text-align: right;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .week-planner-table tr.meal-consumed td {
+        opacity: 0.55;
+    }
+
+    .week-planner-table tr.meal-consumed td.day-consume {
+        opacity: 1;
+    }
+
+    .week-planner-table tr.meal-consumed td.day-label {
+        text-decoration: line-through;
+        color: #6c757d;
+    }
+
+    .consumed-check {
+        font-size: 1rem;
+        margin-right: 4px;
+    }
+
+    .consume-btn {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+    }
+
+    .angre-btn {
+        font-size: 0.75rem;
+        padding: 2px 4px;
+        color: #6c757d;
+    }
+
+    .suggestion-panel {
+        border-left: 4px solid #6f42c1;
+        background-color: #f8f5ff;
+        padding: 0.75rem 1rem;
+    }
+
+    .suggestion-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .suggestion-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .day-label-sm {
+        width: 90px;
+        font-weight: 600;
+        white-space: nowrap;
+        color: #495057;
     }
 </style>

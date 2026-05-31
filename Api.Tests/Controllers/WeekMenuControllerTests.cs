@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Shared;
 using Shared.FireStoreDataModels;
 using Shared.HandlelisteModels;
 using Shared.Repository;
@@ -702,6 +703,225 @@ namespace Api.Tests.Controllers
             Assert.NotNull(result);
             Assert.Single(result.ShoppingItems);
             Assert.True(result.ShoppingItems.Single().Varen.IsBasic);
+        }
+
+        // ── Test 16: Cross-dimension inventory coverage via StandardPurchaseQuantity ──
+
+        [Fact]
+        public async Task GenerateShoppingList_CrossDimensionInventory_MarksItemCovered_ViaStandardPurchaseQuantity()
+        {
+            // Arrange: recipe demands 400 g of carrots; inventory holds 1 bag (Package).
+            // StandardPurchaseQuantity = 1000, StandardPurchaseUnit = "g"
+            // → 1 bag × 1000 g/bag = 1000 g ≥ 400 g → IsInventoryCovered = true
+            const string carrotId = "item-carrots";
+            var shopItem = new ShopItem
+            {
+                Id = carrotId,
+                Name = "Gulrøtter",
+                StandardPurchaseQuantity = 1000,
+                StandardPurchaseUnit = "g"
+            };
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-carrot",
+                Name = "Gulrotsuppe",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = carrotId, ShopItemName = "Gulrøtter", Quantity = 400, Unit = MealUnit.Gram }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-carrot",
+                WeekNumber = 50,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = recipe.Id, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-1",
+                ShopItemId = carrotId,
+                QuantityInStock = 1,           // 1 bag (package)
+                Unit = MealUnit.Package,
+                IsActive = true
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockMealRecipeRepository.Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository.Setup(r => r.Get())
+                .ReturnsAsync(new List<ShopItem> { shopItem });
+            _mockInventoryRepository.Setup(r => r.Get())
+                .ReturnsAsync(new List<InventoryItem> { inventoryItem });
+
+            var req = TestHttpFactory.CreatePostRequest("", $"http://localhost/api/weekmenu/{menu.Id}/generate-shoppinglist");
+
+            // Act
+            var response = await _controller.RunGenerateShoppingList(req, menu.Id);
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            Assert.Single(result.ShoppingItems);
+            var item = result.ShoppingItems.Single();
+            Assert.True(item.IsInventoryCovered, "1 bag (1000 g) should fully cover 400 g demand");
+            Assert.True(item.IsLikelyNotNeeded, "Fully covered item must be marked as likely not needed");
+        }
+
+        [Fact]
+        public async Task GenerateShoppingList_CrossDimensionInventory_PartialCoverage_ReducesDemand()
+        {
+            // Arrange: recipe demands 2500 g of potatoes; inventory holds 2 bags.
+            // StandardPurchaseQuantity = 1000, StandardPurchaseUnit = "g"
+            // → 2 bags × 1000 g/bag = 2000 g < 2500 g → partial.
+            // After stock subtraction (500 g remaining), package-size conversion gives ceil(500/1000) = 1 bag.
+            const string potatoId = "item-potatoes";
+            var shopItem = new ShopItem
+            {
+                Id = potatoId,
+                Name = "Poteter",
+                StandardPurchaseQuantity = 1000,
+                StandardPurchaseUnit = "g"
+            };
+
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-potato",
+                Name = "Potetsuppe",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient { ShopItemId = potatoId, ShopItemName = "Poteter", Quantity = 2500, Unit = MealUnit.Gram }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-potato",
+                WeekNumber = 51,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal { Day = DayOfWeek.Monday, MealRecipeId = recipe.Id, CustomIngredients = new List<MealIngredient>() }
+                }
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-2",
+                ShopItemId = potatoId,
+                QuantityInStock = 2,           // 2 bags = 2000 g
+                Unit = MealUnit.Package,
+                IsActive = true
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockMealRecipeRepository.Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<MealRecipe>>(new List<MealRecipe> { recipe }));
+            _mockShopItemRepository.Setup(r => r.Get())
+                .ReturnsAsync(new List<ShopItem> { shopItem });
+            _mockInventoryRepository.Setup(r => r.Get())
+                .ReturnsAsync(new List<InventoryItem> { inventoryItem });
+
+            var req = TestHttpFactory.CreatePostRequest("", $"http://localhost/api/weekmenu/{menu.Id}/generate-shoppinglist");
+
+            // Act
+            var response = await _controller.RunGenerateShoppingList(req, menu.Id);
+            var result = await ReadBody<ShoppingListModel>(response);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(result);
+            Assert.Single(result.ShoppingItems);
+            var item = result.ShoppingItems.Single();
+            Assert.False(item.IsInventoryCovered, "Partial coverage should not mark as fully covered");
+            // 2500 g demand, 2000 g in stock (2 bags × 1000 g) → 500 g shortfall.
+            // Package-size conversion then rounds up: ceil(500/1000) = 1 bag to buy.
+            Assert.Equal(1, item.Mengde);
+        }
+
+        [Fact]
+        public async Task ConsumeMeal_ConvertsUnitsBeforeDeductingInventory()
+        {
+            // Arrange: 4 kg in stock minus 540 g should leave 3.46 kg.
+            const string shopItemId = "item-flour";
+            var recipe = new MealRecipe
+            {
+                Id = "recipe-flour",
+                Name = "Brød",
+                IsActive = true,
+                Ingredients = new List<MealIngredient>
+                {
+                    new MealIngredient
+                    {
+                        ShopItemId = shopItemId,
+                        ShopItemName = "Mel",
+                        Quantity = 540,
+                        Unit = MealUnit.Gram
+                    }
+                }
+            };
+
+            var menu = new WeekMenu
+            {
+                Id = "menu-consume",
+                WeekNumber = 52,
+                Year = 2025,
+                IsActive = true,
+                DailyMeals = new List<DailyMeal>
+                {
+                    new DailyMeal
+                    {
+                        Day = DayOfWeek.Monday,
+                        MealRecipeId = recipe.Id,
+                        IsConsumed = false,
+                        CustomIngredients = new List<MealIngredient>()
+                    }
+                }
+            };
+
+            var inventoryItem = new InventoryItem
+            {
+                Id = "inv-flour",
+                ShopItemId = shopItemId,
+                QuantityInStock = 4,
+                Unit = MealUnit.Kilogram,
+                IsActive = true
+            };
+
+            _mockWeekMenuRepository.Setup(r => r.Get(menu.Id)).ReturnsAsync(menu);
+            _mockWeekMenuRepository.Setup(r => r.Update(It.IsAny<WeekMenu>()))
+                .ReturnsAsync((WeekMenu weekMenu) => weekMenu);
+            _mockMealRecipeRepository.Setup(r => r.Get(recipe.Id)).ReturnsAsync(recipe);
+            _mockInventoryRepository.Setup(r => r.Get()).ReturnsAsync(new List<InventoryItem> { inventoryItem });
+            _mockInventoryRepository.Setup(r => r.BatchUpdate(It.IsAny<IEnumerable<InventoryItem>>())).ReturnsAsync(true);
+
+            var requestBody = JsonSerializer.Serialize(new ConsumeMealRequest
+            {
+                DayOfWeek = (int)DayOfWeek.Monday,
+                MealRecipeId = recipe.Id
+            });
+            var req = TestHttpFactory.CreatePutRequest(requestBody, $"http://localhost/api/weekmenu/{menu.Id}/consume");
+
+            // Act
+            var response = await _controller.ConsumeMeal(req, menu.Id);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(menu.DailyMeals.Single().IsConsumed);
+            Assert.Equal(3.46, inventoryItem.QuantityInStock, 2);
+            _mockInventoryRepository.Verify(r => r.BatchUpdate(It.Is<IEnumerable<InventoryItem>>(items =>
+                items.Single().Id == inventoryItem.Id && Math.Abs(items.Single().QuantityInStock - 3.46) < 0.01)), Times.Once);
         }
 
         // ── Test 15: Generate returns 404 when WeekMenu not found ─────────────────

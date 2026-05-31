@@ -1,18 +1,36 @@
 ﻿@page "/"
-@using BlazorApp.Client.Pages.Shopping
-@inject HttpClient http
 
 <AuthorizeView>
     <Authorized>
-        <div class="container-sm">
-            <ShoppingListMainPage></ShoppingListMainPage>
+        <div class="home-dashboard">
+            <section class="home-hero">
+                <span class="home-hero-eyebrow">The Aase-broen's</span>
+                <h1>Familiens digitale kjøkken</h1>
+                <p>Alt på ett sted — planlegg ukens middager, generer handlelister automatisk, og hold oversikt over hva som er på lager hjemme.</p>
+            </section>
+
+            <section class="home-card-grid" aria-label="Hurtigtilgang">
+                <a class="home-quick-card" href="/shoppinglist">
+                    <span class="home-quick-card-icon" aria-hidden="true">🛒</span>
+                    <h2>Handlelister</h2>
+                    <p>Lag og del handlelister med familien. Varene sorteres automatisk etter butikkens hyller — slik at du aldri trenger å gå frem og tilbake i butikken.</p>
+                </a>
+
+                <a class="home-quick-card" href="/weekmenus">
+                    <span class="home-quick-card-icon" aria-hidden="true">📅</span>
+                    <h2>Ukesplan</h2>
+                    <p>Planlegg ukens middager dag for dag. Appen foreslår varierte middager og kan generere handlelisten for hele uken automatisk.</p>
+                </a>
+
+                <a class="home-quick-card" href="/inventory">
+                    <span class="home-quick-card-icon" aria-hidden="true">📦</span>
+                    <h2>Lager</h2>
+                    <p>Hold oversikt over hva du har hjemme. Legg inn frosne middager, sett nedre grenser for varer, og se raskt hva som begynner å gå tomt.</p>
+                </a>
+            </section>
         </div>
     </Authorized>
     <NotAuthorized>
         <RedirectToWelcome />
     </NotAuthorized>
 </AuthorizeView>
-
-@code
-{
-}

@@ -689,4 +689,35 @@ All 5 individual PRs closed with reference to PR #94.
 - Added a per-row `Fjern` action for the “🤔 Dette har du kanskje i skapet” table via `RemovePantryItem(ShoppingListItemModel)` so users can drop probable pantry items before saving.
 - Kept `_scalingApplied` notice above the groups and retained the explicit save filter `_generatedList.ShoppingItems = _generatedList.ShoppingItems.Where(i => !i.IsLikelyNotNeeded).ToList();` so both maybe-items and inventory-covered items stay out of the persisted shopping list.
 - Group 3 (`✅ Dette har du i skapet`) is informational only, rendered with success/muted styling and never saved.
- 
+
+### 2025-01-01 — Issue #26: Nav Dropdown CSS :hover → @onclick ✅ COMPLETE
+
+**What changed**:
+- `NewNavComponent.razor`: Added `tabindex="0"` to trigger span for keyboard focusability
+- Fixed `aria-expanded` to emit lowercase `true`/`false` via `.ToString().ToLower()`
+- Added `@onkeydown="HandleAdminKeyDown"` — Enter/Space toggles, Escape closes
+- Added transparent `.dropdown-backdrop` overlay div (`@if (_adminOpen)`) for click-away close
+- Added `CloseAdminMenu()` and `HandleAdminKeyDown(KeyboardEventArgs)` C# methods
+- `app.css`: Removed `:hover` from dropdown visibility selectors; visibility now controlled exclusively by `.open` class
+- Added `.dropdown-backdrop` CSS rule (`position:fixed; inset:0; z-index:999`)
+
+**Key decisions**:
+- Used conditional `@if (_adminOpen)` backdrop div instead of JS interop — keeps everything in Blazor, no IJSRuntime dependency
+- Arrow rotation kept on `.open` class only (removed `:hover` rotation for consistency with onclick-only model)
+- `@onclick:stopPropagation="true"` on trigger prevents the nav div's `@onclick="ToggleNavMenu"` from firing unexpectedly
+
+**Files**: `Client/Shared/NewNavComponent.razor`, `Client/wwwroot/css/app.css`
+**PR**: #95 → `integration/sprint-2-fixes`
+
+
+## Learnings
+
+### Branch collision: feature-on-feature conflicts in integration branches (2025-01)
+
+**Pattern observed:** Two PRs (#98 / #72a backend, #100 / #72c suggestion UI) both touched OneWeekMenuPage.razor, ShoppingListKeysEnum.cs, and ISettings.cs. Blair's branch was cut before the enum cleanup (PR #95/#80) landed, so it carried stale enum values (WeekMenuConsume = 22, WeekMenuSwap = 23, WeekMenuUnconsume = 24) that HEAD had already removed.
+
+**Resolution approach:**
+- For enum + ISettings: git checkout --ours (take integration HEAD) — dead values intentionally removed.
+- For the razor: manual keep-both merge — @code block needs ALL state variables from both features; CSS needs ALL styles from both features. Never discard either side when they implement orthogonal features on the same file.
+- **Gotcha:** Integration HEAD may not yet contain a PR's additions even if the task description says so. Always verify with Select-String after --ours. Here, WeekMenuSuggest = 22 and its ISettings mapping were described as "already in HEAD" but were actually absent — required manual addition post-resolution.
+- **Build check is mandatory** before committing the merge: dotnet build --no-restore catches missing enum values or ISettings keys that the razor references.

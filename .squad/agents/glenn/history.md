@@ -8,6 +8,8 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **Friday slot is hard-coded by WeekOrder, not DayOfWeek enum order**: In `WeekMenuController.SuggestMenu()`, the client consumes suggestions in WeekOrder `[Thursday, Friday, Saturday, Sunday, Monday, Tuesday, Wednesday]`, so index `1` is always Friday. Slot-specific rules like the pizza rule must be applied before weekend picks are slotted, without changing the existing weekday category rota.
+- **Enum cleanup — remove at source AND in ISettings mapping**: When removing dead enum values, search the entire codebase first to confirm they're unused (grep is faster than manual review). Then delete from both the enum definition and the ISettings dictionary mapping—otherwise the stale string key lingers in the dict and confuses future maintainers. This was the pattern for #80 (`WeekMenuConsume`, `WeekMenuSwap`, `WeekMenuUnconsume` had enum values but zero usages, and their mappings were never called).
 - **RunGenerateShoppingList pantry flag order matters**: keep the inventory stock pass first so partial pantry coverage can reduce `Mengde`, then do a separate `IsBasic` pass that sets `IsLikelyNotNeeded = true`, and only after that run package-size conversion. This preserves shortfall math for basic staples while still surfacing them as cupboard-likely items.
 - **ToDictionary null-key guard pattern**: `GoogleFireBaseGenericRepository` can return documents whose `Id` field is null (e.g., legacy data without the `[FirestoreProperty] Id` field stored). Always add `.Where(x => x.Id != null)` before `.ToDictionary(x => x.Id, x => x)` in generate/aggregate flows. Same applies to foreign-key fields like `ShopItemId` in `InventoryItem` — filter with `i.ShopItemId != null` before `GroupBy`. Without these guards, `ArgumentNullException` from `Dictionary` is caught by the controller's outer `try/catch` and returned as 500.
 - **Unit tests do not surface Firestore data-quality bugs**: Mocked repositories always return clean, non-null Id data. The null-key crash only manifests in production with real Firestore documents. Tests that exercise the generate flow must explicitly include a null-Id scenario to catch this.
@@ -16,6 +18,7 @@
 - `Api/Program.cs` has `#if DEBUG` blocks — MemoryGenericRepository in debug, GoogleFireBaseGenericRepository in production.
 - `LastModified = DateTime.UtcNow` must be set on all POST and PUT operations. GET operations do lazy migration for null values.
 - `Api/ShoppingListProfile.cs` holds all AutoMapper mappings with `.ReverseMap()`.
+- **Legacy bool fields need migration-safe reads**: Firestore documents created before a new `bool` field exists deserialize as `false`. Until there is real UI/workflow support for toggling that field, do not gate critical read paths on it; omit the filter and add lazy migration in GET-all to heal old documents over time.
 - Current goals: implement authentication middleware and secure all API endpoints.
 
 ### Issue #81 — Unconsume endpoint (2026-04-24) ✅ COMPLETE

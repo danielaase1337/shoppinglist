@@ -40,7 +40,7 @@
                         <option value="">-- Alle kategorier --</option>
                         @foreach (var cat in Enum.GetValues<MealCategory>())
                         {
-                            <option value="@cat">@GetCategoryIcon(cat) @cat</option>
+                            <option value="@cat">@GetCategoryIcon(cat) @GetCategoryLabel(cat)</option>
                         }
                     </select>
                 </div>
@@ -154,6 +154,19 @@
         MealCategory.Celebration => "🎉",
         MealCategory.Other       => "❓",
         _                        => "🍽️"
+    };
+
+    private static string GetCategoryLabel(MealCategory cat) => cat switch
+    {
+        MealCategory.KidsLike    => "Barn-favoritter",
+        MealCategory.Fish        => "Fisk",
+        MealCategory.Meat        => "Kjøtt",
+        MealCategory.Vegetarian  => "Vegetar",
+        MealCategory.Chicken     => "Kylling",
+        MealCategory.Pasta       => "Pasta",
+        MealCategory.Celebration => "Fest",
+        MealCategory.Other       => "Annet",
+        _                        => cat.ToString()
     };
 
     private void NavigateToNew() => Navigation.NavigateTo("/meals/new");

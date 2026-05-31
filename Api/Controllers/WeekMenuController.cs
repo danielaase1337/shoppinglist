@@ -8,9 +8,11 @@ using Shared.HandlelisteModels;
 using Shared.Repository;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Api.Controllers
 {
@@ -214,6 +216,174 @@ namespace Api.Controllers
             }
         }
 
+        // #72a — Suggest a balanced 7-day meal plan based on recent history and category targets
+        // Route uses plural "weekmenus/suggest" to avoid conflict with "weekmenu/{id}" parameterized route
+        [Function("weekmenu-suggest")]
+        public async Task<HttpResponseData> SuggestMenu(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "weekmenus/suggest")] HttpRequestData req)
+        {
+            try
+            {
+                // Parse optional weekNumber / year from query string; default to current ISO week
+                var qs = HttpUtility.ParseQueryString(req.Url.Query);
+                var today = DateTime.UtcNow;
+                int currentWeek = ISOWeek.GetWeekOfYear(today);
+                int currentYear = today.Year;
+
+                if (!int.TryParse(qs["weekNumber"], out int targetWeek)) targetWeek = currentWeek;
+                if (!int.TryParse(qs["year"], out int targetYear)) targetYear = currentYear;
+
+                // Collect the two preceding ISO week numbers (handles year boundary)
+                var recentWeeks = GetPreviousWeeks(targetWeek, targetYear, 2);
+
+                // Fetch all week menus and filter to the history window
+                var allMenus = await _repository.Get() ?? new List<WeekMenu>();
+                var recentMenus = allMenus
+                    .Where(m => m.IsActive && recentWeeks.Any(w => w.Week == m.WeekNumber && w.Year == m.Year))
+                    .ToList();
+
+                // Collect recipe IDs used in the history window
+                var recentlyUsedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var menu in recentMenus)
+                {
+                    foreach (var daily in menu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
+                    {
+                        if (!string.IsNullOrEmpty(daily.MealRecipeId))
+                            recentlyUsedIds.Add(daily.MealRecipeId);
+                    }
+                }
+
+                // Fetch all meals; guard against null Id (legacy Firestore documents)
+                var allMeals = await _mealRepository.Get() ?? new List<MealRecipe>();
+                // IsActive filter omitted — no meal deactivation UI exists yet.
+                // Legacy Firestore docs without this field deserialise IsActive=false (C# default).
+                // Re-add this filter when a deactivation workflow is implemented.
+                var activeMeals = allMeals
+                    .Where(m => m.Id != null)
+                    .ToList();
+
+                if (!activeMeals.Any())
+                {
+                    var emptyResp = req.CreateResponse(HttpStatusCode.OK);
+                    await emptyResp.WriteAsJsonAsync(new List<MealRecipeModel>());
+                    return emptyResp;
+                }
+
+                // Celebration meals are always eligible regardless of recent history
+                var eligible = activeMeals
+                    .Where(m => m.Category == Shared.FireStoreDataModels.MealCategory.Celebration
+                                || !recentlyUsedIds.Contains(m.Id))
+                    .OrderByDescending(m => m.PopularityScore)
+                    .ToList();
+
+                // Split into weekend (Effort == Weekend) and weekday pools
+                // Weekend pool → Fri/Sat/Sun (WeekOrder indices 1, 2, 3)
+                // Weekday pool → Thu/Mon/Tue/Wed (WeekOrder indices 0, 4, 5, 6)
+                var weekendPool = eligible
+                    .Where(m => m.Effort == Shared.FireStoreDataModels.MealEffort.Weekend)
+                    .ToList();
+                var weekdayPool = eligible
+                    .Where(m => m.Effort != Shared.FireStoreDataModels.MealEffort.Weekend)
+                    .ToList();
+
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Pick 3 weekend meals; reserve Friday for pizza when available, then fall back to weekday pool if needed
+                var weekendPicks = new List<MealRecipe>();
+                var fridayPizza = eligible.FirstOrDefault(m => m.Name != null && m.Name.ToLower().Contains("pizza"));
+                if (fridayPizza != null)
+                {
+                    weekendPicks.Add(fridayPizza);
+                    used.Add(fridayPizza.Id);
+                    weekendPool.Remove(fridayPizza);
+                    weekdayPool.Remove(fridayPizza);
+                }
+
+                foreach (var m in weekendPool)
+                {
+                    if (weekendPicks.Count >= 3) break;
+                    weekendPicks.Add(m);
+                    used.Add(m.Id);
+                }
+                foreach (var m in weekdayPool)
+                {
+                    if (weekendPicks.Count >= 3) break;
+                    if (!used.Contains(m.Id)) { weekendPicks.Add(m); used.Add(m.Id); }
+                }
+
+                // Pick 4 weekday meals with interleaved categories (no two consecutive same category)
+                // Round-robin category order for Thu, Mon, Tue, Wed
+                var categoryRota = new[]
+                {
+                    Shared.FireStoreDataModels.MealCategory.Fish,
+                    Shared.FireStoreDataModels.MealCategory.Chicken,
+                    Shared.FireStoreDataModels.MealCategory.Fish,
+                    Shared.FireStoreDataModels.MealCategory.Meat,
+                    Shared.FireStoreDataModels.MealCategory.Pasta,
+                    Shared.FireStoreDataModels.MealCategory.KidsLike,
+                    Shared.FireStoreDataModels.MealCategory.Vegetarian,
+                    Shared.FireStoreDataModels.MealCategory.Other
+                };
+
+                var weekdayPicks = new List<MealRecipe>();
+                foreach (var cat in categoryRota)
+                {
+                    if (weekdayPicks.Count >= 4) break;
+                    var pick = weekdayPool.FirstOrDefault(m => m.Category == cat && !used.Contains(m.Id));
+                    if (pick != null) { weekdayPicks.Add(pick); used.Add(pick.Id); }
+                }
+                // Fill remaining weekday slots from any eligible
+                foreach (var m in weekdayPool.Concat(eligible))
+                {
+                    if (weekdayPicks.Count >= 4) break;
+                    if (!used.Contains(m.Id)) { weekdayPicks.Add(m); used.Add(m.Id); }
+                }
+
+                // Assemble in WeekOrder: [Thu(0), Fri(1), Sat(2), Sun(3), Mon(4), Tue(5), Wed(6)]
+                // Weekend slots: 1, 2, 3 — Weekday slots: 0, 4, 5, 6
+                var slotted = new MealRecipe[7];
+                slotted[0] = weekdayPicks.ElementAtOrDefault(0); // Thu
+                slotted[1] = weekendPicks.ElementAtOrDefault(0); // Fri
+                slotted[2] = weekendPicks.ElementAtOrDefault(1); // Sat
+                slotted[3] = weekendPicks.ElementAtOrDefault(2); // Sun
+                slotted[4] = weekdayPicks.ElementAtOrDefault(1); // Mon
+                slotted[5] = weekdayPicks.ElementAtOrDefault(2); // Tue
+                slotted[6] = weekdayPicks.ElementAtOrDefault(3); // Wed
+
+                var suggestions = slotted.Where(m => m != null).ToList();
+
+                var models = _mapper.Map<List<MealRecipeModel>>(suggestions);
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(models);
+                return response;
+            }
+            catch (Exception e)
+            {
+                var msg = "Something went wrong generating menu suggestions";
+                _logger.LogError(e, msg);
+                return await GetErroRespons(msg, req);
+            }
+        }
+
+        /// <summary>Returns the <paramref name="count"/> ISO weeks immediately before the given week/year pair.</summary>
+        private static List<(int Week, int Year)> GetPreviousWeeks(int weekNumber, int year, int count)
+        {
+            var result = new List<(int, int)>();
+            int w = weekNumber;
+            int y = year;
+            for (int i = 0; i < count; i++)
+            {
+                w--;
+                if (w < 1)
+                {
+                    y--;
+                    w = ISOWeek.GetWeeksInYear(y);
+                }
+                result.Add((w, y));
+            }
+            return result;
+        }
+
         [Function("weekmenugenerateshoppinglist")]
         public async Task<HttpResponseData> RunGenerateShoppingList([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "weekmenu/{id}/generate-shoppinglist")] HttpRequestData req, string id)
         {
@@ -305,13 +475,15 @@ namespace Api.Controllers
                     {
                         Varen = varen,
                         Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                        IsDone = false
+                        IsDone = false,
+                        IsMealSourced = true
                     };
                 }).ToList();
 
                 // #76 — Stock comparison: mark fully-covered items and reduce partially-covered demand.
-                // Operates on raw ingredient quantities (same units as QuantityInStock) — must run BEFORE
-                // the package conversion below so the subtraction stays in the same unit dimension.
+                // Runs BEFORE package-size conversion so demand subtraction stays in the same unit dimension.
+                // Cross-dimension case (e.g. inventory in Package, recipe in Gram): converts inventory
+                // to recipe base units via StandardPurchaseQuantity before comparing.
                 var allInventory = await _inventoryRepository.Get();
                 var inventoryDict = allInventory?
                     .Where(i => i.IsActive && i.ShopItemId != null)
@@ -324,6 +496,48 @@ namespace Api.Controllers
                     if (item.Varen?.Id == null) continue;
                     if (!inventoryDict.TryGetValue(item.Varen.Id, out var inv)) continue;
 
+                    bool hasAgg = aggregated.TryGetValue(item.Varen.Id, out var agg);
+
+                    // Cross-dimension smart comparison:
+                    // When inventory is stored in packages/units but the recipe demands weight or volume,
+                    // multiply inventory count by StandardPurchaseQuantity to obtain recipe-compatible units.
+                    // Example: inv=1 bag (Package), StandardPurchaseQuantity=1000, StandardPurchaseUnit="g",
+                    //          recipe needs 400 g → effectiveStock = 1×1000 = 1000 g ≥ 400 g → covered.
+                    if (hasAgg
+                        && !agg.UnitMismatch
+                        && item.Varen.StandardPurchaseQuantity > 0
+                        && !string.IsNullOrEmpty(item.Varen.StandardPurchaseUnit)
+                        && !agg.Unit.IsCompatibleWith(inv.Unit.ToNorwegian()))
+                    {
+                        double invCountBase = inv.Unit.NormalizeToBaseUnit(inv.QuantityInStock);
+                        double packageInRecipeBase = MealUnitExtensions.NormalizePurchaseUnitToBase(
+                            item.Varen.StandardPurchaseQuantity, item.Varen.StandardPurchaseUnit);
+
+                        if (!double.IsNaN(invCountBase) && !double.IsNaN(packageInRecipeBase) && packageInRecipeBase > 0)
+                        {
+                            double stockInRecipeBase = invCountBase * packageInRecipeBase;
+                            double demandInBase = agg.Unit.NormalizeToBaseUnit(agg.Quantity);
+
+                            if (!double.IsNaN(demandInBase))
+                            {
+                                if (stockInRecipeBase >= demandInBase)
+                                {
+                                    item.IsLikelyNotNeeded = true;
+                                    item.IsInventoryCovered = true;
+                                }
+                                else if (stockInRecipeBase > 0)
+                                {
+                                    // Partial: convert remaining demand back from base to agg.Unit
+                                    double unitFactor = agg.Unit.NormalizeToBaseUnit(1);
+                                    if (!double.IsNaN(unitFactor) && unitFactor > 0)
+                                        item.Mengde = (int)Math.Ceiling((demandInBase - stockInRecipeBase) / unitFactor);
+                                }
+                                continue; // handled — skip same-dimension fallback
+                            }
+                        }
+                    }
+
+                    // Same-dimension (or unknown-unit) fallback: compare raw quantities directly.
                     var stock = inv.QuantityInStock;
                     if (stock >= item.Mengde)
                     {
@@ -419,19 +633,39 @@ namespace Api.Controllers
                     var recipe = await _mealRepository.Get(requestBody.MealRecipeId);
                     if (recipe != null && recipe.Ingredients != null)
                     {
-                        var allInventory = await _inventoryRepository.Get();
-
+                        var allInventory = (await _inventoryRepository.Get()) ?? new List<InventoryItem>();
+                        var inventoryByShopItemId = allInventory
+                            .Where(i => i.IsActive && !string.IsNullOrEmpty(i.ShopItemId))
+                            .GroupBy(i => i.ShopItemId)
+                            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                        var inventoryChanges = new Dictionary<string, InventoryItem>(StringComparer.OrdinalIgnoreCase);
+ 
                         foreach (var ingredient in recipe.Ingredients)
                         {
                             if (string.IsNullOrEmpty(ingredient.ShopItemId)) continue;
+ 
+                            if (!inventoryByShopItemId.TryGetValue(ingredient.ShopItemId, out var inventoryItem))
+                                continue; // No inventory entry — skip, no crash
+ 
+                            var ingredientBase = ingredient.Unit.NormalizeToBaseUnit(ingredient.Quantity);
+                            var inventoryBase = inventoryItem.Unit.NormalizeToBaseUnit(inventoryItem.QuantityInStock);
 
-                            var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
-                            if (inventoryItem == null) continue; // No inventory entry — skip, no crash
+                            if (double.IsNaN(ingredientBase) || double.IsNaN(inventoryBase))
+                            {
+                                inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
+                            }
+                            else
+                            {
+                                var newBase = Math.Max(0, inventoryBase - ingredientBase);
+                                inventoryItem.QuantityInStock = inventoryItem.Unit.FromBaseUnit(newBase);
+                            }
 
-                            inventoryItem.QuantityInStock = Math.Max(0, inventoryItem.QuantityInStock - ingredient.Quantity);
                             inventoryItem.LastModified = DateTime.UtcNow;
-                            await _inventoryRepository.Update(inventoryItem);
+                            inventoryChanges[inventoryItem.Id] = inventoryItem;
                         }
+
+                        if (inventoryChanges.Any() && !await _inventoryRepository.BatchUpdate(inventoryChanges.Values))
+                            return await GetErroRespons($"Could not update inventory for week menu {weekMenuId} after consume", req);
                     }
                 }
 
@@ -494,7 +728,19 @@ namespace Api.Controllers
                             var inventoryItem = allInventory?.FirstOrDefault(i => i.ShopItemId == ingredient.ShopItemId && i.IsActive);
                             if (inventoryItem == null) continue; // No inventory entry — skip, no crash
 
-                            inventoryItem.QuantityInStock += ingredient.Quantity;
+                            var ingredientBase = ingredient.Unit.NormalizeToBaseUnit(ingredient.Quantity);
+                            var inventoryBase = inventoryItem.Unit.NormalizeToBaseUnit(inventoryItem.QuantityInStock);
+
+                            if (double.IsNaN(ingredientBase) || double.IsNaN(inventoryBase))
+                            {
+                                inventoryItem.QuantityInStock += ingredient.Quantity;
+                            }
+                            else
+                            {
+                                var restoredBase = inventoryBase + ingredientBase;
+                                inventoryItem.QuantityInStock = inventoryItem.Unit.FromBaseUnit(restoredBase);
+                            }
+
                             inventoryItem.LastModified = DateTime.UtcNow;
                             await _inventoryRepository.Update(inventoryItem);
                         }

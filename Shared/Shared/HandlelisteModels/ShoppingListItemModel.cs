@@ -16,5 +16,8 @@ namespace Shared.HandlelisteModels
 
         // Set by generate-shoppinglist when inventory quantity fully covers this item's demand
         public bool IsInventoryCovered { get; set; }
+
+        // #75 — True when this item was added via WeekMenu generate-shoppinglist
+        public bool IsMealSourced { get; set; }
     }
 }

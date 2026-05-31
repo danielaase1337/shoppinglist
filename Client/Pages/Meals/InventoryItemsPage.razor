@@ -23,76 +23,92 @@
     {
         @* Freeze shortcut *@
         <div class="card">
-            <h5>🧊 Legg til frossen middag</h5>
-            <div class="row g-2 align-items-end">
-                <div class="col-6">
-                    <label class="form-label">Velg rett som ble laget dobbelt</label>
-                    <select class="form-select" @bind="_freezeRecipeId">
-                        <option value="">-- Velg middag --</option>
-                        @foreach (var recipe in _recipes ?? Enumerable.Empty<MealRecipeModel>())
-                        {
-                            <option value="@recipe.Id">@recipe.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-auto">
-                    <button class="btn btn-info" @onclick="AddFrozenMeal" disabled="@(string.IsNullOrEmpty(_freezeRecipeId) || _saving)">
-                        🧊 Legg til frossen porsjon
-                    </button>
-                </div>
+            <div class="collapse-header" @onclick="() => _freezeOpen = !_freezeOpen">
+                <h5>🧊 Legg til frossen middag</h5>
+                <span class="collapse-arrow">@(_freezeOpen ? "▲" : "▼")</span>
             </div>
+            @if (_freezeOpen)
+            {
+                <div class="collapse-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6">
+                            <label class="form-label">Velg rett som ble laget dobbelt</label>
+                            <select class="form-select" @bind="_freezeRecipeId">
+                                <option value="">-- Velg middag --</option>
+                                @foreach (var recipe in _recipes ?? Enumerable.Empty<MealRecipeModel>())
+                                {
+                                    <option value="@recipe.Id">@recipe.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-info" @onclick="AddFrozenMeal" disabled="@(string.IsNullOrEmpty(_freezeRecipeId) || _saving)">
+                                🧊 Legg til frossen porsjon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
 
         @* Add item form *@
         <div class="card">
-            <h5>Legg til vare</h5>
-            <div class="row g-2 align-items-end">
-                <div class="col-3">
-                    <label class="form-label">Varenavn</label>
-                    @if (!_shopItemsLoaded)
-                    {
-                        <div class="form-control form-control-sm d-flex align-items-center">
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <small class="text-muted">Laster varer...</small>
-                        </div>
-                    }
-                    else
-                    {
-                        <SfAutoComplete TValue="string" TItem="ShopItemModel"
-                                        Placeholder="Søk etter vare..."
-                                        @bind-Value="@_newName"
-                                        DataSource="@_shopItems"
-                                        FilterType="FilterType.Contains"
-                                        Highlight>
-                            <AutoCompleteFieldSettings Value="Name" Text="Name" />
-                            <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
-                                                ValueChange="@OnNewItemShopItemChanged" />
-                        </SfAutoComplete>
-                    }
-                </div>
-                <div class="col-2">
-                    <label class="form-label">Antall på lager</label>
-                    <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newQty" />
-                </div>
-                <div class="col-2">
-                    <label class="form-label">Nedre grense</label>
-                    <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newThreshold" />
-                </div>
-                <div class="col-2">
-                    <label class="form-label">Enhet</label>
-                    <select class="form-select form-select-sm" @bind="_newUnitStr">
-                        @foreach (var u in Enum.GetValues<MealUnit>())
-                        {
-                            <option value="@u">@u.ToNorwegian()</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-auto">
-                    <button type="button" class="btn btn-sm btn-success" @onclick="AddItem" disabled="@(string.IsNullOrWhiteSpace(_newName) || _saving)">
-                        <i class="fas fa-plus"></i> Legg til
-                    </button>
-                </div>
+            <div class="collapse-header" @onclick="() => _addItemOpen = !_addItemOpen">
+                <h5>Legg til vare</h5>
+                <span class="collapse-arrow">@(_addItemOpen ? "▲" : "▼")</span>
             </div>
+            @if (_addItemOpen)
+            {
+                <div class="collapse-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-3">
+                            <label class="form-label">Varenavn</label>
+                            @if (!_shopItemsLoaded)
+                            {
+                                <div class="form-control form-control-sm d-flex align-items-center">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <small class="text-muted">Laster varer...</small>
+                                </div>
+                            }
+                            else
+                            {
+                                <SfAutoComplete TValue="string" TItem="ShopItemModel"
+                                                Placeholder="Søk etter vare..."
+                                                @bind-Value="@_newName"
+                                                DataSource="@_shopItems"
+                                                FilterType="FilterType.Contains"
+                                                Highlight>
+                                    <AutoCompleteFieldSettings Value="Name" Text="Name" />
+                                    <AutoCompleteEvents TItem="ShopItemModel" TValue="string"
+                                                        ValueChange="@OnNewItemShopItemChanged" />
+                                </SfAutoComplete>
+                            }
+                        </div>
+                        <div class="col-2">
+                            <label class="form-label">Antall på lager</label>
+                            <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newQty" />
+                        </div>
+                        <div class="col-2">
+                            <label class="form-label">Nedre grense</label>
+                            <input type="number" step="0.5" min="0" class="form-control form-control-sm" @bind="_newThreshold" />
+                        </div>
+                        <div class="col-2">
+                            <label class="form-label">Enhet</label>
+                            <select class="form-select form-select-sm" @bind="_newUnitStr">
+                                @foreach (var u in Enum.GetValues<MealUnit>())
+                                {
+                                    <option value="@u">@u.ToNorwegian()</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-success" @onclick="AddItem" disabled="@(string.IsNullOrWhiteSpace(_newName) || _saving)">
+                                <i class="fas fa-plus"></i> Legg til
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
 
         @* Inventory table *@
@@ -207,6 +223,8 @@
     private bool                     _shopItemsLoaded = false;
     private bool                     _saving          = false;
     private string?                  _editingId       = null;
+    private bool                     _freezeOpen      = false;
+    private bool                     _addItemOpen     = false;
 
     // Add-item form
     private string _newName       = "";
@@ -466,5 +484,31 @@
 
     .clickable-row:hover {
         color: #0d6efd;
+    }
+
+    .collapse-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+        padding: 4px 0;
+    }
+
+    .collapse-header:hover h5 {
+        color: #4f46e5;
+    }
+
+    .collapse-header h5 {
+        margin: 0;
+    }
+
+    .collapse-arrow {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .collapse-body {
+        padding-top: 12px;
     }
 </style>

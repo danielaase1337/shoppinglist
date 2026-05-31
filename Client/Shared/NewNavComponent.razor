@@ -1,9 +1,6 @@
 ﻿@inject NavigationManager Navigation
 
-
 <nav class="navbar navbar-expand-sm navbar-dark">
-    
-    
     <a class="navbar-brand" href="">The Aase-broen's</a>
 
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#toggler"
@@ -15,33 +12,61 @@
         <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
             <AuthorizeView>
                 <Authorized>
-                    <NavLink class="nav-link" href="shoppinglist">
-                        <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span>  Handlelister
-                    </NavLink>
+                    @if (_planleggingOpen || _adminOpen)
+                    {
+                        <div class="dropdown-backdrop" @onclick="CloseAllDropdowns" @onclick:stopPropagation="false"></div>
+                    }
 
-                    @* Admin functions — click-toggled dropdown (D7: accessible on mobile/touch/keyboard) *@
-                    <li class="nav-item admin-dropdown @(_adminOpen ? "open" : "")">
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/shoppinglist">
+                            <span class="oi oi-arrow-circle-right" aria-hidden="true" style="margin:2px"></span> Handleliste
+                        </NavLink>
+                    </li>
+
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/weekmenus">
+                            <span class="oi oi-calendar" aria-hidden="true" style="margin:2px"></span> Ukesplan
+                        </NavLink>
+                    </li>
+
+                    <li class="nav-item nav-dropdown @(_planleggingOpen ? "open" : "")">
                         <span class="nav-link dropdown-trigger"
                               role="button"
+                              tabindex="0"
                               aria-haspopup="true"
-                              aria-expanded="@_adminOpen"
-                              @onclick="ToggleAdminMenu"
-                              @onclick:stopPropagation="true">
-                            <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Admin <span class="dropdown-arrow">▼</span>
+                              aria-expanded="@_planleggingOpen.ToString().ToLower()"
+                              @onclick="TogglePlanleggingMenu"
+                              @onclick:stopPropagation="true"
+                              @onkeydown="HandlePlanleggingKeyDown"
+                              @onkeydown:stopPropagation="true">
+                            <span class="oi oi-wrench" aria-hidden="true" style="margin:2px"></span> Planlegging <span class="dropdown-arrow">▼</span>
                         </span>
-                        <div class="admin-dropdown-menu">
-                            <NavLink class="dropdown-item" href="/frequent-lists">
-                                <span class="oi oi-list-rich" aria-hidden="true" style="margin:2px"></span> Hyppige Lister
-                            </NavLink>
+                        <div class="nav-dropdown-menu">
                             <NavLink class="dropdown-item" href="/meals">
                                 <span class="oi oi-fork" aria-hidden="true" style="margin:2px"></span> Middager
                             </NavLink>
-                            <NavLink class="dropdown-item" href="/weekmenus">
-                                <span class="oi oi-calendar" aria-hidden="true" style="margin:2px"></span> Ukemeny
+                            <NavLink class="dropdown-item" href="/frequent-lists">
+                                <span class="oi oi-list-rich" aria-hidden="true" style="margin:2px"></span> Hyppige Lister
                             </NavLink>
                             <NavLink class="dropdown-item" href="/inventory">
                                 <span class="oi oi-inbox" aria-hidden="true" style="margin:2px"></span> Lager
                             </NavLink>
+                        </div>
+                    </li>
+
+                    <li class="nav-item nav-dropdown @(_adminOpen ? "open" : "")">
+                        <span class="nav-link dropdown-trigger"
+                              role="button"
+                              tabindex="0"
+                              aria-haspopup="true"
+                              aria-expanded="@_adminOpen.ToString().ToLower()"
+                              @onclick="ToggleAdminMenu"
+                              @onclick:stopPropagation="true"
+                              @onkeydown="HandleAdminKeyDown"
+                              @onkeydown:stopPropagation="true">
+                            <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Administrasjon <span class="dropdown-arrow">▼</span>
+                        </span>
+                        <div class="nav-dropdown-menu">
                             <NavLink class="dropdown-item" href="/familyprofile">
                                 <span class="oi oi-people" aria-hidden="true" style="margin:2px"></span> Familieprofil
                             </NavLink>
@@ -74,27 +99,87 @@
                     </li>
                 </NotAuthorized>
             </AuthorizeView>
-
         </ul>
     </div>
-    
-    
 </nav>
+
 @code {
     private bool collapseNavMenu = true;
-    private bool _adminOpen = false;
+    private bool _planleggingOpen;
+    private bool _adminOpen;
 
     private string NavMenuCssClass => collapseNavMenu ? "collapse navbar-collapse" : "navbar-collapse";
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
-        if (collapseNavMenu) _adminOpen = false;
+        if (collapseNavMenu)
+        {
+            CloseAllDropdowns();
+        }
+    }
+
+    private void TogglePlanleggingMenu()
+    {
+        _planleggingOpen = !_planleggingOpen;
+        if (_planleggingOpen)
+        {
+            _adminOpen = false;
+        }
     }
 
     private void ToggleAdminMenu()
     {
         _adminOpen = !_adminOpen;
+        if (_adminOpen)
+        {
+            _planleggingOpen = false;
+        }
     }
 
+    private void ClosePlanleggingMenu()
+    {
+        _planleggingOpen = false;
+    }
+
+    private void CloseAdminMenu()
+    {
+        _adminOpen = false;
+    }
+
+    private void CloseAllDropdowns()
+    {
+        ClosePlanleggingMenu();
+        CloseAdminMenu();
+    }
+
+    private void HandlePlanleggingKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+            case " ":
+            case "Spacebar":
+                TogglePlanleggingMenu();
+                break;
+            case "Escape":
+                ClosePlanleggingMenu();
+                break;
+        }
+    }
+
+    private void HandleAdminKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+            case " ":
+            case "Spacebar":
+                ToggleAdminMenu();
+                break;
+            case "Escape":
+                CloseAdminMenu();
+                break;
+        }
+    }
 }

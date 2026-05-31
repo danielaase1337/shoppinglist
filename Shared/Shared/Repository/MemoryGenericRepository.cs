@@ -596,13 +596,24 @@ namespace Shared.Repository
                     throw new ArgumentException("Entity must have an ID to be updated", nameof(entityToUpdate));
                 }
 
-                if (_data.TryGetValue(entityToUpdate.Id, out TEntity exiting))
+                if (_data.ContainsKey(entityToUpdate.Id))
                 {
                     _data[entityToUpdate.Id] = entityToUpdate;
+                }
+                else
+                {
+                    _data.Add(entityToUpdate.Id, entityToUpdate);
                 }
 
                 return entityToUpdate;
             });
+        }
+
+        public async Task<bool> BatchUpdate(IEnumerable<TEntity> entities)
+        {
+            foreach (var entity in entities)
+                await Update(entity);
+            return true;
         }
 
         protected async Task<string> GetNextID()
