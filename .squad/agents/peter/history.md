@@ -572,3 +572,47 @@ All Phase 1–5 implementation issues commented with delivery summary and closed
 - OwnerId isolation (#66) is partially addressed structurally but not enforced — remains on hold per D2 v1 decision until auth hardening sprint.
 - Moq pattern finding: `Task<ICollection<T>>` in `.ReturnsAsync()` requires explicit generic parameter — documented in test files and PR description.
 - Decision record filed: `.squad/decisions/inbox/peter-pr-opened.md`
+
+## 2026-XX-XX — Sprint 2 Issue Audit (#74, #75, #76, #72 Decomposition) ✅
+
+**Requested by:** Daniel Aase (triage of "fixed" but still-open issues with `go:needs-research` labels)
+
+### Audit Findings
+
+**#74 (Mark daily meals as consumed)** — 50% Complete
+- ✅ Backend **fully implemented**: `ConsumeMeal` + `UnConsumeMeal` endpoints, deduction logic, inventory guards
+- ❌ Frontend **missing**: No "Mark as eaten" button in `OneWeekMenuPage.razor`, no IsConsumed state UI
+- **Lesson:** Backend-only features are invisible to users. This was marked "fixed" but the UI gap means it's not shipped.
+
+**#75 (Meal-sourced auto-stock on list completion)** — 60% Complete
+- ✅ Backend hook exists: `ShoppingListController.PUT` detects `IsDone: false→true` and auto-increments inventory
+- ✅ Selective tracking works: `StockBehaviour.Track` enum controls which items are tracked
+- ❌ Missing: `ShoppingListItemModel.IsMealSourced` property to distinguish meal-generated items from user-added items
+- **Lesson:** The hook is over-broad (auto-stocks ALL tracked items). For true issue #75 intent, we need a tagging mechanism. Quick 1-hour fix (add 2 properties + update generate endpoint).
+
+**#76 (Purchase unit sizes)** — 80% Complete
+- ✅ Data model **fully present**: `StandardPurchaseQuantity` + `StandardPurchaseUnit` on both Firestore and DTO models
+- ✅ UI already implemented: Three-section display in `OneWeekMenuPage.razor` (buy / maybe / have)
+- ❓ Logic unclear: `generate-shoppinglist` endpoint likely not using purchase units for smart comparison yet. Needs verification in `WeekMenuController.RunGenerateShoppingList()`.
+- **Lesson:** "Fields exist" != "feature works." Field existence without comparison logic is an incomplete feature. Must verify endpoint logic against spec.
+
+**#72 (Smart suggestion engine)** — Not Started
+- Decomposed into 4 sub-tasks:
+  - **#72a (Core engine):** Fetch last 2 weeks, filter used meals, apply category balance → return 7 suggestions. Medium, no blocker.
+  - **#72b (Freshness pairing):** Detect partial-use ingredients, pair recipes to use them same week. Large, depends on #72a + new `ShopItem.IsFresh` property.
+  - **#72c (UI suggestion panel):** Button in `OneWeekMenuPage.razor`, modal with suggestions. Medium, depends on #72a.
+  - **#72d (Statistics dashboard):** Optional future: show usage frequency + category pie chart. Medium, depends on #72a.
+- **Recommendation:** Ship #72a + #72c together (core + UI), defer #72b (freshness) and #72d (stats) to phase 2.
+- **Lesson:** Breaking down large features before implementation clarifies dependencies and unblocks parallel work.
+
+### Decision Record
+
+- Audit output filed at `.squad/decisions/inbox/peter-sprint2-triage.md`
+- Recommendation: Focus Sprint 2 on #74 UI + #75 tagging + #76 verification before marking issues closed
+- #72 decomposition ready for Sprint 3 planning
+
+### Key Learning
+
+- **"Fixed" is ambiguous — distinguish between "data model complete" and "feature shipped."** #75 data hook exists but tagging doesn't, #76 fields exist but logic unverified, #74 backend done but UI missing. Always ask: "What would a user see if they tried to use this right now?" If the answer is "nothing," it's not shipped yet.
+- **Audit often reveals scope creep vs. scope gap:** #74 was originally scoped as a full feature but implementation split implementation across layers. #75 scope was narrower than implementation (hook auto-stocks all items, not just meal-sourced). #76 scope matches implementation partially (model OK, logic TBD).
+- **Dependencies within a single issue matter:** #72 can't ship #72b (freshness pairing) without #72a (core engine). Breaking down before sprint planning prevents starting on the wrong sub-task.
