@@ -276,52 +276,72 @@ namespace Api.Controllers
                     .OrderByDescending(m => m.PopularityScore)
                     .ToList();
 
-                // Target category distribution for a 7-day plan
-                var targets = new List<(Shared.FireStoreDataModels.MealCategory Category, int Count)>
-                {
-                    (Shared.FireStoreDataModels.MealCategory.Fish,     2),
-                    (Shared.FireStoreDataModels.MealCategory.Chicken,  1),
-                    (Shared.FireStoreDataModels.MealCategory.Pasta,    1),
-                    (Shared.FireStoreDataModels.MealCategory.KidsLike, 1),
-                    (Shared.FireStoreDataModels.MealCategory.Meat,     1)
-                    // Remaining slot filled from any category by popularity
-                };
+                // Split into weekend (Effort == Weekend) and weekday pools
+                // Weekend pool → Fri/Sat/Sun (WeekOrder indices 1, 2, 3)
+                // Weekday pool → Thu/Mon/Tue/Wed (WeekOrder indices 0, 4, 5, 6)
+                var weekendPool = eligible
+                    .Where(m => m.Effort == Shared.FireStoreDataModels.MealEffort.Weekend)
+                    .ToList();
+                var weekdayPool = eligible
+                    .Where(m => m.Effort != Shared.FireStoreDataModels.MealEffort.Weekend)
+                    .ToList();
 
-                var suggestions = new List<MealRecipe>();
                 var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                // Fill targeted category slots (highest-popularity within each category wins)
-                foreach (var (cat, count) in targets)
+                // Pick 3 weekend meals; fall back to weekday pool if needed
+                var weekendPicks = new List<MealRecipe>();
+                foreach (var m in weekendPool)
                 {
-                    var picks = eligible
-                        .Where(m => m.Category == cat && !used.Contains(m.Id))
-                        .Take(count);
-                    foreach (var pick in picks)
-                    {
-                        suggestions.Add(pick);
-                        used.Add(pick.Id);
-                    }
+                    if (weekendPicks.Count >= 3) break;
+                    weekendPicks.Add(m);
+                    used.Add(m.Id);
+                }
+                foreach (var m in weekdayPool)
+                {
+                    if (weekendPicks.Count >= 3) break;
+                    if (!used.Contains(m.Id)) { weekendPicks.Add(m); used.Add(m.Id); }
                 }
 
-                // Fill remaining slots up to 7 from highest-popularity eligible meals
-                var remaining = eligible
-                    .Where(m => !used.Contains(m.Id))
-                    .Take(7 - suggestions.Count);
-                foreach (var r in remaining)
+                // Pick 4 weekday meals with interleaved categories (no two consecutive same category)
+                // Round-robin category order for Thu, Mon, Tue, Wed
+                var categoryRota = new[]
                 {
-                    suggestions.Add(r);
-                    used.Add(r.Id);
+                    Shared.FireStoreDataModels.MealCategory.Fish,
+                    Shared.FireStoreDataModels.MealCategory.Chicken,
+                    Shared.FireStoreDataModels.MealCategory.Fish,
+                    Shared.FireStoreDataModels.MealCategory.Meat,
+                    Shared.FireStoreDataModels.MealCategory.Pasta,
+                    Shared.FireStoreDataModels.MealCategory.KidsLike,
+                    Shared.FireStoreDataModels.MealCategory.Vegetarian,
+                    Shared.FireStoreDataModels.MealCategory.Other
+                };
+
+                var weekdayPicks = new List<MealRecipe>();
+                foreach (var cat in categoryRota)
+                {
+                    if (weekdayPicks.Count >= 4) break;
+                    var pick = weekdayPool.FirstOrDefault(m => m.Category == cat && !used.Contains(m.Id));
+                    if (pick != null) { weekdayPicks.Add(pick); used.Add(pick.Id); }
+                }
+                // Fill remaining weekday slots from any eligible
+                foreach (var m in weekdayPool.Concat(eligible))
+                {
+                    if (weekdayPicks.Count >= 4) break;
+                    if (!used.Contains(m.Id)) { weekdayPicks.Add(m); used.Add(m.Id); }
                 }
 
-                // Fallback: if the eligible pool is exhausted, allow recently-used meals to fill the plan
-                if (suggestions.Count < 7)
-                {
-                    var fallback = activeMeals
-                        .Where(m => !used.Contains(m.Id))
-                        .OrderByDescending(m => m.PopularityScore)
-                        .Take(7 - suggestions.Count);
-                    suggestions.AddRange(fallback);
-                }
+                // Assemble in WeekOrder: [Thu(0), Fri(1), Sat(2), Sun(3), Mon(4), Tue(5), Wed(6)]
+                // Weekend slots: 1, 2, 3 — Weekday slots: 0, 4, 5, 6
+                var slotted = new MealRecipe[7];
+                slotted[0] = weekdayPicks.ElementAtOrDefault(0); // Thu
+                slotted[1] = weekendPicks.ElementAtOrDefault(0); // Fri
+                slotted[2] = weekendPicks.ElementAtOrDefault(1); // Sat
+                slotted[3] = weekendPicks.ElementAtOrDefault(2); // Sun
+                slotted[4] = weekdayPicks.ElementAtOrDefault(1); // Mon
+                slotted[5] = weekdayPicks.ElementAtOrDefault(2); // Tue
+                slotted[6] = weekdayPicks.ElementAtOrDefault(3); // Wed
+
+                var suggestions = slotted.Where(m => m != null).ToList();
 
                 var models = _mapper.Map<List<MealRecipeModel>>(suggestions);
                 var response = req.CreateResponse(HttpStatusCode.OK);

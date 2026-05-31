@@ -396,7 +396,6 @@
         }
 
         _recipesLoaded = true;
-        ApplyFridaySuggestion();
     }
 
     private DailyMealModel GetOrCreateDailyMeal(DayOfWeek day)
@@ -473,28 +472,6 @@
     {
         _dismissedIngredientIds.Add(shopItemId);
         _useUpSuggestions.RemoveAll(s => s.IngredientShopItemId == shopItemId);
-    }
-
-    private void ApplyFridaySuggestion()
-    {
-        if (_recipes == null || !_recipes.Any()) return;
-
-        var friday = GetOrCreateDailyMeal(DayOfWeek.Friday);
-        if (!string.IsNullOrEmpty(friday.MealRecipeId)) return;
-
-        var suggestion = _recipes
-            .Where(r => r.IsActive)
-            .OrderByDescending(r => r.PopularityScore)
-            .FirstOrDefault(r =>
-                r.Category == MealCategory.KidsLike ||
-                r.Name.Contains("pizza", StringComparison.OrdinalIgnoreCase));
-
-        if (suggestion != null)
-        {
-            friday.MealRecipeId = suggestion.Id;
-            friday.MealRecipeName = suggestion.Name;
-            friday.IsSuggested = true;
-        }
     }
 
     private IEnumerable<MealRecipeModel> GetSortedRecipes()
