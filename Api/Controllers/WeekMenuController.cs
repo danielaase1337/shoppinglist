@@ -290,12 +290,13 @@ namespace Api.Controllers
 
                 // Pick 3 weekend meals; reserve Friday for pizza when available, then fall back to weekday pool if needed
                 var weekendPicks = new List<MealRecipe>();
-                var fridayPizza = weekendPool.FirstOrDefault(m => m.Name != null && m.Name.ToLower().Contains("pizza"));
+                var fridayPizza = eligible.FirstOrDefault(m => m.Name != null && m.Name.ToLower().Contains("pizza"));
                 if (fridayPizza != null)
                 {
                     weekendPicks.Add(fridayPizza);
                     used.Add(fridayPizza.Id);
                     weekendPool.Remove(fridayPizza);
+                    weekdayPool.Remove(fridayPizza);
                 }
 
                 foreach (var m in weekendPool)
