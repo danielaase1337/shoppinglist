@@ -8,9 +8,11 @@ using Shared.HandlelisteModels;
 using Shared.Repository;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Api.Controllers
 {
@@ -214,6 +216,141 @@ namespace Api.Controllers
             }
         }
 
+        // #72a — Suggest a balanced 7-day meal plan based on recent history and category targets
+        [Function("weekmenu-suggest")]
+        public async Task<HttpResponseData> SuggestMenu(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "weekmenu/suggest")] HttpRequestData req)
+        {
+            try
+            {
+                // Parse optional weekNumber / year from query string; default to current ISO week
+                var qs = HttpUtility.ParseQueryString(req.Url.Query);
+                var today = DateTime.UtcNow;
+                int currentWeek = ISOWeek.GetWeekOfYear(today);
+                int currentYear = today.Year;
+
+                if (!int.TryParse(qs["weekNumber"], out int targetWeek)) targetWeek = currentWeek;
+                if (!int.TryParse(qs["year"], out int targetYear)) targetYear = currentYear;
+
+                // Collect the two preceding ISO week numbers (handles year boundary)
+                var recentWeeks = GetPreviousWeeks(targetWeek, targetYear, 2);
+
+                // Fetch all week menus and filter to the history window
+                var allMenus = await _repository.Get() ?? new List<WeekMenu>();
+                var recentMenus = allMenus
+                    .Where(m => m.IsActive && recentWeeks.Any(w => w.Week == m.WeekNumber && w.Year == m.Year))
+                    .ToList();
+
+                // Collect recipe IDs used in the history window
+                var recentlyUsedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var menu in recentMenus)
+                {
+                    foreach (var daily in menu.DailyMeals ?? Enumerable.Empty<DailyMeal>())
+                    {
+                        if (!string.IsNullOrEmpty(daily.MealRecipeId))
+                            recentlyUsedIds.Add(daily.MealRecipeId);
+                    }
+                }
+
+                // Fetch all active meals; guard against null Id (legacy Firestore documents)
+                var allMeals = await _mealRepository.Get() ?? new List<MealRecipe>();
+                var activeMeals = allMeals
+                    .Where(m => m.IsActive && m.Id != null)
+                    .ToList();
+
+                if (!activeMeals.Any())
+                {
+                    var emptyResp = req.CreateResponse(HttpStatusCode.OK);
+                    await emptyResp.WriteAsJsonAsync(new List<MealRecipeModel>());
+                    return emptyResp;
+                }
+
+                // Celebration meals are always eligible regardless of recent history
+                var eligible = activeMeals
+                    .Where(m => m.Category == Shared.FireStoreDataModels.MealCategory.Celebration
+                                || !recentlyUsedIds.Contains(m.Id))
+                    .OrderByDescending(m => m.PopularityScore)
+                    .ToList();
+
+                // Target category distribution for a 7-day plan
+                var targets = new List<(Shared.FireStoreDataModels.MealCategory Category, int Count)>
+                {
+                    (Shared.FireStoreDataModels.MealCategory.Fish,     2),
+                    (Shared.FireStoreDataModels.MealCategory.Chicken,  1),
+                    (Shared.FireStoreDataModels.MealCategory.Pasta,    1),
+                    (Shared.FireStoreDataModels.MealCategory.KidsLike, 1),
+                    (Shared.FireStoreDataModels.MealCategory.Meat,     1)
+                    // Remaining slot filled from any category by popularity
+                };
+
+                var suggestions = new List<MealRecipe>();
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Fill targeted category slots (highest-popularity within each category wins)
+                foreach (var (cat, count) in targets)
+                {
+                    var picks = eligible
+                        .Where(m => m.Category == cat && !used.Contains(m.Id))
+                        .Take(count);
+                    foreach (var pick in picks)
+                    {
+                        suggestions.Add(pick);
+                        used.Add(pick.Id);
+                    }
+                }
+
+                // Fill remaining slots up to 7 from highest-popularity eligible meals
+                var remaining = eligible
+                    .Where(m => !used.Contains(m.Id))
+                    .Take(7 - suggestions.Count);
+                foreach (var r in remaining)
+                {
+                    suggestions.Add(r);
+                    used.Add(r.Id);
+                }
+
+                // Fallback: if the eligible pool is exhausted, allow recently-used meals to fill the plan
+                if (suggestions.Count < 7)
+                {
+                    var fallback = activeMeals
+                        .Where(m => !used.Contains(m.Id))
+                        .OrderByDescending(m => m.PopularityScore)
+                        .Take(7 - suggestions.Count);
+                    suggestions.AddRange(fallback);
+                }
+
+                var models = _mapper.Map<List<MealRecipeModel>>(suggestions);
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                await response.WriteAsJsonAsync(models);
+                return response;
+            }
+            catch (Exception e)
+            {
+                var msg = "Something went wrong generating menu suggestions";
+                _logger.LogError(e, msg);
+                return await GetErroRespons(msg, req);
+            }
+        }
+
+        /// <summary>Returns the <paramref name="count"/> ISO weeks immediately before the given week/year pair.</summary>
+        private static List<(int Week, int Year)> GetPreviousWeeks(int weekNumber, int year, int count)
+        {
+            var result = new List<(int, int)>();
+            int w = weekNumber;
+            int y = year;
+            for (int i = 0; i < count; i++)
+            {
+                w--;
+                if (w < 1)
+                {
+                    y--;
+                    w = ISOWeek.GetWeeksInYear(y);
+                }
+                result.Add((w, y));
+            }
+            return result;
+        }
+
         [Function("weekmenugenerateshoppinglist")]
         public async Task<HttpResponseData> RunGenerateShoppingList([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "weekmenu/{id}/generate-shoppinglist")] HttpRequestData req, string id)
         {
@@ -305,7 +442,8 @@ namespace Api.Controllers
                     {
                         Varen = varen,
                         Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                        IsDone = false
+                        IsDone = false,
+                        IsMealSourced = true
                     };
                 }).ToList();
 
