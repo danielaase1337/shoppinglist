@@ -305,7 +305,8 @@ namespace Api.Controllers
                     {
                         Varen = varen,
                         Mengde = (int)Math.Ceiling(kvp.Value.Quantity),
-                        IsDone = false
+                        IsDone = false,
+                        IsMealSourced = true
                     };
                 }).ToList();
 

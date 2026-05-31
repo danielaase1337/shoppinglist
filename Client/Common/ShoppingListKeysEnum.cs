@@ -35,6 +35,8 @@ namespace BlazorApp.Client.Common
         WeekMenuConsume = 22,
         WeekMenuSwap = 23,
         // #81 — Undo consume
-        WeekMenuUnconsume = 24
+        WeekMenuUnconsume = 24,
+        // #72a — Suggest a 7-day meal plan
+        WeekMenuSuggest = 25
     }
 }
