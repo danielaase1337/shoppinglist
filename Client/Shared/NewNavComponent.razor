@@ -20,13 +20,20 @@
                     </NavLink>
 
                     @* Admin functions — click-toggled dropdown (D7: accessible on mobile/touch/keyboard) *@
+                    @if (_adminOpen)
+                    {
+                        <div class="dropdown-backdrop" @onclick="CloseAdminMenu" @onclick:stopPropagation="false"></div>
+                    }
                     <li class="nav-item admin-dropdown @(_adminOpen ? "open" : "")">
                         <span class="nav-link dropdown-trigger"
                               role="button"
+                              tabindex="0"
                               aria-haspopup="true"
-                              aria-expanded="@_adminOpen"
+                              aria-expanded="@_adminOpen.ToString().ToLower()"
                               @onclick="ToggleAdminMenu"
-                              @onclick:stopPropagation="true">
+                              @onclick:stopPropagation="true"
+                              @onkeydown="HandleAdminKeyDown"
+                              @onkeydown:stopPropagation="true">
                             <span class="oi oi-cog" aria-hidden="true" style="margin:2px"></span> Admin <span class="dropdown-arrow">▼</span>
                         </span>
                         <div class="admin-dropdown-menu">
@@ -95,6 +102,25 @@
     private void ToggleAdminMenu()
     {
         _adminOpen = !_adminOpen;
+    }
+
+    private void CloseAdminMenu()
+    {
+        _adminOpen = false;
+    }
+
+    private void HandleAdminKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+            case " ":
+                _adminOpen = !_adminOpen;
+                break;
+            case "Escape":
+                _adminOpen = false;
+                break;
+        }
     }
 
 }
