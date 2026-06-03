@@ -505,6 +505,8 @@ else
         liste.LastModified = DateTime.UtcNow;
         
         await Http.PutAsJsonAsync<ShoppingListModel>(Settings.GetApiUrl(ShoppingListKeysEnum.ShoppingLists), ThisShoppingList);
+        DataCache.InvalidateShoppingListCache(liste.Id);
+        DataCache.InvalidateShoppingListsCache();
     }
 
     public async Task VareMengdeFocusLost()
@@ -517,12 +519,11 @@ else
     {
         var completed = ThisShoppingList.ShoppingItems.Where(f => f.IsDone).ToList();
 
-
         foreach (var item in completed)
         {
-            var url = await Http.DeleteAsync(Settings.GetApiUrlId(ShoppingListKeysEnum.ShopItem, item.Id));
             ThisShoppingList.ShoppingItems.Remove(item);
         }
+        await UpdateShoppinglist(ThisShoppingList);
         FilterList(activeListFiler);
     }
     public void FilterList(object value)

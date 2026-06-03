@@ -86,6 +86,18 @@
 
 ## Learnings & Tech Details
 
+### 2026-05-10 — Shopping List Item Persistence Bug Investigation
+
+**Root cause confirmed: `UpdateShoppinglist` never invalidates `DataCacheService` after PUT.**
+
+- `OneShoppingListPage.razor:502–508`: `UpdateShoppinglist` calls `Http.PutAsJsonAsync` but does **not** call `DataCache.InvalidateShoppingListCache(liste.Id)`. The PUT reaches the API/Firestore correctly — the data IS saved.
+- `DataCacheService.cs:62`: `_detailsCacheTtl = TimeSpan.FromMinutes(10)`. On navigation back within 10 minutes, `OnParametersSetAsync` calls `DataCache.GetShoppingListAsync(Id)` → cache HIT → returns the stale pre-add snapshot.
+- The specific scenario (generated list → add items → navigate away → items gone) maps exactly to this: WeekMenuPage POSTs a new list, navigates to it, user adds items, cache is populated but never updated after the PUT, items disappear on return.
+- Secondary: `UpdateShoppinglist` discards the PUT response entirely. `DeleteVare` (correct pattern) reads back `ThisShoppingList = await updated.Content.ReadFromJsonAsync<ShoppingListModel>()`.
+- Separate bug: `DeleteAllClicked` calls `Settings.GetApiUrlId(ShoppingListKeysEnum.ShopItem, item.Id)` → deletes the **global product** from the catalogue, not the list entry.
+- **Fix required:** Add `DataCache.InvalidateShoppingListCache(liste.Id)` inside `UpdateShoppinglist`, and optionally read back the PUT response. WeekMenuPage `SaveShoppingList()` should also call `DataCache.InvalidateShoppingListsCache()` after POST.
+- **Key lesson:** Any service that uses a timed cache must be invalidated on every write. In Blazor WASM with a singleton `DataCacheService`, forgetting to call `Invalidate*` after a PUT is an invisible silent failure — the API has correct data but the client serves stale data indefinitely until TTL expires.
+
 ### 2026-05-29 — Meal Ingredient Inline Edit (#70) ✅ COMPLETE
 
 **Inline edit pattern for meal ingredients on `OneMealRecipePage.razor`**
