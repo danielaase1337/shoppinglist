@@ -354,19 +354,66 @@ namespace Api.Tests.Controllers
                 .Setup(r => r.Get())
                 .Returns(Task.FromResult<ICollection<InventoryItem>>(new List<InventoryItem> { inventoryItem }));
             _mockInventoryRepo
-                .Setup(r => r.Update(It.IsAny<InventoryItem>()))
-                .ReturnsAsync((InventoryItem inv) => inv);
+                .Setup(r => r.BatchUpdate(It.IsAny<IEnumerable<InventoryItem>>()))
+                .ReturnsAsync(true);
 
             var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(updatedModel));
 
             // Act
             var response = await _controller.RunAll(request);
 
-            // Assert: inventory Update was called for the matching item
+            // Assert: BatchUpdate called once with updated quantity
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            _mockInventoryRepo.Verify(r => r.Update(It.Is<InventoryItem>(
-                inv => inv.ShopItemId == shopItemId && inv.QuantityInStock == 3.0 // 1.0 + 2 (Mengde)
+            _mockInventoryRepo.Verify(r => r.BatchUpdate(It.Is<IEnumerable<InventoryItem>>(
+                items => items.Any(inv => inv.ShopItemId == shopItemId && inv.QuantityInStock == 3.0) // 1.0 + 2 (Mengde)
             )), Times.Once);
+            _mockInventoryRepo.Verify(r => r.Update(It.IsAny<InventoryItem>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task Update_BatchesAllInventoryWritesInOneCall_WhenMultipleItemsTransition()
+        {
+            // Arrange: list with three trackable items — two existing in inventory, one new
+            var existingInv1 = new InventoryItem { Id = "inv-melk", ShopItemId = "item-melk", ShopItemName = "Melk", QuantityInStock = 1.0, IsActive = true };
+            var existingInv2 = new InventoryItem { Id = "inv-egg", ShopItemId = "item-egg", ShopItemName = "Egg", QuantityInStock = 6.0, IsActive = true };
+
+            var existing = new ShoppingList { Id = "list-2", IsDone = false, ShoppingItems = new List<ShoppingListItem>() };
+
+            var updatedModel = new ShoppingListModel
+            {
+                Id = "list-2",
+                IsDone = true,
+                ShoppingItems = new List<ShoppingListItemModel>
+                {
+                    new() { Varen = new ShopItemModel { Id = "item-melk", Name = "Melk", ItemCategory = new ItemCategoryModel() }, Mengde = 2 },
+                    new() { Varen = new ShopItemModel { Id = "item-egg",  Name = "Egg",  ItemCategory = new ItemCategoryModel() }, Mengde = 12 },
+                    new() { Varen = new ShopItemModel { Id = "item-ost",  Name = "Ost",  ItemCategory = new ItemCategoryModel() }, Mengde = 1 }, // new, not in inventory yet
+                }
+            };
+
+            _mockRepo.Setup(r => r.Get("list-2")).ReturnsAsync(existing);
+            _mockRepo.Setup(r => r.Update(It.IsAny<ShoppingList>())).ReturnsAsync(new ShoppingList { Id = "list-2", IsDone = true, ShoppingItems = new List<ShoppingListItem>() });
+            _mockInventoryRepo
+                .Setup(r => r.Get())
+                .Returns(Task.FromResult<ICollection<InventoryItem>>(new List<InventoryItem> { existingInv1, existingInv2 }));
+            _mockInventoryRepo
+                .Setup(r => r.BatchUpdate(It.IsAny<IEnumerable<InventoryItem>>()))
+                .ReturnsAsync(true);
+
+            var request = TestHttpFactory.CreatePutRequest(JsonSerializer.Serialize(updatedModel));
+
+            // Act
+            var response = await _controller.RunAll(request);
+
+            // Assert: single BatchUpdate call with all 3 items — N+1 pattern avoided
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            _mockInventoryRepo.Verify(r => r.BatchUpdate(It.Is<IEnumerable<InventoryItem>>(items =>
+                items.Count() == 3 &&
+                items.Any(i => i.ShopItemId == "item-melk" && i.QuantityInStock == 3.0) &&  // 1.0 + 2
+                items.Any(i => i.ShopItemId == "item-egg"  && i.QuantityInStock == 18.0) && // 6.0 + 12
+                items.Any(i => i.ShopItemId == "item-ost"  && i.QuantityInStock == 1.0)     // new item
+            )), Times.Once);
+            _mockInventoryRepo.Verify(r => r.Update(It.IsAny<InventoryItem>()), Times.Never);
         }
     }
 }
